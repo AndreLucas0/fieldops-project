@@ -1,0 +1,76 @@
+### FieldOps — ambiente local de desenvolvimento (docs/arquitetura.md §11.12)
+###
+### Sobe apenas a infraestrutura compartilhada (banco de dados e
+### armazenamento de evidências compatível com S3, conforme sugerido em
+### §11.8). Cada aplicação (API, mobile, interface administrativa) roda
+### fora deste arquivo, no seu próprio processo/repositório, apontando para
+### os serviços aqui expostos via .env (ver .env.example).
+###
+### Uso:
+###   cp .env.example .env
+###   docker compose up -d
+###   docker compose --profile tools up -d   # inclui o Adminer (opcional)
+###
+### O banco sobe com o schema de validação (db/schema.sql) e o dataset de
+### demonstração (db/seed.sql) já aplicados na primeira inicialização, via
+### docker-entrypoint-initdb.d — isso só roda quando o volume é criado pela
+### primeira vez. Para reaplicar depois de alterar o seed:
+###   docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /docker-entrypoint-initdb.d/20-seed.sql
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-fieldops}
+      POSTGRES_USER: ${DB_USER:-fieldops}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-fieldops}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - fieldops_db_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/20-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-fieldops} -d ${DB_NAME:-fieldops}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Armazenamento de evidências compatível com S3 para desenvolvimento local
+  # (docs/arquitetura.md §11.8 — "poderá ser utilizado ... serviço
+  # compatível com S3"). Em produção, um provedor de objetos gerenciado
+  # substitui este serviço; a API só precisa apontar para outro endpoint.
+  evidence-storage:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${EVIDENCE_STORAGE_ACCESS_KEY:-fieldops}
+      MINIO_ROOT_PASSWORD: ${EVIDENCE_STORAGE_SECRET_KEY:-fieldops123}
+    ports:
+      - "${EVIDENCE_STORAGE_PORT:-9000}:9000"
+      - "${EVIDENCE_STORAGE_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - fieldops_evidence_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Cliente web opcional para inspecionar o banco sem instalar nada além do
+  # Docker. Não sobe por padrão — só com `--profile tools`.
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    profiles: ["tools"]
+    ports:
+      - "${ADMINER_PORT:-8081}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  fieldops_db_data:
+  fieldops_evidence_data:

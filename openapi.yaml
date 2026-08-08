@@ -1,0 +1,3230 @@
+openapi: 3.0.3
+
+info:
+  title: FieldOps API
+  version: "1.0.0"
+  description: |
+    Contrato REST oficial do FieldOps — fonte única de verdade para o aplicativo
+    mobile (Expo/React Native), a interface administrativa (Angular) e a API
+    (Java/Spring Boot).
+
+    Este arquivo foi derivado de `docs/api-rest.md`, `docs/modelo-de-dados.md`,
+    `docs/regras-de-negocio.md` e `docs/criterios-de-aceitacao.md`. Onde a
+    documentação de origem deixava mais de uma opção em aberto, uma decisão foi
+    tomada aqui e registrada abaixo para que o time (e a IA) parem de reinventar
+    o contrato a cada sessão de desenvolvimento.
+
+    ## Decisões de normalização tomadas neste contrato
+
+    1. **Sincronização (RF 12.15):** o documento de origem permitia endpoint
+       combinado OU endpoints separados. Foi escolhido o par
+       `POST /mobile/sync/push` + `GET /mobile/sync/pull`, por separar
+       claramente o envio idempotente (outbox) da leitura incremental por
+       cursor, o que facilita testar cada lado isoladamente.
+    2. **Nomes de parâmetro de caminho:** todos os subrecursos de uma inspeção
+       usam `{inspectionId}` (o documento de origem alternava entre `{id}` e
+       `{inspectionId}` nas seções 12.10 e 12.14).
+    3. **Construtor de modelo (RF 12.9):** `POST/PUT .../sections` e
+       `.../items` operam implicitamente sobre a versão em rascunho (`DRAFT`)
+       do `InspectionTemplate`, já que RN-018 permite alteração livre apenas
+       nesse estado. Não existe endpoint para editar seções/itens de uma
+       versão já publicada (RN-019).
+    4. **Criação de inspeção:** `technicianId` é obrigatório em
+       `POST /inspections` porque RN-025 lista técnico como atributo
+       obrigatório da inspeção. `POST /inspections/{inspectionId}/assign`
+       fica reservado para reatribuição (troca de técnico) em uma inspeção já
+       existente.
+    5. **Tipos de resposta:** o enum `ResponseType` desta versão do contrato
+       inclui somente os 7 tipos obrigatórios do MVP (seção 8.5 de
+       `funcionalidades.md`). Tipos P1 (seleção múltipla, assinatura etc.)
+       devem ser adicionados ao enum quando entrarem em escopo — não antes,
+       para não permitir que o backend aceite publicações com tipos que o
+       app ainda não sabe renderizar (RN-023).
+    6. **Site/Equipment imutáveis após criação:** `clientId` (em Site) e
+       `siteId`/`qrCode` (em Equipment) não aparecem nos DTOs de atualização.
+       A documentação de origem não previa realocação de local/cliente; se
+       isso vier a ser necessário, deve ser uma decisão de produto explícita,
+       não um efeito colateral de um PUT genérico.
+
+    Qualquer alteração incompatível deste contrato deve seguir a política da
+    seção 12.18 de `docs/api-rest.md` (nova versão ou plano de migração
+    explícito).
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Ambiente local de desenvolvimento
+  - url: https://api-integracao.fieldops.local/api/v1
+    description: Ambiente de integração contínua
+
+tags:
+  - name: Auth
+    description: Autenticação, sessão e emissão/renovação de token.
+  - name: Users
+    description: Gerenciamento de usuários e perfis (contexto Identidade e acesso).
+  - name: Clients
+    description: Cadastro de clientes (contexto Cadastros).
+  - name: Sites
+    description: Cadastro de locais de inspeção (contexto Cadastros).
+  - name: Equipment
+    description: Cadastro de equipamentos (contexto Cadastros).
+  - name: Inspection Templates
+    description: Modelos de inspeção, versões, seções e itens.
+  - name: Inspections
+    description: Planejamento, execução e ciclo de vida da inspeção.
+  - name: Mobile
+    description: Endpoints filtrados pelo usuário técnico autenticado.
+  - name: Responses
+    description: Respostas do checklist.
+  - name: Evidence
+    description: Upload e consulta de evidências.
+  - name: Non-Conformities
+    description: Registro e acompanhamento de não conformidades.
+  - name: Reviews
+    description: Revisão, aprovação e reprovação de inspeções.
+  - name: Synchronization
+    description: Outbox, idempotência e sincronização offline-first.
+  - name: Dashboard
+    description: Indicadores administrativos (P1, resumo básico no MVP).
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  # ============================================================
+  # AUTH
+  # ============================================================
+  /auth/login:
+    post:
+      operationId: login
+      tags: [Auth]
+      summary: Autenticar usuário (UC-01, AC-AUTH)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Sessão criada com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Credenciais inválidas ou usuário inativo (AC-AUTH). A mensagem não deve revelar se o e-mail existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [Auth]
+      summary: Renovar sessão a partir do refresh token (AC-AUTH — token expirado)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Nova sessão emitida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [Auth]
+      summary: Encerrar sessão (AC-AUTH — logout)
+      responses:
+        '204':
+          description: Sessão encerrada. Dados sensíveis da sessão devem ser removidos pelo cliente.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [Auth]
+      summary: Consultar usuário autenticado
+      responses:
+        '200':
+          description: Dados mínimos do usuário autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================
+  # USERS
+  # ============================================================
+  /users:
+    get:
+      operationId: listUsers
+      tags: [Users]
+      summary: Listar usuários (somente ADMIN)
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+        - name: name
+          in: query
+          schema: { type: string }
+        - name: email
+          in: query
+          schema: { type: string }
+        - name: role
+          in: query
+          schema: { $ref: '#/components/schemas/UserRole' }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/UserStatus' }
+      responses:
+        '200':
+          description: Página de usuários.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createUser
+      tags: [Users]
+      summary: Cadastrar usuário (AC-USERS)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateRequest'
+      responses:
+        '201':
+          description: Usuário criado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: E-mail já cadastrado (AC-USERS — e-mail não pode ser duplicado).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [Users]
+      summary: Consultar usuário por id
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Usuário encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateUser
+      tags: [Users]
+      summary: Atualizar usuário
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '200':
+          description: Usuário atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /users/{id}/status:
+    patch:
+      operationId: updateUserStatus
+      tags: [Users]
+      summary: Ativar, inativar ou bloquear usuário (RN-001, RN-002, RN-008)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserStatusUpdateRequest'
+      responses:
+        '200':
+          description: >
+            Situação atualizada. Conforme RN-008, a troca para INACTIVE ou
+            BLOCKED deve invalidar sessões ativas do usuário.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/reset-password:
+    post:
+      operationId: resetUserPassword
+      tags: [Users]
+      summary: Solicitar redefinição de senha de um usuário
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Solicitação processada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResetPasswordResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # CLIENTS
+  # ============================================================
+  /clients:
+    get:
+      operationId: listClients
+      tags: [Clients]
+      summary: Listar clientes (AC-MASTER)
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+        - name: name
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ActiveStatus' }
+      responses:
+        '200':
+          description: Página de clientes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createClient
+      tags: [Clients]
+      summary: Cadastrar cliente (RN-009, AC-MASTER — nome obrigatório)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientCreateRequest'
+      responses:
+        '201':
+          description: Cliente criado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /clients/{id}:
+    get:
+      operationId: getClient
+      tags: [Clients]
+      summary: Consultar cliente por id
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Cliente encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateClient
+      tags: [Clients]
+      summary: Atualizar cliente
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientUpdateRequest'
+      responses:
+        '200':
+          description: Cliente atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /clients/{id}/status:
+    patch:
+      operationId: updateClientStatus
+      tags: [Clients]
+      summary: Ativar ou inativar cliente (RN-013 — inativação em vez de exclusão física)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatusUpdateRequest'
+      responses:
+        '200':
+          description: >
+            Situação atualizada. Cliente inativo não poderá ser selecionado
+            em novos agendamentos (AC-MASTER), mas continua vinculado a
+            inspeções históricas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /clients/{clientId}/sites:
+    get:
+      operationId: listClientSites
+      tags: [Sites]
+      summary: Listar locais de um cliente (AC-MASTER — filtro em cascata)
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ActiveStatus' }
+      responses:
+        '200':
+          description: Página de locais do cliente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SitePage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # SITES
+  # ============================================================
+  /sites:
+    get:
+      operationId: listSites
+      tags: [Sites]
+      summary: Listar locais
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+        - name: clientId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: name
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ActiveStatus' }
+      responses:
+        '200':
+          description: Página de locais.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SitePage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createSite
+      tags: [Sites]
+      summary: Cadastrar local (RN-009 — todo local deve pertencer a um cliente)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteCreateRequest'
+      responses:
+        '201':
+          description: Local criado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionSite'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Cliente inexistente, inativo ou dados inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /sites/{id}:
+    get:
+      operationId: getSite
+      tags: [Sites]
+      summary: Consultar local por id
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Local encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionSite'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateSite
+      tags: [Sites]
+      summary: Atualizar local
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteUpdateRequest'
+      responses:
+        '200':
+          description: Local atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionSite'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /sites/{id}/status:
+    patch:
+      operationId: updateSiteStatus
+      tags: [Sites]
+      summary: Ativar ou inativar local
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatusUpdateRequest'
+      responses:
+        '200':
+          description: >
+            Situação atualizada. Local inativo não pode receber nova
+            inspeção (AC-MASTER).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionSite'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /sites/{siteId}/equipment:
+    get:
+      operationId: listSiteEquipment
+      tags: [Equipment]
+      summary: Listar equipamentos de um local (AC-MASTER — filtro em cascata)
+      parameters:
+        - name: siteId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/EquipmentStatus' }
+      responses:
+        '200':
+          description: Página de equipamentos do local.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EquipmentPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # EQUIPMENT
+  # ============================================================
+  /equipment:
+    get:
+      operationId: listEquipment
+      tags: [Equipment]
+      summary: Listar equipamentos
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+        - name: siteId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: assetNumber
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/EquipmentStatus' }
+      responses:
+        '200':
+          description: Página de equipamentos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EquipmentPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createEquipment
+      tags: [Equipment]
+      summary: Cadastrar equipamento (RN-010, RN-011 — QR Code único)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EquipmentCreateRequest'
+      responses:
+        '201':
+          description: Equipamento criado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Equipment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: QR Code já utilizado por outro equipamento (RN-011).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /equipment/{id}:
+    get:
+      operationId: getEquipment
+      tags: [Equipment]
+      summary: Consultar equipamento por id
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Equipamento encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Equipment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateEquipment
+      tags: [Equipment]
+      summary: Atualizar equipamento
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EquipmentUpdateRequest'
+      responses:
+        '200':
+          description: Equipamento atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Equipment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /equipment/by-qr/{qrCode}:
+    get:
+      operationId: getEquipmentByQrCode
+      tags: [Equipment]
+      summary: Identificar equipamento por QR Code (UC-08, RN-063, RN-064)
+      description: >
+        A busca deve ocorrer primeiro nos dados autorizados ao usuário
+        autenticado (AC-QR). Não deve, sozinha, autorizar acesso a
+        equipamento fora do escopo do usuário.
+      parameters:
+        - name: qrCode
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Equipamento encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Equipment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Equipamento não localizado ou fora do escopo do usuário (AC-QR).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /equipment/{id}/status:
+    patch:
+      operationId: updateEquipmentStatus
+      tags: [Equipment]
+      summary: Ativar, inativar ou baixar equipamento (RN-012)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EquipmentStatusUpdateRequest'
+      responses:
+        '200':
+          description: >
+            Situação atualizada. Equipamento inativo ou baixado não pode ser
+            utilizado em nova inspeção (RN-012, AC-MASTER).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Equipment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # INSPECTION TEMPLATES
+  # ============================================================
+  /inspection-templates:
+    get:
+      operationId: listInspectionTemplates
+      tags: [Inspection Templates]
+      summary: Listar modelos de inspeção
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/TemplateStatus' }
+      responses:
+        '200':
+          description: Página de modelos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionTemplatePage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createInspectionTemplate
+      tags: [Inspection Templates]
+      summary: Criar modelo em rascunho (UC-04, AC-TEMPLATE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InspectionTemplateCreateRequest'
+      responses:
+        '201':
+          description: Modelo criado em rascunho.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionTemplate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /inspection-templates/{id}:
+    get:
+      operationId: getInspectionTemplate
+      tags: [Inspection Templates]
+      summary: Consultar modelo por id
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Modelo encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionTemplate'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateInspectionTemplate
+      tags: [Inspection Templates]
+      summary: Atualizar dados gerais do modelo (título, descrição, categoria)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InspectionTemplateUpdateRequest'
+      responses:
+        '200':
+          description: Modelo atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionTemplate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /inspection-templates/{id}/sections:
+    post:
+      operationId: createTemplateSection
+      tags: [Inspection Templates]
+      summary: Criar seção na versão em rascunho do modelo (RN-017, RN-018)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateSectionCreateRequest'
+      responses:
+        '201':
+          description: Seção criada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateSection'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: O modelo não possui uma versão em rascunho editável (RN-019).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /inspection-templates/{id}/sections/{sectionId}:
+    put:
+      operationId: updateTemplateSection
+      tags: [Inspection Templates]
+      summary: Atualizar seção da versão em rascunho
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+        - name: sectionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateSectionUpdateRequest'
+      responses:
+        '200':
+          description: Seção atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateSection'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /inspection-templates/{id}/sections/{sectionId}/items:
+    post:
+      operationId: createTemplateItem
+      tags: [Inspection Templates]
+      summary: Criar item em uma seção do rascunho (RN-016)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+        - name: sectionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateItemCreateRequest'
+      responses:
+        '201':
+          description: Item criado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /inspection-templates/{id}/items/{itemId}:
+    put:
+      operationId: updateTemplateItem
+      tags: [Inspection Templates]
+      summary: Atualizar item da versão em rascunho
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateItemUpdateRequest'
+      responses:
+        '200':
+          description: Item atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /inspection-templates/{id}/publish:
+    post:
+      operationId: publishInspectionTemplate
+      tags: [Inspection Templates]
+      summary: Publicar nova versão do modelo (AC-TEMPLATE — publicar modelo válido)
+      description: >
+        Exige título, categoria, ao menos uma seção e ao menos um item com
+        tipo de resposta válido (RN-015, RN-016). Tipos de resposta fora do
+        enum `ResponseType` do MVP não podem ser publicados (RN-023).
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '201':
+          description: Nova versão publicada e disponível para novos agendamentos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionTemplateVersion'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: >
+            Publicação bloqueada — modelo sem seções/itens válidos, ou item
+            sem tipo de resposta (AC-TEMPLATE — publicação inválida). As
+            pendências devem ser listadas em `fieldErrors`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /inspection-templates/{id}/versions:
+    get:
+      operationId: listInspectionTemplateVersions
+      tags: [Inspection Templates]
+      summary: Listar versões publicadas de um modelo
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: Página de versões.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionTemplateVersionPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /inspection-template-versions/{versionId}:
+    get:
+      operationId: getInspectionTemplateVersion
+      tags: [Inspection Templates]
+      summary: Consultar versão publicada, incluindo seções e itens
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Versão encontrada com estrutura completa.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionTemplateVersionDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # INSPECTIONS
+  # ============================================================
+  /inspections:
+    get:
+      operationId: listInspections
+      tags: [Inspections]
+      summary: Listar inspeções (visão administrativa, AC-ADMIN-MONITOR)
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/InspectionStatus' }
+        - name: technicianId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: supervisorId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: clientId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: siteId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: equipmentId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: priority
+          in: query
+          schema: { $ref: '#/components/schemas/InspectionPriority' }
+        - name: scheduledFrom
+          in: query
+          schema: { type: string, format: date-time }
+        - name: scheduledTo
+          in: query
+          schema: { type: string, format: date-time }
+        - name: overdue
+          in: query
+          description: Quando verdadeiro, filtra somente inspeções atrasadas.
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Página de inspeções.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      operationId: createInspection
+      tags: [Inspections]
+      summary: Agendar inspeção (UC-06, AC-SCHEDULING)
+      description: >
+        Cliente, local, equipamento (quando aplicável), técnico e data
+        prevista são validados quanto a existência, vínculo (local pertence
+        ao cliente, equipamento pertence ao local) e situação ativa
+        (RN-014, RN-025, RN-026, RN-027). Ao confirmar, a API cria o
+        `InspectionItemSnapshot` a partir da versão publicada (10.8.2).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InspectionCreateRequest'
+      responses:
+        '201':
+          description: Inspeção criada com snapshot dos itens.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: >
+            Regra de negócio não atendida (versão não publicada, local não
+            pertence ao cliente, equipamento não pertence ao local, técnico
+            inativo etc.).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /inspections/{inspectionId}:
+    get:
+      operationId: getInspection
+      tags: [Inspections]
+      summary: Consultar inspeção com snapshot, respostas, evidências e não conformidades
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      responses:
+        '200':
+          description: Detalhe completo da inspeção.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateInspection
+      tags: [Inspections]
+      summary: Atualizar dados de planejamento da inspeção (somente em DRAFT/ASSIGNED)
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InspectionUpdateRequest'
+      responses:
+        '200':
+          description: Inspeção atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Transição de estado inválida para edição comum (RN-089).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /inspections/{inspectionId}/assign:
+    post:
+      operationId: assignInspection
+      tags: [Inspections]
+      summary: Atribuir ou reatribuir técnico responsável (RN-027, RN-031)
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignInspectionRequest'
+      responses:
+        '200':
+          description: >
+            Técnico atribuído. Inspeção em `DRAFT` transiciona para
+            `ASSIGNED` (fluxo-geral.md 7.6).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Técnico inativo (RN-027) ou transição de estado não permitida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /inspections/{inspectionId}/cancel:
+    post:
+      operationId: cancelInspection
+      tags: [Inspections]
+      summary: Cancelar inspeção (RN-029, RN-030)
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelInspectionRequest'
+      responses:
+        '200':
+          description: Inspeção cancelada com usuário, data e justificativa registrados.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Inspeção aprovada não pode ser cancelada pelo fluxo comum (RN-030).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /inspections/{inspectionId}/start:
+    post:
+      operationId: startInspection
+      tags: [Inspections]
+      summary: Iniciar inspeção (UC-09, AC-START)
+      description: >
+        Somente o técnico responsável pode iniciar, e somente uma inspeção
+        `ASSIGNED` (RN-032, RN-033). Este endpoint é o alvo típico de uma
+        operação de sincronização (`entityType: INSPECTION`) quando o
+        início ocorre offline.
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartInspectionRequest'
+      responses:
+        '200':
+          description: Inspeção em andamento.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Inspeção pertence a outro técnico (AC-START — inspeção não autorizada).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Estado atual não permite início (fluxo-geral.md 7.6).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /inspections/{inspectionId}/submit:
+    post:
+      operationId: submitInspection
+      tags: [Inspections]
+      summary: Concluir e enviar inspeção (UC-13, AC-COMPLETE)
+      description: >
+        Bloqueada quando existirem itens obrigatórios sem resposta
+        (RN-037), observação exigida ausente (RN-038) ou evidência crítica
+        ausente (RN-039). Ver exemplo de erro 422 em `docs/api-rest.md`
+        (código `INSPECTION_REQUIRED_ITEMS_MISSING`).
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitInspectionRequest'
+      responses:
+        '200':
+          description: Inspeção enviada e disponível para revisão.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          description: Itens obrigatórios pendentes ou dados exigidos ausentes (AC-COMPLETE).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /inspections/{inspectionId}/begin-review:
+    post:
+      operationId: beginInspectionReview
+      tags: [Reviews]
+      summary: Iniciar revisão formal (UC-16, AC-REVIEW)
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      responses:
+        '200':
+          description: Estado alterado para `UNDER_REVIEW`, ação auditada (RN-079).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /inspections/{inspectionId}/approve:
+    post:
+      operationId: approveInspection
+      tags: [Reviews]
+      summary: Aprovar inspeção (RN-081, RN-082, AC-REVIEW)
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApproveInspectionRequest'
+      responses:
+        '200':
+          description: >
+            Inspeção aprovada; revisor e horário registrados; respostas
+            ficam protegidas contra edição comum (RN-082, RN-049).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Inspeção não está em revisão (RN-089).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /inspections/{inspectionId}/reject:
+    post:
+      operationId: rejectInspection
+      tags: [Reviews]
+      summary: Reprovar inspeção com motivo obrigatório (RN-080, AC-REVIEW)
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectInspectionRequest'
+      responses:
+        '200':
+          description: >
+            Inspeção reprovada; técnico recebe a informação na próxima
+            sincronização (AC-REVIEW).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionDetail'
+        '400':
+          description: Motivo da reprovação ausente (AC-REVIEW).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /inspections/{inspectionId}/history:
+    get:
+      operationId: getInspectionHistory
+      tags: [Inspections]
+      summary: Consultar histórico de auditoria da inspeção (RN-086)
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: Página de eventos de auditoria em ordem cronológica.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /inspections/{inspectionId}/reviews:
+    get:
+      operationId: listInspectionReviews
+      tags: [Reviews]
+      summary: Listar ciclos de revisão de uma inspeção (10.11.1 — uma inspeção pode ter vários ciclos)
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      responses:
+        '200':
+          description: Lista de revisões em ordem de ciclo.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InspectionReview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # MOBILE
+  # ============================================================
+  /mobile/inspections:
+    get:
+      operationId: listMobileInspections
+      tags: [Mobile]
+      summary: Listar inspeções atribuídas ao técnico autenticado (AC-MOBILE-LIST)
+      description: >
+        A API filtra pelo usuário autenticado — não deve depender de um
+        `technicianId` informado pelo cliente (12.10).
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/InspectionStatus' }
+        - name: priority
+          in: query
+          schema: { $ref: '#/components/schemas/InspectionPriority' }
+        - name: scheduledFrom
+          in: query
+          schema: { type: string, format: date-time }
+        - name: scheduledTo
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Página de inspeções atribuídas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /mobile/inspections/{inspectionId}:
+    get:
+      operationId: getMobileInspection
+      tags: [Mobile]
+      summary: Baixar detalhe completo da inspeção para uso offline (UC-07)
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      responses:
+        '200':
+          description: >
+            Detalhe completo, incluindo snapshot dos itens, respostas
+            existentes e revisões pertinentes (11.9 — dados baixados).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Inspeção não pertence ao técnico autenticado (AC-SECURITY).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # RESPONSES
+  # ============================================================
+  /inspections/{inspectionId}/responses:
+    get:
+      operationId: listInspectionResponses
+      tags: [Responses]
+      summary: Listar respostas registradas de uma inspeção
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      responses:
+        '200':
+          description: Lista de respostas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InspectionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /inspections/{inspectionId}/responses/{responseId}:
+    put:
+      operationId: upsertInspectionResponse
+      tags: [Responses]
+      summary: Registrar ou atualizar resposta de um item (AC-CHECKLIST)
+      description: >
+        `responseId` é gerado no dispositivo (UUID) para permitir criação
+        offline sem remapeamento (10.2). `baseVersion` habilita controle de
+        concorrência otimista — divergência retorna 409 (RN-075).
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+        - name: responseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InspectionResponseUpsertRequest'
+      responses:
+        '200':
+          description: Resposta registrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionResponse'
+        '400':
+          description: Valor inválido para o tipo de resposta do item (AC-CHECKLIST).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Conflito de versão-base (RN-075) ou inspeção bloqueada para edição (RN-043, RN-082).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Observação exigida ausente em resposta não conforme (RN-038).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /inspections/{inspectionId}/responses:batch:
+    post:
+      operationId: batchUpsertInspectionResponses
+      tags: [Responses]
+      summary: Registrar respostas em lote (uso típico pela sincronização)
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InspectionResponseBatchRequest'
+      responses:
+        '200':
+          description: >
+            Resultado individual por resposta enviada — falha em um item
+            não deve reverter os demais confirmados (AC-SYNC — falha
+            parcial).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionResponseBatchResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # EVIDENCE
+  # ============================================================
+  /inspections/{inspectionId}/evidence:
+    get:
+      operationId: listInspectionEvidence
+      tags: [Evidence]
+      summary: Listar evidências de uma inspeção
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+        - name: responseId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: nonConformityId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Lista de evidências.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Evidence'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: uploadEvidence
+      tags: [Evidence]
+      summary: Enviar evidência (UC-11, AC-EVIDENCE)
+      description: >
+        Upload multipart. Formato e tamanho são validados (RN-046); o nome
+        original do arquivo não é utilizado como identificador (RN-050).
+        `idempotencyKey` evita duplicidade em reenvios (RN-067, RN-068).
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EvidenceUploadRequest'
+            encoding:
+              file:
+                contentType: image/jpeg, image/png
+      responses:
+        '201':
+          description: Evidência registrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Evidence'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: >
+            `idempotencyKey` já processada — deve responder como já
+            aplicada, sem criar duplicidade (RN-068).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+
+  /evidence/{id}:
+    get:
+      operationId: getEvidence
+      tags: [Evidence]
+      summary: Consultar metadados (e URL temporária de acesso) de uma evidência
+      description: >
+        O acesso ao arquivo deve ocorrer por endpoint autorizado ou URL
+        temporária — nunca por exposição pública permanente (11.8).
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Evidência encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Evidence'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteEvidence
+      tags: [Evidence]
+      summary: Excluir evidência sincronizada (RN-048, RN-049)
+      description: >
+        Bloqueada para evidências de inspeções aprovadas (RN-049,
+        somente-leitura). A exclusão é auditada (10.16 — Evidências).
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '204':
+          description: Evidência removida (ou acesso ao objeto bloqueado) e auditoria registrada.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Inspeção aprovada — evidência é somente leitura (RN-049).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ============================================================
+  # NON-CONFORMITIES
+  # ============================================================
+  /non-conformities:
+    get:
+      operationId: listNonConformities
+      tags: [Non-Conformities]
+      summary: Listar não conformidades (visão administrativa)
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - name: inspectionId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: severity
+          in: query
+          schema: { $ref: '#/components/schemas/Severity' }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/NonConformityStatus' }
+      responses:
+        '200':
+          description: Página de não conformidades.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NonConformityPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /non-conformities/{id}:
+    get:
+      operationId: getNonConformity
+      tags: [Non-Conformities]
+      summary: Consultar não conformidade por id
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Não conformidade encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NonConformity'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateNonConformity
+      tags: [Non-Conformities]
+      summary: Atualizar não conformidade
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NonConformityUpdateRequest'
+      responses:
+        '200':
+          description: Não conformidade atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NonConformity'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Criticidade crítica sem evidência associada (RN-055).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /non-conformities/{id}/status:
+    patch:
+      operationId: updateNonConformityStatus
+      tags: [Non-Conformities]
+      summary: Alterar estado da não conformidade (RN-056 — auditável, sem exclusão física)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NonConformityStatusUpdateRequest'
+      responses:
+        '200':
+          description: Estado atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NonConformity'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /inspections/{inspectionId}/non-conformities:
+    post:
+      operationId: createNonConformity
+      tags: [Non-Conformities]
+      summary: Registrar não conformidade (UC-12, AC-NONCONFORMITY)
+      description: >
+        Criticidade `CRITICAL` exige ao menos uma evidência vinculada antes
+        do envio da inspeção (RN-039, RN-055) — validado definitivamente em
+        `POST /inspections/{inspectionId}/submit`.
+      parameters:
+        - $ref: '#/components/parameters/InspectionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NonConformityCreateRequest'
+      responses:
+        '201':
+          description: Não conformidade registrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NonConformity'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # ============================================================
+  # SYNCHRONIZATION
+  # ============================================================
+  /mobile/sync/push:
+    post:
+      operationId: pushSyncOperations
+      tags: [Synchronization]
+      summary: Enviar operações pendentes da outbox (UC-14, AC-SYNC)
+      description: >
+        Operações são processadas respeitando dependências (RN-069); falha
+        em uma não descarta as demais (RN-070). Reenvio do mesmo
+        `operationId` não cria duplicidade (RN-067, RN-068).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPushRequest'
+      responses:
+        '200':
+          description: Resultado individual por operação enviada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncPushResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /mobile/sync/pull:
+    get:
+      operationId: pullSyncChanges
+      tags: [Synchronization]
+      summary: Baixar alterações do servidor a partir de um cursor (11.9 — Download de alterações)
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          description: Cursor da última sincronização bem-sucedida. Omitido na primeira sincronização.
+          schema: { type: string }
+      responses:
+        '200':
+          description: >
+            Alterações desde o cursor informado. O cursor local só deve
+            avançar após persistência local bem-sucedida (11.9, AC-SYNC).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncPullResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================
+  # DASHBOARD (P1 — resumo básico pode compor o MVP administrativo)
+  # ============================================================
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [Dashboard]
+      summary: Resumo de indicadores administrativos
+      responses:
+        '200':
+          description: Resumo agregado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /dashboard/inspections-by-status:
+    get:
+      operationId: getInspectionsByStatus
+      tags: [Dashboard]
+      summary: Quantidade de inspeções agrupadas por estado
+      responses:
+        '200':
+          description: Contagem por estado.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StatusCount'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /dashboard/non-conformities-by-severity:
+    get:
+      operationId: getNonConformitiesBySeverity
+      tags: [Dashboard]
+      summary: Quantidade de não conformidades agrupadas por criticidade
+      responses:
+        '200':
+          description: Contagem por criticidade.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SeverityCount'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+# ==================================================================
+# COMPONENTS
+# ==================================================================
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    InspectionIdParam:
+      name: inspectionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    PageParam:
+      name: page
+      in: query
+      description: Número da página, iniciando em 0.
+      schema: { type: integer, minimum: 0, default: 0 }
+    SizeParam:
+      name: size
+      in: query
+      description: Quantidade de itens por página.
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    SortParam:
+      name: sort
+      in: query
+      description: 'Campo e direção de ordenação, ex.: "createdAt,desc".'
+      schema: { type: string }
+      example: createdAt,desc
+
+  responses:
+    BadRequest:
+      description: Requisição malformada.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Sessão ausente ou inválida.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Usuário autenticado sem permissão para a operação.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Recurso não encontrado ou não visível ao usuário autenticado.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Conflito de estado, versão otimista ou unicidade.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    UnprocessableEntity:
+      description: Regra de negócio ou validação semântica não atendida.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    PayloadTooLarge:
+      description: Arquivo acima do limite permitido.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    UnsupportedMediaType:
+      description: Formato de arquivo não suportado.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+
+    # ---------- Erros ----------
+    FieldError:
+      type: object
+      properties:
+        field: { type: string }
+        message: { type: string }
+      required: [field, message]
+
+    Error:
+      type: object
+      description: Estrutura de erro padronizada (12.2 de docs/api-rest.md).
+      properties:
+        timestamp: { type: string, format: date-time }
+        status: { type: integer }
+        code: { type: string, example: INSPECTION_REQUIRED_ITEMS_MISSING }
+        message: { type: string }
+        path: { type: string }
+        requestId: { type: string }
+        fieldErrors:
+          type: array
+          items: { $ref: '#/components/schemas/FieldError' }
+      required: [timestamp, status, code, message, path]
+
+    # ---------- Enums ----------
+    UserRole:
+      type: string
+      enum: [ADMIN, SUPERVISOR, TECHNICIAN, CLIENT_VIEWER]
+    UserStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE, BLOCKED]
+    ActiveStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE]
+    EquipmentStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE, DECOMMISSIONED]
+    TemplateStatus:
+      type: string
+      enum: [DRAFT, ACTIVE, INACTIVE]
+    ResponseType:
+      type: string
+      description: >
+        Tipos de resposta obrigatórios do MVP (funcionalidades.md 8.5).
+        Tipos P1 (SINGLE... múltipla, assinatura, localização como
+        resposta etc.) não fazem parte deste enum até entrarem em escopo
+        (RN-023).
+      enum:
+        - TEXT_SHORT
+        - TEXT_LONG
+        - NUMBER
+        - BOOLEAN
+        - CONFORMITY
+        - SINGLE_CHOICE
+        - DATE
+    InspectionPriority:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+    InspectionStatus:
+      type: string
+      description: Estado de negócio da inspeção (fluxo-geral.md 7.4) — não confundir com estado local de sincronização.
+      enum:
+        - DRAFT
+        - ASSIGNED
+        - IN_PROGRESS
+        - SUBMITTED
+        - UNDER_REVIEW
+        - APPROVED
+        - REJECTED
+        - CANCELED
+    Conformity:
+      type: string
+      enum: [NOT_APPLICABLE, CONFORMING, NON_CONFORMING]
+    Severity:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+    NonConformityStatus:
+      type: string
+      description: No MVP somente OPEN é utilizado (RN-057); demais valores fazem parte do fluxo de tratamento futuro.
+      enum: [OPEN]
+    ReviewDecision:
+      type: string
+      enum: [APPROVED, REJECTED]
+    EvidenceType:
+      type: string
+      enum: [PHOTO]
+    SyncEntityType:
+      type: string
+      enum: [INSPECTION, INSPECTION_RESPONSE, EVIDENCE, NON_CONFORMITY]
+    SyncOperationType:
+      type: string
+      enum: [UPSERT, DELETE]
+    SyncOperationStatus:
+      type: string
+      enum: [APPLIED, ALREADY_APPLIED, REJECTED, CONFLICT, DEPENDENCY_FAILED]
+
+    # ---------- Auth ----------
+    LoginRequest:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+      required: [email, password]
+
+    UserSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/UserRole' }
+      required: [id, name, email, role]
+
+    LoginResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer, description: Duração do access token em segundos. }
+        user: { $ref: '#/components/schemas/UserSummary' }
+      required: [accessToken, refreshToken, expiresIn, user]
+
+    RefreshTokenRequest:
+      type: object
+      properties:
+        refreshToken: { type: string }
+      required: [refreshToken]
+
+    RefreshTokenResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer }
+      required: [accessToken, refreshToken, expiresIn]
+
+    CurrentUserResponse:
+      allOf:
+        - $ref: '#/components/schemas/UserSummary'
+        - type: object
+          properties:
+            status: { $ref: '#/components/schemas/UserStatus' }
+            phone: { type: string, nullable: true }
+
+    # ---------- Users ----------
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        name: { type: string, maxLength: 150 }
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/UserRole' }
+        status: { $ref: '#/components/schemas/UserStatus' }
+        phone: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time, readOnly: true }
+        updatedAt: { type: string, format: date-time, readOnly: true }
+        version: { type: integer, readOnly: true }
+      required: [id, name, email, role, status, createdAt, updatedAt, version]
+
+    UserCreateRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 150 }
+        email: { type: string, format: email }
+        password: { type: string, format: password, minLength: 8 }
+        role: { $ref: '#/components/schemas/UserRole' }
+        phone: { type: string, nullable: true }
+      required: [name, email, password, role]
+
+    UserUpdateRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 150 }
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/UserRole' }
+        phone: { type: string, nullable: true }
+      required: [name, email, role]
+
+    UserStatusUpdateRequest:
+      type: object
+      properties:
+        status: { $ref: '#/components/schemas/UserStatus' }
+      required: [status]
+
+    ResetPasswordResponse:
+      type: object
+      properties:
+        message: { type: string }
+
+    UserPage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/User' }
+
+    # ---------- Clients ----------
+    Client:
+      type: object
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        name: { type: string, maxLength: 150 }
+        legalName: { type: string, nullable: true }
+        document: { type: string, nullable: true }
+        email: { type: string, format: email, nullable: true }
+        phone: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/ActiveStatus' }
+        createdAt: { type: string, format: date-time, readOnly: true }
+        updatedAt: { type: string, format: date-time, readOnly: true }
+        version: { type: integer, readOnly: true }
+      required: [id, name, status, createdAt, updatedAt, version]
+
+    ClientCreateRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 150 }
+        legalName: { type: string, nullable: true }
+        document: { type: string, nullable: true }
+        email: { type: string, format: email, nullable: true }
+        phone: { type: string, nullable: true }
+      required: [name]
+
+    ClientUpdateRequest:
+      $ref: '#/components/schemas/ClientCreateRequest'
+
+    ClientPage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/Client' }
+
+    StatusUpdateRequest:
+      type: object
+      properties:
+        status: { $ref: '#/components/schemas/ActiveStatus' }
+      required: [status]
+
+    # ---------- Sites ----------
+    InspectionSite:
+      type: object
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        clientId: { type: string, format: uuid }
+        name: { type: string, maxLength: 150 }
+        description: { type: string, nullable: true }
+        addressLine: { type: string, nullable: true }
+        city: { type: string, nullable: true }
+        state: { type: string, nullable: true }
+        postalCode: { type: string, nullable: true }
+        latitude: { type: number, format: double, nullable: true }
+        longitude: { type: number, format: double, nullable: true }
+        contactName: { type: string, nullable: true }
+        contactPhone: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/ActiveStatus' }
+        createdAt: { type: string, format: date-time, readOnly: true }
+        updatedAt: { type: string, format: date-time, readOnly: true }
+        version: { type: integer, readOnly: true }
+      required: [id, clientId, name, status, createdAt, updatedAt, version]
+
+    SiteCreateRequest:
+      type: object
+      properties:
+        clientId: { type: string, format: uuid }
+        name: { type: string, maxLength: 150 }
+        description: { type: string, nullable: true }
+        addressLine: { type: string, nullable: true }
+        city: { type: string, nullable: true }
+        state: { type: string, nullable: true }
+        postalCode: { type: string, nullable: true }
+        latitude: { type: number, format: double, nullable: true }
+        longitude: { type: number, format: double, nullable: true }
+        contactName: { type: string, nullable: true }
+        contactPhone: { type: string, nullable: true }
+      required: [clientId, name]
+
+    SiteUpdateRequest:
+      type: object
+      description: clientId não é editável por este contrato (ver decisão de normalização nº 6).
+      properties:
+        name: { type: string, maxLength: 150 }
+        description: { type: string, nullable: true }
+        addressLine: { type: string, nullable: true }
+        city: { type: string, nullable: true }
+        state: { type: string, nullable: true }
+        postalCode: { type: string, nullable: true }
+        latitude: { type: number, format: double, nullable: true }
+        longitude: { type: number, format: double, nullable: true }
+        contactName: { type: string, nullable: true }
+        contactPhone: { type: string, nullable: true }
+      required: [name]
+
+    SitePage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/InspectionSite' }
+
+    # ---------- Equipment ----------
+    Equipment:
+      type: object
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        siteId: { type: string, format: uuid }
+        name: { type: string, maxLength: 150 }
+        assetNumber: { type: string, nullable: true }
+        serialNumber: { type: string, nullable: true }
+        manufacturer: { type: string, nullable: true }
+        model: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        qrCode: { type: string }
+        status: { $ref: '#/components/schemas/EquipmentStatus' }
+        installedAt: { type: string, format: date, nullable: true }
+        createdAt: { type: string, format: date-time, readOnly: true }
+        updatedAt: { type: string, format: date-time, readOnly: true }
+        version: { type: integer, readOnly: true }
+      required: [id, siteId, name, qrCode, status, createdAt, updatedAt, version]
+
+    EquipmentCreateRequest:
+      type: object
+      properties:
+        siteId: { type: string, format: uuid }
+        name: { type: string, maxLength: 150 }
+        qrCode: { type: string }
+        assetNumber: { type: string, nullable: true }
+        serialNumber: { type: string, nullable: true }
+        manufacturer: { type: string, nullable: true }
+        model: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        installedAt: { type: string, format: date, nullable: true }
+      required: [siteId, name, qrCode]
+
+    EquipmentUpdateRequest:
+      type: object
+      description: siteId e qrCode não são editáveis por este contrato (ver decisão de normalização nº 6).
+      properties:
+        name: { type: string, maxLength: 150 }
+        assetNumber: { type: string, nullable: true }
+        serialNumber: { type: string, nullable: true }
+        manufacturer: { type: string, nullable: true }
+        model: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        installedAt: { type: string, format: date, nullable: true }
+      required: [name]
+
+    EquipmentStatusUpdateRequest:
+      type: object
+      properties:
+        status: { $ref: '#/components/schemas/EquipmentStatus' }
+      required: [status]
+
+    EquipmentPage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/Equipment' }
+
+    # ---------- Inspection Templates ----------
+    InspectionTemplate:
+      type: object
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        title: { type: string, maxLength: 200 }
+        description: { type: string, nullable: true }
+        category: { type: string }
+        status: { $ref: '#/components/schemas/TemplateStatus' }
+        currentVersion: { type: integer, readOnly: true, nullable: true }
+        createdBy: { type: string, format: uuid, readOnly: true }
+        createdAt: { type: string, format: date-time, readOnly: true }
+        updatedAt: { type: string, format: date-time, readOnly: true }
+        version: { type: integer, readOnly: true }
+      required: [id, title, category, status, createdAt, updatedAt, version]
+
+    InspectionTemplateCreateRequest:
+      type: object
+      properties:
+        title: { type: string, maxLength: 200 }
+        description: { type: string, nullable: true }
+        category: { type: string }
+      required: [title, category]
+
+    InspectionTemplateUpdateRequest:
+      $ref: '#/components/schemas/InspectionTemplateCreateRequest'
+
+    InspectionTemplatePage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/InspectionTemplate' }
+
+    InspectionTemplateVersion:
+      type: object
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        templateId: { type: string, format: uuid }
+        versionNumber: { type: integer, readOnly: true }
+        titleSnapshot: { type: string }
+        descriptionSnapshot: { type: string, nullable: true }
+        publishedBy: { type: string, format: uuid, readOnly: true }
+        publishedAt: { type: string, format: date-time, readOnly: true }
+        activeForNewInspections: { type: boolean, default: true }
+        createdAt: { type: string, format: date-time, readOnly: true }
+      required: [id, templateId, versionNumber, titleSnapshot, publishedBy, publishedAt, createdAt]
+
+    InspectionTemplateVersionPage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/InspectionTemplateVersion' }
+
+    InspectionTemplateVersionDetail:
+      allOf:
+        - $ref: '#/components/schemas/InspectionTemplateVersion'
+        - type: object
+          properties:
+            sections:
+              type: array
+              items: { $ref: '#/components/schemas/TemplateSectionDetail' }
+
+    TemplateSection:
+      type: object
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        templateVersionId: { type: string, format: uuid, readOnly: true }
+        title: { type: string, maxLength: 150 }
+        description: { type: string, nullable: true }
+        displayOrder: { type: integer }
+        createdAt: { type: string, format: date-time, readOnly: true }
+      required: [id, templateVersionId, title, displayOrder, createdAt]
+
+    TemplateSectionDetail:
+      allOf:
+        - $ref: '#/components/schemas/TemplateSection'
+        - type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/TemplateItem' }
+
+    TemplateSectionCreateRequest:
+      type: object
+      properties:
+        title: { type: string, maxLength: 150 }
+        description: { type: string, nullable: true }
+        displayOrder: { type: integer }
+      required: [title, displayOrder]
+
+    TemplateSectionUpdateRequest:
+      $ref: '#/components/schemas/TemplateSectionCreateRequest'
+
+    TemplateItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        sectionId: { type: string, format: uuid, readOnly: true }
+        code: { type: string, nullable: true }
+        title: { type: string, maxLength: 300 }
+        description: { type: string, nullable: true }
+        responseType: { $ref: '#/components/schemas/ResponseType' }
+        required: { type: boolean, default: false }
+        observationRequiredOnFailure: { type: boolean, default: false }
+        evidenceRequiredOnFailure: { type: boolean, default: false }
+        optionsJson:
+          type: object
+          nullable: true
+          description: Alternativas e configurações específicas do tipo de resposta (ex. lista de opções de SINGLE_CHOICE).
+          additionalProperties: true
+        displayOrder: { type: integer }
+        createdAt: { type: string, format: date-time, readOnly: true }
+      required: [id, sectionId, title, responseType, required, displayOrder, createdAt]
+
+    TemplateItemCreateRequest:
+      type: object
+      properties:
+        code: { type: string, nullable: true }
+        title: { type: string, maxLength: 300 }
+        description: { type: string, nullable: true }
+        responseType: { $ref: '#/components/schemas/ResponseType' }
+        required: { type: boolean, default: false }
+        observationRequiredOnFailure: { type: boolean, default: false }
+        evidenceRequiredOnFailure: { type: boolean, default: false }
+        optionsJson:
+          type: object
+          nullable: true
+          additionalProperties: true
+        displayOrder: { type: integer }
+      required: [title, responseType, displayOrder]
+
+    TemplateItemUpdateRequest:
+      $ref: '#/components/schemas/TemplateItemCreateRequest'
+
+    # ---------- Inspections ----------
+    Inspection:
+      type: object
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        templateVersionId: { type: string, format: uuid }
+        clientId: { type: string, format: uuid }
+        siteId: { type: string, format: uuid }
+        equipmentId: { type: string, format: uuid, nullable: true }
+        technicianId: { type: string, format: uuid }
+        supervisorId: { type: string, format: uuid, nullable: true }
+        createdBy: { type: string, format: uuid, readOnly: true }
+        title: { type: string, nullable: true }
+        instructions: { type: string, nullable: true }
+        priority: { $ref: '#/components/schemas/InspectionPriority' }
+        status: { $ref: '#/components/schemas/InspectionStatus', readOnly: true }
+        scheduledFor: { type: string, format: date-time }
+        startedAtDevice: { type: string, format: date-time, nullable: true, readOnly: true }
+        startedAtServer: { type: string, format: date-time, nullable: true, readOnly: true }
+        completedAtDevice: { type: string, format: date-time, nullable: true, readOnly: true }
+        submittedAtServer: { type: string, format: date-time, nullable: true, readOnly: true }
+        approvedAt: { type: string, format: date-time, nullable: true, readOnly: true }
+        canceledAt: { type: string, format: date-time, nullable: true, readOnly: true }
+        canceledBy: { type: string, format: uuid, nullable: true, readOnly: true }
+        canceledReason: { type: string, nullable: true, readOnly: true }
+        createdAt: { type: string, format: date-time, readOnly: true }
+        updatedAt: { type: string, format: date-time, readOnly: true }
+        version: { type: integer, readOnly: true }
+      required:
+        - id
+        - templateVersionId
+        - clientId
+        - siteId
+        - technicianId
+        - priority
+        - status
+        - scheduledFor
+        - createdAt
+        - updatedAt
+        - version
+
+    InspectionCreateRequest:
+      type: object
+      properties:
+        templateVersionId: { type: string, format: uuid }
+        clientId: { type: string, format: uuid }
+        siteId: { type: string, format: uuid }
+        equipmentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Obrigatório salvo quando o modelo for destinado a local/ambiente (RN-026).
+        technicianId: { type: string, format: uuid }
+        supervisorId: { type: string, format: uuid, nullable: true }
+        title: { type: string, nullable: true }
+        instructions: { type: string, nullable: true }
+        priority: { $ref: '#/components/schemas/InspectionPriority' }
+        scheduledFor: { type: string, format: date-time }
+      required: [templateVersionId, clientId, siteId, technicianId, priority, scheduledFor]
+
+    InspectionUpdateRequest:
+      type: object
+      properties:
+        equipmentId: { type: string, format: uuid, nullable: true }
+        title: { type: string, nullable: true }
+        instructions: { type: string, nullable: true }
+        priority: { $ref: '#/components/schemas/InspectionPriority' }
+        scheduledFor: { type: string, format: date-time }
+      required: [priority, scheduledFor]
+
+    AssignInspectionRequest:
+      type: object
+      properties:
+        technicianId: { type: string, format: uuid }
+      required: [technicianId]
+
+    CancelInspectionRequest:
+      type: object
+      properties:
+        reason: { type: string, minLength: 1 }
+      required: [reason]
+
+    StartInspectionRequest:
+      type: object
+      description: Corpo opcional — usado quando o início ocorre com localização disponível (RN-061).
+      properties:
+        startedAtDevice: { type: string, format: date-time }
+        location: { $ref: '#/components/schemas/GeoLocation' }
+
+    SubmitInspectionRequest:
+      type: object
+      properties:
+        completedAtDevice: { type: string, format: date-time }
+        location: { $ref: '#/components/schemas/GeoLocation' }
+      required: [completedAtDevice]
+
+    GeoLocation:
+      type: object
+      description: RN-062 — latitude, longitude, precisão e horário quando disponíveis.
+      properties:
+        latitude: { type: number, format: double }
+        longitude: { type: number, format: double }
+        accuracyMeters: { type: number, format: double, nullable: true }
+        capturedAt: { type: string, format: date-time }
+      required: [latitude, longitude, capturedAt]
+
+    InspectionPage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/Inspection' }
+
+    InspectionDetail:
+      allOf:
+        - $ref: '#/components/schemas/Inspection'
+        - type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/InspectionItemSnapshot' }
+            responses:
+              type: array
+              items: { $ref: '#/components/schemas/InspectionResponse' }
+            nonConformities:
+              type: array
+              items: { $ref: '#/components/schemas/NonConformity' }
+            reviews:
+              type: array
+              items: { $ref: '#/components/schemas/InspectionReview' }
+
+    InspectionItemSnapshot:
+      type: object
+      description: Cópia imutável do item no momento do agendamento (10.8.3).
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        inspectionId: { type: string, format: uuid, readOnly: true }
+        sourceTemplateItemId: { type: string, format: uuid, nullable: true }
+        sectionTitle: { type: string }
+        sectionDescription: { type: string, nullable: true }
+        sectionOrder: { type: integer }
+        itemCode: { type: string, nullable: true }
+        itemTitle: { type: string }
+        itemDescription: { type: string, nullable: true }
+        responseType: { $ref: '#/components/schemas/ResponseType' }
+        required: { type: boolean }
+        rulesJson:
+          type: object
+          nullable: true
+          additionalProperties: true
+        optionsJson:
+          type: object
+          nullable: true
+          additionalProperties: true
+        itemOrder: { type: integer }
+        createdAt: { type: string, format: date-time, readOnly: true }
+      required:
+        - id
+        - inspectionId
+        - sectionTitle
+        - sectionOrder
+        - itemTitle
+        - responseType
+        - required
+        - itemOrder
+        - createdAt
+
+    # ---------- Responses ----------
+    InspectionResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        inspectionId: { type: string, format: uuid, readOnly: true }
+        inspectionItemId: { type: string, format: uuid }
+        valueText: { type: string, nullable: true }
+        valueNumber: { type: number, format: double, nullable: true }
+        valueBoolean: { type: boolean, nullable: true }
+        valueDate: { type: string, format: date, nullable: true }
+        valueJson:
+          type: object
+          nullable: true
+          additionalProperties: true
+        observation: { type: string, nullable: true }
+        conformity: { $ref: '#/components/schemas/Conformity' }
+        answeredBy: { type: string, format: uuid, readOnly: true }
+        answeredAtDevice: { type: string, format: date-time }
+        serverReceivedAt: { type: string, format: date-time, readOnly: true, nullable: true }
+        createdAt: { type: string, format: date-time, readOnly: true }
+        updatedAt: { type: string, format: date-time, readOnly: true }
+        version: { type: integer, readOnly: true, description: Controle otimista — usado como baseVersion em requisições futuras. }
+      required: [id, inspectionItemId, answeredAtDevice, createdAt, updatedAt, version]
+
+    InspectionResponseUpsertRequest:
+      type: object
+      description: >
+        Ao menos um dos campos `value*` deve ser informado conforme o
+        `responseType` do item (AC-CHECKLIST — componente deve corresponder
+        ao tipo de resposta).
+      properties:
+        inspectionItemId: { type: string, format: uuid }
+        valueText: { type: string, nullable: true }
+        valueNumber: { type: number, format: double, nullable: true }
+        valueBoolean: { type: boolean, nullable: true }
+        valueDate: { type: string, format: date, nullable: true }
+        valueJson:
+          type: object
+          nullable: true
+          additionalProperties: true
+        observation: { type: string, nullable: true }
+        conformity: { $ref: '#/components/schemas/Conformity' }
+        answeredAtDevice: { type: string, format: date-time }
+        baseVersion:
+          type: integer
+          description: Versão conhecida pelo cliente no momento da edição — usada para detectar conflito (RN-075).
+      required: [inspectionItemId, answeredAtDevice, baseVersion]
+
+    InspectionResponseBatchRequest:
+      type: object
+      properties:
+        responses:
+          type: array
+          items: { $ref: '#/components/schemas/InspectionResponseUpsertRequest' }
+      required: [responses]
+
+    InspectionResponseBatchResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              inspectionItemId: { type: string, format: uuid }
+              status: { $ref: '#/components/schemas/SyncOperationStatus' }
+              responseId: { type: string, format: uuid, nullable: true }
+              version: { type: integer, nullable: true }
+              error: { $ref: '#/components/schemas/Error' }
+            required: [inspectionItemId, status]
+
+    # ---------- Evidence ----------
+    Evidence:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        inspectionId: { type: string, format: uuid }
+        responseId: { type: string, format: uuid, nullable: true }
+        nonConformityId: { type: string, format: uuid, nullable: true }
+        type: { $ref: '#/components/schemas/EvidenceType' }
+        storageKey: { type: string, readOnly: true }
+        accessUrl: { type: string, format: uri, readOnly: true, description: URL temporária de acesso ao arquivo (11.8). }
+        mimeType: { type: string }
+        sizeBytes: { type: integer, format: int64 }
+        checksum: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        latitude: { type: number, format: double, nullable: true }
+        longitude: { type: number, format: double, nullable: true }
+        capturedAtDevice: { type: string, format: date-time }
+        serverReceivedAt: { type: string, format: date-time, readOnly: true, nullable: true }
+        uploadedAt: { type: string, format: date-time, readOnly: true, nullable: true }
+        createdBy: { type: string, format: uuid, readOnly: true }
+        createdAt: { type: string, format: date-time, readOnly: true }
+      required: [id, inspectionId, type, mimeType, sizeBytes, capturedAtDevice, createdAt]
+
+    EvidenceUploadRequest:
+      type: object
+      properties:
+        idempotencyKey: { type: string, format: uuid }
+        responseId: { type: string, format: uuid, nullable: true }
+        nonConformityId: { type: string, format: uuid, nullable: true }
+        type: { $ref: '#/components/schemas/EvidenceType' }
+        description: { type: string, nullable: true }
+        capturedAtDevice: { type: string, format: date-time }
+        latitude: { type: number, format: double, nullable: true }
+        longitude: { type: number, format: double, nullable: true }
+        file:
+          type: string
+          format: binary
+      required: [idempotencyKey, type, capturedAtDevice, file]
+
+    # ---------- Non-Conformities ----------
+    NonConformity:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        inspectionId: { type: string, format: uuid }
+        inspectionItemId: { type: string, format: uuid, nullable: true }
+        responseId: { type: string, format: uuid, nullable: true }
+        title: { type: string, maxLength: 200 }
+        description: { type: string }
+        severity: { $ref: '#/components/schemas/Severity' }
+        status: { $ref: '#/components/schemas/NonConformityStatus' }
+        createdBy: { type: string, format: uuid, readOnly: true }
+        createdAtDevice: { type: string, format: date-time }
+        serverReceivedAt: { type: string, format: date-time, readOnly: true, nullable: true }
+        createdAt: { type: string, format: date-time, readOnly: true }
+        updatedAt: { type: string, format: date-time, readOnly: true }
+        version: { type: integer, readOnly: true }
+      required: [id, inspectionId, title, description, severity, status, createdAtDevice, createdAt, updatedAt, version]
+
+    NonConformityCreateRequest:
+      type: object
+      properties:
+        inspectionItemId: { type: string, format: uuid, nullable: true }
+        responseId: { type: string, format: uuid, nullable: true }
+        title: { type: string, maxLength: 200 }
+        description: { type: string }
+        severity: { $ref: '#/components/schemas/Severity' }
+        createdAtDevice: { type: string, format: date-time }
+      required: [title, description, severity, createdAtDevice]
+
+    NonConformityUpdateRequest:
+      type: object
+      properties:
+        title: { type: string, maxLength: 200 }
+        description: { type: string }
+        severity: { $ref: '#/components/schemas/Severity' }
+      required: [title, description, severity]
+
+    NonConformityStatusUpdateRequest:
+      type: object
+      properties:
+        status: { $ref: '#/components/schemas/NonConformityStatus' }
+      required: [status]
+
+    NonConformityPage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/NonConformity' }
+
+    # ---------- Reviews ----------
+    InspectionReview:
+      type: object
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        inspectionId: { type: string, format: uuid, readOnly: true }
+        reviewerId: { type: string, format: uuid, readOnly: true }
+        decision: { $ref: '#/components/schemas/ReviewDecision' }
+        reason: { type: string, nullable: true, description: Obrigatório quando decision = REJECTED (RN-080). }
+        comments: { type: string, nullable: true }
+        reviewedAt: { type: string, format: date-time, readOnly: true }
+        reviewCycle: { type: integer, readOnly: true }
+        createdAt: { type: string, format: date-time, readOnly: true }
+      required: [id, inspectionId, reviewerId, decision, reviewedAt, reviewCycle, createdAt]
+
+    ApproveInspectionRequest:
+      type: object
+      properties:
+        comments: { type: string, nullable: true }
+
+    RejectInspectionRequest:
+      type: object
+      properties:
+        reason: { type: string, minLength: 1 }
+        itemsToCorrect:
+          type: array
+          items: { type: string, format: uuid }
+      required: [reason]
+
+    # ---------- Audit ----------
+    AuditEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        inspectionId: { type: string, format: uuid, nullable: true }
+        actorId: { type: string, format: uuid, nullable: true }
+        action: { type: string, example: INSPECTION_APPROVED }
+        entityType: { type: string }
+        entityId: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time }
+        deviceOccurredAt: { type: string, format: date-time, nullable: true }
+        previousValueJson:
+          type: object
+          nullable: true
+          additionalProperties: true
+        newValueJson:
+          type: object
+          nullable: true
+          additionalProperties: true
+        metadataJson:
+          type: object
+          nullable: true
+          additionalProperties: true
+        requestId: { type: string, nullable: true }
+        deviceId: { type: string, nullable: true }
+      required: [id, action, entityType, entityId, occurredAt]
+
+    AuditEventPage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/AuditEvent' }
+
+    # ---------- Synchronization ----------
+    SyncOperationRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          format: uuid
+          description: Identificador idempotente único, gerado no dispositivo (RN-067).
+        entityType: { $ref: '#/components/schemas/SyncEntityType' }
+        entityId: { type: string, format: uuid }
+        operationType: { $ref: '#/components/schemas/SyncOperationType' }
+        baseVersion: { type: integer, nullable: true }
+        payload:
+          type: object
+          description: >
+            Corpo específico da entidade sincronizada — mesmo formato do
+            respectivo DTO de escrita (ex. `InspectionResponseUpsertRequest`
+            para entityType INSPECTION_RESPONSE).
+          additionalProperties: true
+      required: [operationId, entityType, entityId, operationType, payload]
+
+    SyncPushRequest:
+      type: object
+      properties:
+        deviceId: { type: string, format: uuid }
+        lastPullCursor: { type: string, nullable: true }
+        operations:
+          type: array
+          items: { $ref: '#/components/schemas/SyncOperationRequest' }
+      required: [deviceId, operations]
+
+    SyncOperationResult:
+      type: object
+      properties:
+        operationId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/SyncOperationStatus' }
+        entityVersion: { type: integer, nullable: true }
+        error: { $ref: '#/components/schemas/Error' }
+      required: [operationId, status]
+
+    SyncPushResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/SyncOperationResult' }
+        nextCursor: { type: string, nullable: true }
+        serverTime: { type: string, format: date-time }
+      required: [results, serverTime]
+
+    SyncChange:
+      type: object
+      description: Alteração incremental disponibilizada pelo servidor desde o último cursor.
+      properties:
+        entityType: { $ref: '#/components/schemas/SyncEntityType' }
+        entityId: { type: string, format: uuid }
+        operationType: { $ref: '#/components/schemas/SyncOperationType' }
+        payload:
+          type: object
+          additionalProperties: true
+        version: { type: integer }
+        occurredAt: { type: string, format: date-time }
+      required: [entityType, entityId, operationType, payload, version, occurredAt]
+
+    SyncPullResponse:
+      type: object
+      properties:
+        changes:
+          type: array
+          items: { $ref: '#/components/schemas/SyncChange' }
+        nextCursor: { type: string }
+        serverTime: { type: string, format: date-time }
+      required: [changes, nextCursor, serverTime]
+
+    # ---------- Dashboard ----------
+    DashboardSummary:
+      type: object
+      properties:
+        totalInspections: { type: integer }
+        inspectionsInProgress: { type: integer }
+        inspectionsPendingReview: { type: integer }
+        inspectionsOverdue: { type: integer }
+        inspectionsApproved: { type: integer }
+        inspectionsRejected: { type: integer }
+        nonConformitiesOpen: { type: integer }
+
+    StatusCount:
+      type: object
+      properties:
+        status: { $ref: '#/components/schemas/InspectionStatus' }
+        count: { type: integer }
+      required: [status, count]
+
+    SeverityCount:
+      type: object
+      properties:
+        severity: { $ref: '#/components/schemas/Severity' }
+        count: { type: integer }
+      required: [severity, count]
+
+    # ---------- Paginação ----------
+    PageInfo:
+      type: object
+      description: Metadados de paginação (RNF-003 — listagens administrativas devem paginar).
+      properties:
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }

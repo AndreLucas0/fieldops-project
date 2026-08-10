@@ -1,6 +1,6 @@
 # 🛠️ FieldOps — Plataforma de Inspeção em Campo
 
-> **Projeto Acadêmico** | CST em Análise e Desenvolvimento de Sistemas (CEUNSP)
+> **Projeto Acadêmico** | CST em Análise e Desenvolvimento de Sistemas
 
 O **FieldOps** é uma plataforma digital *offline-first* para planejamento, execução, acompanhamento e revisão de inspeções técnicas realizadas em campo. A solução substitui processos baseados em formulários impressos e planilhas por um fluxo digital integrado, garantindo rastreabilidade, padronização e preservação de evidências, mesmo em locais sem conectividade com a internet.
 

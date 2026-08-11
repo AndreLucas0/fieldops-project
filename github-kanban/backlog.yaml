@@ -1,0 +1,107 @@
+# backlog.yaml — fonte de verdade do backlog.
+# Rode: python sync_backlog.py --file backlog.yaml
+#
+# Regras:
+# - IDs (EP-XX, US-XX, TS-XX-YY) são a chave de idempotência. Não reutilize.
+# - Se você renomear um item, o título é atualizado no GitHub (mesmo ID = mesma issue).
+# - Se remover um item do YAML, a issue NÃO é apagada (só logada como "órfã").
+
+project:
+  owner: "AndreLucas0"
+  repo: "fieldops-project"
+  project_number: 16   # veja em https://github.com/users/SEU_USER/projects/N
+
+# Nomes exatos dos campos no seu Project v2.
+# Ajuste se você renomeou.
+fields:
+  status: "Status"
+  type: "Type"
+  priority: "Priority"
+  story_points: "Story Points"
+  iteration: "Iteration"
+  epic: "Epic"
+
+defaults:
+  status: "Todo"
+
+# ---------------------------------------------------------------
+# Épicos → User Stories → Tasks
+# ---------------------------------------------------------------
+epics:
+  - id: EP-01
+    name: "Autenticação"
+    description: |
+      Fluxo completo de login, cadastro e recuperação de senha.
+      Depende de: nada.
+    priority: "High"
+    iteration: "Sprint 1"
+
+    user_stories:
+      - id: US-01
+        title: "Login com email e senha"
+        story: |
+          **Como** cliente,
+          **quero** fazer login com email e senha,
+          **para** acessar meu histórico de compras.
+        acceptance_criteria:
+          - "Erro claro e específico quando credenciais são inválidas"
+          - "Token JWT retornado com expiração de 24h"
+          - "Rate limit de 5 tentativas/minuto por IP"
+        priority: "High"
+        story_points: 5
+        iteration: "Sprint 1"
+        tasks:
+          - id: TS-01-01
+            title: "Modelar entidade User (Spring Boot + JPA)"
+            priority: "High"
+            story_points: 2
+            iteration: "Sprint 1"
+          - id: TS-01-02
+            title: "Endpoint POST /auth/login com JWT"
+            priority: "High"
+            story_points: 3
+            iteration: "Sprint 1"
+
+      - id: US-02
+        title: "Recuperação de senha via email"
+        story: |
+          **Como** cliente que esqueceu a senha,
+          **quero** receber um link por email,
+          **para** redefinir minha senha.
+        acceptance_criteria:
+          - "Token de reset expira em 1h"
+          - "Email chega em até 30s"
+        priority: "Medium"
+        story_points: 3
+        iteration: "Sprint 2"
+        tasks:
+          - id: TS-02-01
+            title: "Endpoint POST /auth/forgot-password"
+            priority: "Medium"
+            story_points: 2
+          - id: TS-02-02
+            title: "Integração com serviço de email (SES/SendGrid)"
+            priority: "Medium"
+            story_points: 1
+
+  - id: EP-02
+    name: "Dashboard"
+    description: "Tela inicial pós-login com métricas do usuário."
+    priority: "Medium"
+    user_stories:
+      - id: US-03
+        title: "Visualizar métricas resumidas"
+        story: |
+          **Como** cliente logado,
+          **quero** ver um resumo das minhas métricas na home,
+          **para** entender rapidamente meu status.
+        acceptance_criteria:
+          - "Carrega em menos de 2s"
+          - "Mostra pelo menos 4 KPIs"
+        priority: "Medium"
+        story_points: 5
+        tasks:
+          - id: TS-03-01
+            title: "Endpoint GET /dashboard/summary"
+            priority: "Medium"
+            story_points: 3

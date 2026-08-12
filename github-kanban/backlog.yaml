@@ -2,106 +2,1684 @@
 # Rode: python sync_backlog.py --file backlog.yaml
 #
 # Regras:
-# - IDs (EP-XX, US-XX, TS-XX-YY) são a chave de idempotência. Não reutilize.
+# - IDs (US-XX, TS-XX-YY) são a chave de idempotência. Não reutilize.
 # - Se você renomear um item, o título é atualizado no GitHub (mesmo ID = mesma issue).
 # - Se remover um item do YAML, a issue NÃO é apagada (só logada como "órfã").
 
 project:
   owner: "AndreLucas0"
   repo: "fieldops-project"
-  project_number: 16   # veja em https://github.com/users/SEU_USER/projects/N
+  project_number: 16
 
-# Nomes exatos dos campos no seu Project v2.
-# Ajuste se você renomeou.
 fields:
   status: "Status"
   type: "Type"
   priority: "Priority"
   story_points: "Story Points"
   iteration: "Iteration"
-  epic: "Epic"
 
 defaults:
   status: "Todo"
 
 # ---------------------------------------------------------------
-# Épicos → User Stories → Tasks
+# User Stories → Tasks
+# Sprint 1: Fundação técnica
+# Sprint 2: Identidade, acesso e cadastros
+# Sprint 3: Modelos de inspeção e planejamento
+# Sprint 4: Execução de campo
+# Sprint 5: Recursos nativos e evidências
+# Sprint 6: Offline e sincronização
+# Sprint 7: Revisão, decisão e qualidade
+# Sprint 8: Entrega e demonstração
 # ---------------------------------------------------------------
-epics:
-  - id: EP-01
-    name: "Autenticação"
-    description: |
-      Fluxo completo de login, cadastro e recuperação de senha.
-      Depende de: nada.
+user_stories:
+
+  # ── Sprint 1: Fundação técnica ──────────────────────────────
+
+  - id: US-01
+    title: "Configurar repositório e convenções de desenvolvimento"
+    story: |
+      **Como** equipe de desenvolvimento,
+      **quero** repositórios criados com convenções definidas,
+      **para** desenvolver os componentes de forma coordenada e padronizada.
+    acceptance_criteria:
+      - "Repositório criado com estrutura de pastas definida e README inicial"
+      - "Lint, verificação de tipos e hooks de qualidade configurados"
+      - "Fluxo de pull request documentado e template criado"
+      - "Contrato inicial de autenticação e enums definidos"
     priority: "High"
+    story_points: 5
     iteration: "Sprint 1"
-
-    user_stories:
-      - id: US-01
-        title: "Login com email e senha"
-        story: |
-          **Como** cliente,
-          **quero** fazer login com email e senha,
-          **para** acessar meu histórico de compras.
-        acceptance_criteria:
-          - "Erro claro e específico quando credenciais são inválidas"
-          - "Token JWT retornado com expiração de 24h"
-          - "Rate limit de 5 tentativas/minuto por IP"
+    tasks:
+      - id: TS-01-01
+        title: "Criar repositório no GitHub com estrutura de pastas base"
         priority: "High"
-        story_points: 5
+        story_points: 1
         iteration: "Sprint 1"
-        tasks:
-          - id: TS-01-01
-            title: "Modelar entidade User (Spring Boot + JPA)"
-            priority: "High"
-            story_points: 2
-            iteration: "Sprint 1"
-          - id: TS-01-02
-            title: "Endpoint POST /auth/login com JWT"
-            priority: "High"
-            story_points: 3
-            iteration: "Sprint 1"
+      - id: TS-01-02
+        title: "Adicionar .gitignore, .editorconfig e README inicial"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-01-03
+        title: "Configurar ESLint e Prettier com regras base"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-01-04
+        title: "Configurar TypeScript com strict mode nos projetos"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-01-05
+        title: "Configurar pre-commit hooks com Husky e lint-staged"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-01-06
+        title: "Criar template de pull request e regras de proteção de branch"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-01-07
+        title: "Documentar convenções de commit e fluxo Git no README"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
 
-      - id: US-02
-        title: "Recuperação de senha via email"
-        story: |
-          **Como** cliente que esqueceu a senha,
-          **quero** receber um link por email,
-          **para** redefinir minha senha.
-        acceptance_criteria:
-          - "Token de reset expira em 1h"
-          - "Email chega em até 30s"
-        priority: "Medium"
-        story_points: 3
+  - id: US-02
+    title: "Criar projeto base do aplicativo mobile (Expo + TypeScript)"
+    story: |
+      **Como** desenvolvedor mobile,
+      **quero** um projeto Expo com TypeScript, rotas e estrutura por features,
+      **para** iniciar o desenvolvimento do aplicativo de forma organizada.
+    acceptance_criteria:
+      - "Projeto Expo inicializado com TypeScript e Expo Router configurado"
+      - "Estrutura de pastas por features criada com aliases de importação"
+      - "Rotas públicas e protegidas funcionando com dados mockados"
+      - "Componentes base criados: botão, campo de texto, card e estado de tela"
+    priority: "High"
+    story_points: 8
+    iteration: "Sprint 1"
+    tasks:
+      - id: TS-02-01
+        title: "Inicializar projeto Expo com SDK atual e TypeScript"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-02-02
+        title: "Instalar e configurar Expo Router com grupos de rotas (público e protegido)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-02-03
+        title: "Configurar aliases de importação via tsconfig paths"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-02-04
+        title: "Criar estrutura de pastas por features (auth, inspections, sync)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-02-05
+        title: "Implementar guard de rota que redireciona para login sem sessão mockada"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-02-06
+        title: "Criar componente base Button com variantes (primary, secondary, danger)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-02-07
+        title: "Criar componente base TextInput com label e mensagem de erro"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-02-08
+        title: "Criar componente base Card com variante de status"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-02-09
+        title: "Criar componentes EmptyState e LoadingSpinner reutilizáveis"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-02-10
+        title: "Criar tela de login e tela inicial (home stub) com dados mockados"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+
+  - id: US-03
+    title: "Criar projeto base do painel administrativo web"
+    story: |
+      **Como** desenvolvedor web,
+      **quero** um projeto Angular com layout, rotas e estrutura modular,
+      **para** iniciar o desenvolvimento do painel administrativo.
+    acceptance_criteria:
+      - "Projeto Angular inicializado com estrutura modular por feature"
+      - "Layout base com navegação lateral e header implementados"
+      - "Rotas públicas e protegidas configuradas"
+      - "Telas iniciais mockadas para login e área restrita"
+    priority: "High"
+    story_points: 5
+    iteration: "Sprint 1"
+    tasks:
+      - id: TS-03-01
+        title: "Inicializar projeto Angular com configuração base e estrutura modular"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-03-02
+        title: "Configurar lazy loading por feature module"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-03-03
+        title: "Implementar layout base com sidebar de navegação e header"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-03-04
+        title: "Configurar Angular Router com rotas públicas e AuthGuard inicial"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-03-05
+        title: "Criar tela de login e tela inicial (dashboard stub) mockadas"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+
+  - id: US-04
+    title: "Criar API base com Spring Boot conectada ao PostgreSQL"
+    story: |
+      **Como** desenvolvedor backend,
+      **quero** uma API Spring Boot conectada ao PostgreSQL com migrações versionadas,
+      **para** iniciar o desenvolvimento dos serviços de forma sustentável.
+    acceptance_criteria:
+      - "Projeto Spring Boot inicializado com dependências e configuração de ambiente"
+      - "Conexão com PostgreSQL configurada com migrações via Flyway"
+      - "Contrato OpenAPI inicial publicado com endpoints de autenticação e inspeção"
+      - "Handler global de exceções retornando respostas padronizadas sem stack trace"
+    priority: "High"
+    story_points: 8
+    iteration: "Sprint 1"
+    tasks:
+      - id: TS-04-01
+        title: "Inicializar projeto Spring Boot com dependências (Security, JPA, Validation, OpenAPI)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-04-02
+        title: "Configurar profiles de ambiente (dev, prod) com application.yml"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-04-03
+        title: "Configurar datasource PostgreSQL e connection pool"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-04-04
+        title: "Configurar Flyway com migration inicial (tabela de controle)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-04-05
+        title: "Implementar GlobalExceptionHandler com respostas padronizadas"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-04-06
+        title: "Configurar Springdoc OpenAPI com documentação base"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+      - id: TS-04-07
+        title: "Criar dados simulados (mocks/stubs) para autenticação e inspeção"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 1"
+
+  # ── Sprint 2: Identidade, acesso e cadastros ────────────────
+
+  - id: US-05
+    title: "Autenticar usuário com e-mail e senha via API"
+    story: |
+      **Como** usuário do sistema,
+      **quero** autenticar-me com e-mail e senha,
+      **para** acessar somente os recursos permitidos ao meu perfil.
+    acceptance_criteria:
+      - "Login válido retorna access token JWT e refresh token com expiração definida"
+      - "Credenciais inválidas retornam erro sem revelar qual campo está incorreto"
+      - "Usuário inativo tem acesso negado com mensagem orientativa"
+      - "Token de acesso renovado automaticamente via refresh token"
+    priority: "High"
+    story_points: 8
+    iteration: "Sprint 2"
+    tasks:
+      - id: TS-05-01
+        title: "Criar entidade User com campos: email, senha (hash), perfil, ativo"
+        priority: "High"
+        story_points: 1
         iteration: "Sprint 2"
-        tasks:
-          - id: TS-02-01
-            title: "Endpoint POST /auth/forgot-password"
-            priority: "Medium"
-            story_points: 2
-          - id: TS-02-02
-            title: "Integração com serviço de email (SES/SendGrid)"
-            priority: "Medium"
-            story_points: 1
+      - id: TS-05-02
+        title: "Criar migration V2 para tabela users"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-05-03
+        title: "Implementar UserRepository e UserService com busca por email"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-05-04
+        title: "Configurar Spring Security com filtro de autenticação JWT"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-05-05
+        title: "Implementar endpoint POST /auth/login com validação de credenciais"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-05-06
+        title: "Implementar geração e assinatura de access token JWT"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-05-07
+        title: "Implementar geração e armazenamento de refresh token"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-05-08
+        title: "Implementar endpoint POST /auth/refresh com validação do refresh token"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-05-09
+        title: "Implementar endpoint POST /auth/logout com invalidação de token"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
 
-  - id: EP-02
-    name: "Dashboard"
-    description: "Tela inicial pós-login com métricas do usuário."
-    priority: "Medium"
-    user_stories:
-      - id: US-03
-        title: "Visualizar métricas resumidas"
-        story: |
-          **Como** cliente logado,
-          **quero** ver um resumo das minhas métricas na home,
-          **para** entender rapidamente meu status.
-        acceptance_criteria:
-          - "Carrega em menos de 2s"
-          - "Mostra pelo menos 4 KPIs"
-        priority: "Medium"
-        story_points: 5
-        tasks:
-          - id: TS-03-01
-            title: "Endpoint GET /dashboard/summary"
-            priority: "Medium"
-            story_points: 3
+  - id: US-06
+    title: "Gerenciar sessão de login no aplicativo mobile"
+    story: |
+      **Como** técnico,
+      **quero** iniciar e encerrar minha sessão no aplicativo,
+      **para** acessar minhas inspeções com segurança.
+    acceptance_criteria:
+      - "Tela de login com validação de campos e mensagem de erro sem revelar detalhes"
+      - "Sessão persistida com SecureStore e carregada ao reiniciar o app"
+      - "Logout remove dados sensíveis e retorna à tela de login"
+      - "Refresh automático de token transparente ao usuário"
+    priority: "High"
+    story_points: 8
+    iteration: "Sprint 2"
+    tasks:
+      - id: TS-06-01
+        title: "Criar serviço HTTP base com instância axios e configuração de base URL por ambiente"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-06-02
+        title: "Implementar tela de login com campos de email e senha"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-06-03
+        title: "Implementar validação de campos no formulário de login"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-06-04
+        title: "Integrar tela de login ao endpoint POST /auth/login com tratamento de erro"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-06-05
+        title: "Persistir access token e refresh token com Expo SecureStore"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-06-06
+        title: "Implementar carregamento de sessão ao iniciar o app (splash → home ou login)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-06-07
+        title: "Implementar interceptador Axios para refresh automático de token expirado"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-06-08
+        title: "Implementar logout: limpar SecureStore, chamar /auth/logout e redirecionar"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+
+  - id: US-07
+    title: "Gerenciar sessão de login no painel administrativo web"
+    story: |
+      **Como** administrador ou supervisor,
+      **quero** iniciar e encerrar minha sessão na interface web,
+      **para** acessar as funcionalidades administrativas com segurança.
+    acceptance_criteria:
+      - "Tela de login com validação e mensagem de erro sem revelar qual campo falhou"
+      - "Sessão persistida e interceptador HTTP com Bearer token configurado"
+      - "Logout limpa a sessão e bloqueia acesso às rotas protegidas"
+      - "Refresh automático antes de redirecionar para login"
+    priority: "High"
+    story_points: 5
+    iteration: "Sprint 2"
+    tasks:
+      - id: TS-07-01
+        title: "Implementar tela de login Angular com formulário reativo e validação"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-07-02
+        title: "Implementar AuthService com chamada ao POST /auth/login e armazenamento de token"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-07-03
+        title: "Configurar HttpInterceptor com Bearer token em todas as requisições"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-07-04
+        title: "Implementar interceptador de refresh automático de token expirado"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-07-05
+        title: "Implementar AuthGuard para rotas protegidas e logout com limpeza de sessão"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+
+  - id: US-08
+    title: "Gerenciar usuários do sistema (administrador)"
+    story: |
+      **Como** administrador,
+      **quero** cadastrar, editar e inativar usuários,
+      **para** controlar quem acessa o sistema e com qual perfil.
+    acceptance_criteria:
+      - "Administrador cadastra usuário com nome, e-mail, perfil e situação"
+      - "E-mail duplicado é bloqueado com mensagem clara"
+      - "Usuário inativo não consegue iniciar nova sessão"
+      - "Técnico não acessa endpoints administrativos; perfil validado na API"
+    priority: "High"
+    story_points: 8
+    iteration: "Sprint 2"
+    tasks:
+      - id: TS-08-01
+        title: "Implementar endpoint POST /users com validação de unicidade de email e perfil"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-08-02
+        title: "Implementar endpoint GET /users com paginação e filtros (nome, perfil, status)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-08-03
+        title: "Implementar endpoint PUT /users/:id para edição de dados do usuário"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-08-04
+        title: "Implementar endpoint PATCH /users/:id/status para ativar e inativar usuário"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-08-05
+        title: "Implementar autorização por perfil bloqueando técnico em endpoints administrativos"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-08-06
+        title: "Criar tela de listagem de usuários com tabela e filtros no painel web"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-08-07
+        title: "Criar formulário de cadastro e edição de usuário no painel web"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-08-08
+        title: "Implementar ação de ativar/inativar usuário com confirmação no painel web"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+
+  - id: US-09
+    title: "Gerenciar clientes, locais e equipamentos"
+    story: |
+      **Como** supervisor,
+      **quero** gerenciar clientes, locais e equipamentos vinculados entre si,
+      **para** organizar as inspeções por organização e local atendido.
+    acceptance_criteria:
+      - "Clientes cadastrados com nome obrigatório, pesquisáveis e filtráveis"
+      - "Locais vinculados a clientes; filtrados pelo cliente selecionado"
+      - "Equipamentos vinculados a locais com QR Code único obrigatório"
+      - "Registros inativos não podem ser usados em novas inspeções"
+    priority: "High"
+    story_points: 13
+    iteration: "Sprint 2"
+    tasks:
+      - id: TS-09-01
+        title: "Criar migrations para tabelas clients, locations e equipments"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-09-02
+        title: "Implementar CRUD de clientes (POST, GET, PUT, PATCH status) na API"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-09-03
+        title: "Implementar pesquisa textual e paginação no endpoint GET /clients"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-09-04
+        title: "Criar tela de listagem e formulário de clientes no painel web"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-09-05
+        title: "Implementar CRUD de locais com vínculo obrigatório ao cliente (API)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-09-06
+        title: "Criar tela de listagem e formulário de locais no painel web"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-09-07
+        title: "Implementar geração de QR Code UUID único ao criar equipamento (API)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-09-08
+        title: "Implementar CRUD de equipamentos com vínculo ao local (API)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-09-09
+        title: "Criar tela de listagem e formulário de equipamentos com exibição do QR Code (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-09-10
+        title: "Implementar filtro de locais por cliente e equipamentos por local na seleção (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+      - id: TS-09-11
+        title: "Validar que registros inativos não são aceitos em novas inspeções (API)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 2"
+
+  # ── Sprint 3: Modelos de inspeção e planejamento ─────────────
+
+  - id: US-10
+    title: "Criar e configurar modelo de inspeção em rascunho"
+    story: |
+      **Como** supervisor,
+      **quero** criar um modelo de inspeção com seções e itens configuráveis,
+      **para** padronizar a execução das inspeções de campo.
+    acceptance_criteria:
+      - "Modelo criado em rascunho com título, descrição e categoria"
+      - "Seções criadas e ordenadas dentro do modelo"
+      - "Itens com tipo de resposta, obrigatoriedade e regras de evidência definidos"
+      - "Rascunho editável até a publicação"
+    priority: "High"
+    story_points: 13
+    iteration: "Sprint 3"
+    tasks:
+      - id: TS-10-01
+        title: "Criar migrations para tabelas templates, template_sections e template_items"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-10-02
+        title: "Implementar endpoint POST /templates para criar modelo em rascunho"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-10-03
+        title: "Implementar endpoint PUT /templates/:id para editar título e descrição"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-10-04
+        title: "Implementar endpoint POST /templates/:id/sections para criar seção"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-10-05
+        title: "Implementar endpoint PATCH /templates/:id/sections/order para reordenar seções"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-10-06
+        title: "Implementar endpoint POST /sections/:id/items para criar item"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-10-07
+        title: "Implementar enum de tipos de resposta (texto, número, booleano, conformidade, seleção, data, foto)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-10-08
+        title: "Implementar campos de obrigatoriedade, exigência de observação e exigência de evidência por item"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-10-09
+        title: "Criar tela de listagem de modelos no painel web"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-10-10
+        title: "Criar tela de construtor de modelo com lista de seções e itens (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-10-11
+        title: "Criar formulário de seção e formulário de item com seleção de tipo de resposta (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+
+  - id: US-11
+    title: "Publicar versão imutável do modelo de inspeção"
+    story: |
+      **Como** supervisor,
+      **quero** visualizar uma prévia e publicar uma versão imutável do modelo,
+      **para** garantir que as inspeções usem sempre uma versão estável e rastreável.
+    acceptance_criteria:
+      - "Publicação bloqueada se não houver ao menos uma seção com item válido"
+      - "Versão publicada é numerada e imutável; alterações geram nova versão"
+      - "Inspeções existentes preservam o snapshot da versão utilizada"
+      - "Prévia do checklist exibida antes da publicação"
+    priority: "High"
+    story_points: 8
+    iteration: "Sprint 3"
+    tasks:
+      - id: TS-11-01
+        title: "Implementar validação pré-publicação: modelo com seção e ao menos um item com tipo definido"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-11-02
+        title: "Implementar endpoint POST /templates/:id/publish para criar versão numerada"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-11-03
+        title: "Implementar imutabilidade da versão publicada (bloquear edições na versão)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-11-04
+        title: "Implementar versionamento: alterações estruturais em modelo com versão ativa criam nova versão"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-11-05
+        title: "Criar tela de prévia do checklist a partir dos dados do rascunho (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-11-06
+        title: "Implementar botão de publicação com feedback de validação e erros (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+
+  - id: US-12
+    title: "Agendar e atribuir inspeção a um técnico"
+    story: |
+      **Como** supervisor,
+      **quero** agendar uma inspeção a partir de um modelo publicado e atribuí-la a um técnico,
+      **para** garantir que o trabalho de campo seja planejado e rastreado.
+    acceptance_criteria:
+      - "Inspeção criada com snapshot dos itens, prioridade e data prevista"
+      - "Local pertence ao cliente e equipamento ao local selecionados"
+      - "Técnico deve estar ativo para ser atribuído"
+      - "Inspeção visível ao técnico após sincronização"
+    priority: "High"
+    story_points: 8
+    iteration: "Sprint 3"
+    tasks:
+      - id: TS-12-01
+        title: "Criar migrations para tabelas inspections e inspection_item_snapshots"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-12-02
+        title: "Implementar endpoint POST /inspections com geração de snapshot dos itens"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-12-03
+        title: "Validar: local pertence ao cliente, equipamento ao local, técnico ativo"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-12-04
+        title: "Criar formulário de agendamento com seleção de modelo publicado (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-12-05
+        title: "Implementar seleção encadeada cliente → local → equipamento no formulário (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-12-06
+        title: "Implementar seleção de técnico ativo e campos de prioridade, prazo e instruções (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-12-07
+        title: "Exibir confirmação de agendamento e estado inicial da inspeção no painel (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+
+  - id: US-13
+    title: "Acompanhar e cancelar inspeções agendadas"
+    story: |
+      **Como** supervisor,
+      **quero** acompanhar inspeções em uma listagem com filtros e cancelar quando necessário,
+      **para** manter o controle do planejamento operacional.
+    acceptance_criteria:
+      - "Listagem com filtros por estado, técnico, cliente e período"
+      - "Inspeções atrasadas identificadas visualmente"
+      - "Cancelamento exige justificativa e registra auditoria"
+      - "Estado local do técnico atualizado na próxima sincronização"
+    priority: "High"
+    story_points: 5
+    iteration: "Sprint 3"
+    tasks:
+      - id: TS-13-01
+        title: "Implementar endpoint GET /inspections com filtros por estado, técnico, cliente e período"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-13-02
+        title: "Criar tela de listagem de inspeções com filtros e paginação no painel web"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-13-03
+        title: "Implementar identificação visual de inspeções atrasadas na listagem (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-13-04
+        title: "Implementar endpoint PATCH /inspections/:id/cancel com justificativa obrigatória"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+      - id: TS-13-05
+        title: "Implementar modal de cancelamento com campo de justificativa no painel web"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 3"
+
+  # ── Sprint 4: Execução de campo ───────────────────────────────
+
+  - id: US-14
+    title: "Visualizar inspeções atribuídas no aplicativo mobile"
+    story: |
+      **Como** técnico,
+      **quero** visualizar e filtrar as inspeções atribuídas a mim,
+      **para** organizar meu trabalho de campo com clareza.
+    acceptance_criteria:
+      - "Lista exibe estado, prioridade, data, cliente e local de cada inspeção"
+      - "Interface diferencia atrasada, em andamento e pendente de sincronização"
+      - "Filtros não apagam dados locais"
+      - "Tela de detalhes funciona offline para inspeções já baixadas"
+    priority: "High"
+    story_points: 5
+    iteration: "Sprint 4"
+    tasks:
+      - id: TS-14-01
+        title: "Implementar endpoint GET /me/inspections retornando somente inspeções do técnico autenticado"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-14-02
+        title: "Criar tela de lista de inspeções com cards exibindo estado, prioridade, data, cliente e local"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-14-03
+        title: "Implementar diferenciação visual de inspeções atrasadas, em andamento e pendentes de sincronização"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-14-04
+        title: "Implementar filtros locais por estado, data e prioridade sem remover dados do SQLite"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-14-05
+        title: "Criar tela de detalhes da inspeção com dados do equipamento, técnico e instruções"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+
+  - id: US-15
+    title: "Iniciar inspeção e registrar horário de início"
+    story: |
+      **Como** técnico,
+      **quero** iniciar formalmente uma inspeção e ter o horário registrado,
+      **para** garantir rastreabilidade da execução de campo.
+    acceptance_criteria:
+      - "Data e hora do dispositivo registradas no início"
+      - "Estado local muda para Em andamento após confirmação"
+      - "Operação de início criada na outbox"
+      - "API bloqueia início de inspeção de outro técnico"
+    priority: "High"
+    story_points: 5
+    iteration: "Sprint 4"
+    tasks:
+      - id: TS-15-01
+        title: "Implementar tela de confirmação de início com dados resumidos da inspeção"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-15-02
+        title: "Registrar data e hora do dispositivo ao confirmar o início"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-15-03
+        title: "Atualizar estado local da inspeção para Em andamento no SQLite"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-15-04
+        title: "Criar entrada na outbox com operação de início e identificador idempotente"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-15-05
+        title: "Implementar endpoint PATCH /inspections/:id/start com validação de autorização"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+
+  - id: US-16
+    title: "Responder checklist dinâmico da inspeção"
+    story: |
+      **Como** técnico,
+      **quero** responder o checklist gerado dinamicamente a partir do snapshot,
+      **para** registrar as verificações de campo de forma padronizada.
+    acceptance_criteria:
+      - "Itens na ordem do snapshot com o componente correto para cada tipo"
+      - "Resposta salva imediatamente em SQLite; preservada após reiniciar o app"
+      - "Resposta não conforme exige observação quando configurado"
+      - "Itens obrigatórios pendentes identificados e progresso exibido"
+    priority: "High"
+    story_points: 13
+    iteration: "Sprint 4"
+    tasks:
+      - id: TS-16-01
+        title: "Criar tabela inspection_responses no SQLite local"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-16-02
+        title: "Implementar componente de resposta para tipo Texto curto"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-16-03
+        title: "Implementar componente de resposta para tipo Número"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-16-04
+        title: "Implementar componente de resposta para tipo Verdadeiro/Falso"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-16-05
+        title: "Implementar componente de resposta para tipo Conforme/Não conforme"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-16-06
+        title: "Implementar componente de resposta para tipo Seleção única"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-16-07
+        title: "Implementar componente de resposta para tipo Data"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-16-08
+        title: "Implementar renderizador dinâmico de itens por tipo de resposta via snapshot"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-16-09
+        title: "Salvar resposta imediatamente no SQLite ao alterar input do item"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-16-10
+        title: "Implementar barra de progresso por seção e total de itens respondidos"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-16-11
+        title: "Exigir campo de observação ao registrar resposta não conforme quando configurado"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+
+  - id: US-17
+    title: "Concluir inspeção com validação dos requisitos obrigatórios"
+    story: |
+      **Como** técnico,
+      **quero** concluir a inspeção somente quando todos os requisitos estiverem atendidos,
+      **para** garantir a integridade do registro antes do envio.
+    acceptance_criteria:
+      - "Conclusão bloqueada com itens obrigatórios ou evidências pendentes"
+      - "Itens pendentes destacados na tela ao tentar concluir"
+      - "Horário de conclusão registrado e respostas bloqueadas para edição"
+      - "Inspeção offline marcada como Aguardando sincronização"
+    priority: "High"
+    story_points: 8
+    iteration: "Sprint 4"
+    tasks:
+      - id: TS-17-01
+        title: "Criar tela de resumo da inspeção antes da confirmação de conclusão"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-17-02
+        title: "Implementar validação de todos os itens obrigatórios respondidos"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-17-03
+        title: "Implementar validação de evidências exigidas presentes"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-17-04
+        title: "Destacar itens pendentes na tela quando conclusão for bloqueada"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-17-05
+        title: "Registrar data e hora de conclusão no SQLite ao confirmar"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-17-06
+        title: "Bloquear edição de respostas após conclusão e atualizar estado local para Aguardando sincronização"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-17-07
+        title: "Criar entrada na outbox com operação de conclusão e identificador idempotente"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+      - id: TS-17-08
+        title: "Implementar endpoint PATCH /inspections/:id/complete com validação na API"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 4"
+
+  # ── Sprint 5: Recursos nativos e evidências ───────────────────
+
+  - id: US-18
+    title: "Identificar equipamento por leitura de QR Code"
+    story: |
+      **Como** técnico,
+      **quero** ler o QR Code do equipamento para confirmá-lo antes de iniciar,
+      **para** garantir que a inspeção está sendo executada no equipamento correto.
+    acceptance_criteria:
+      - "Câmera solicita permissão antes do uso; leitura limitada a um código por ciclo"
+      - "Equipamento localizado na base local e exibido para confirmação"
+      - "Divergência exige confirmação ou bloqueia conforme regra"
+      - "Identificação manual disponível quando permissão negada"
+    priority: "High"
+    story_points: 5
+    iteration: "Sprint 5"
+    tasks:
+      - id: TS-18-01
+        title: "Instalar e configurar biblioteca de scanner de QR Code (expo-barcode-scanner ou expo-camera)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-18-02
+        title: "Implementar tela de scanner com solicitação de permissão de câmera"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-18-03
+        title: "Buscar equipamento na base local SQLite pelo código lido e exibir dados"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-18-04
+        title: "Tratar divergência: exibir alerta de confirmação ou bloquear conforme regra da inspeção"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-18-05
+        title: "Disponibilizar campo de identificação manual quando permissão de câmera negada"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+
+  - id: US-19
+    title: "Capturar e associar fotografia como evidência do item"
+    story: |
+      **Como** técnico,
+      **quero** capturar uma fotografia e associá-la ao item correto do checklist,
+      **para** registrar evidências visuais da inspeção.
+    acceptance_criteria:
+      - "Câmera solicitada com permissão; prévia exibida para confirmar ou refazer"
+      - "Evidência salva localmente com identificador próprio e associada ao item"
+      - "Upload pendente criado para sincronização; evidência visível offline"
+      - "Falha de upload não reverte outros dados confirmados"
+    priority: "High"
+    story_points: 8
+    iteration: "Sprint 5"
+    tasks:
+      - id: TS-19-01
+        title: "Implementar solicitação de permissão de câmera com expo-image-picker"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-19-02
+        title: "Implementar captura de foto e exibição de prévia com opção de confirmar ou refazer"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-19-03
+        title: "Validar formato e tamanho do arquivo antes de salvar"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-19-04
+        title: "Salvar arquivo de imagem localmente com identificador único (UUID)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-19-05
+        title: "Associar evidência ao item do checklist e registrar no SQLite"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-19-06
+        title: "Criar entrada de upload pendente na outbox com referência ao arquivo local"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-19-07
+        title: "Implementar endpoint POST /evidences com upload multipart (API)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-19-08
+        title: "Implementar controle de acesso a arquivos (não públicos sem token válido)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+
+  - id: US-20
+    title: "Registrar localização GPS no início e na conclusão da inspeção"
+    story: |
+      **Como** técnico,
+      **quero** ter minha localização registrada automaticamente ao iniciar e concluir,
+      **para** garantir rastreabilidade geográfica da execução.
+    acceptance_criteria:
+      - "Permissão de localização solicitada antes do uso; coleta pontual, não contínua"
+      - "Latitude, longitude, precisão e horário armazenados quando disponíveis"
+      - "Permissão negada não impede o fluxo; ausência registrada ou informada"
+      - "Dados visíveis na revisão administrativa após sincronização"
+    priority: "High"
+    story_points: 5
+    iteration: "Sprint 5"
+    tasks:
+      - id: TS-20-01
+        title: "Implementar solicitação de permissão de localização com expo-location"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-20-02
+        title: "Coletar latitude, longitude, precisão e horário pontualmente no início da inspeção"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-20-03
+        title: "Coletar localização pontualmente na conclusão da inspeção"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-20-04
+        title: "Persistir dados de localização no SQLite e incluir nas operações da outbox"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-20-05
+        title: "Exibir localização de início e conclusão na tela de revisão administrativa (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+
+  - id: US-21
+    title: "Registrar não conformidade com criticidade e evidência"
+    story: |
+      **Como** técnico,
+      **quero** registrar não conformidades identificadas durante a inspeção,
+      **para** documentar problemas com criticidade e evidências associadas.
+    acceptance_criteria:
+      - "Não conformidade criada com título, descrição e criticidade validados"
+      - "Criticidade crítica exige evidência fotográfica"
+      - "Registro funciona offline e é adicionado à outbox"
+      - "Não conformidade visível na revisão administrativa após sincronização"
+    priority: "High"
+    story_points: 5
+    iteration: "Sprint 5"
+    tasks:
+      - id: TS-21-01
+        title: "Criar tabela non_conformities no SQLite local"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-21-02
+        title: "Implementar formulário de não conformidade com campos título, descrição e criticidade"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-21-03
+        title: "Validar obrigatoriedade de evidência para criticidade crítica"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-21-04
+        title: "Salvar não conformidade no SQLite vinculada ao item e inspeção e criar entrada na outbox"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-21-05
+        title: "Implementar endpoint POST /inspections/:id/non-conformities na API"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+
+  - id: US-22
+    title: "Visualizar evidências e não conformidades no painel administrativo"
+    story: |
+      **Como** supervisor,
+      **quero** visualizar fotografias e não conformidades registradas durante a inspeção,
+      **para** analisar o contexto antes de decidir sobre a revisão.
+    acceptance_criteria:
+      - "Fotografias amplificáveis e associadas ao item correto"
+      - "Não conformidades listadas com criticidade e evidências vinculadas"
+      - "Localização de início e conclusão consultável"
+      - "Evidências de inspeção aprovada são somente leitura"
+    priority: "High"
+    story_points: 3
+    iteration: "Sprint 5"
+    tasks:
+      - id: TS-22-01
+        title: "Implementar listagem de evidências por item na tela de revisão (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-22-02
+        title: "Implementar visualizador de imagem com zoom e navegação entre fotos (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+      - id: TS-22-03
+        title: "Implementar listagem de não conformidades com criticidade na revisão (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 5"
+
+  # ── Sprint 6: Offline e sincronização ────────────────────────
+
+  - id: US-23
+    title: "Acessar e executar inspeções sem conexão à internet"
+    story: |
+      **Como** técnico,
+      **quero** acessar e executar inspeções em áreas sem sinal,
+      **para** garantir a continuidade do trabalho de campo independente de conectividade.
+    acceptance_criteria:
+      - "Inspeções previamente baixadas acessíveis sem conexão"
+      - "Respostas preservadas após fechar e reabrir o app"
+      - "Referências locais de evidências mantidas offline"
+      - "Inspeção concluída offline marcada como Aguardando sincronização"
+    priority: "High"
+    story_points: 5
+    iteration: "Sprint 6"
+    tasks:
+      - id: TS-23-01
+        title: "Criar schema SQLite completo: inspections, snapshots, responses, evidences, non_conformities"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-23-02
+        title: "Implementar download de inspeção completa e gravação no SQLite"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-23-03
+        title: "Carregar inspeção e respostas do SQLite ao abrir o app sem conectividade"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-23-04
+        title: "Garantir retomada de inspeção em andamento após reiniciar o app"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-23-05
+        title: "Persistir URI local de evidências e manter estado de upload pendente offline"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+
+  - id: US-24
+    title: "Sincronizar operações pendentes com o servidor via outbox"
+    story: |
+      **Como** sistema,
+      **quero** enviar operações pendentes ao servidor de forma ordenada e idempotente,
+      **para** garantir que os dados chegam com integridade e sem duplicidade.
+    acceptance_criteria:
+      - "Operações enviadas na ordem correta respeitando dependências"
+      - "Identificador idempotente impede duplicidade em reenvio"
+      - "Falha parcial mantém confirmadas e preserva pendências"
+      - "Arquivo pendente tem estado individual independente dos dados textuais"
+    priority: "High"
+    story_points: 8
+    iteration: "Sprint 6"
+    tasks:
+      - id: TS-24-01
+        title: "Criar tabela outbox no SQLite com campos: id, tipo, payload, status, tentativas, idempotency_key"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-24-02
+        title: "Implementar serviço de enfileiramento de operações na outbox"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-24-03
+        title: "Implementar ordenação de operações por tipo e dependência antes do envio"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-24-04
+        title: "Implementar envio de lote de operações ao servidor"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-24-05
+        title: "Processar resultado individual por operação e marcar confirmadas no SQLite"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-24-06
+        title: "Implementar retry controlado para operações com falha recuperável"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-24-07
+        title: "Implementar idempotência na API: rejeitar ou responder operação já processada pelo mesmo idempotency_key"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+
+  - id: US-25
+    title: "Baixar alterações do servidor com cursor de sincronização incremental"
+    story: |
+      **Como** sistema,
+      **quero** baixar apenas as alterações ocorridas desde a última sincronização,
+      **para** manter o estado local atualizado com eficiência e sem redundância.
+    acceptance_criteria:
+      - "Cursor avança somente após persistência local confirmada"
+      - "Alterações do servidor atualizam estados das inspeções locais"
+      - "Conflito de versão detectado e dados locais preservados"
+      - "Inspeção cancelada atualiza estado local sem apagar respostas pendentes"
+    priority: "High"
+    story_points: 8
+    iteration: "Sprint 6"
+    tasks:
+      - id: TS-25-01
+        title: "Implementar endpoint GET /sync/pull?after=cursor na API retornando eventos desde o cursor"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-25-02
+        title: "Implementar geração de cursor baseado em timestamp ou sequência incremental"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-25-03
+        title: "Implementar cliente de pull no mobile consumindo o endpoint com cursor persistido localmente"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-25-04
+        title: "Avançar cursor local somente após persistência dos dados recebidos no SQLite"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-25-05
+        title: "Detectar conflito de versão e marcar inspeção com estado de conflito sem sobrescrever local"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-25-06
+        title: "Atualizar estado local de inspeção cancelada sem apagar respostas pendentes"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+
+  - id: US-26
+    title: "Monitorar status de sincronização no aplicativo"
+    story: |
+      **Como** técnico,
+      **quero** visualizar o status de sincronização e as pendências no aplicativo,
+      **para** saber se os dados foram enviados com sucesso ou se há falhas.
+    acceptance_criteria:
+      - "Tela exibe operações pendentes, falhas e data da última sincronização"
+      - "Outbox persiste ao sair e entrar no app"
+      - "Falha de envio exibe mensagem com opção de tentar novamente"
+      - "Contador de pendências atualizado após cada sincronização"
+    priority: "High"
+    story_points: 3
+    iteration: "Sprint 6"
+    tasks:
+      - id: TS-26-01
+        title: "Criar tela de sincronização com contador de operações pendentes por tipo"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-26-02
+        title: "Exibir data e hora da última sincronização bem-sucedida"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+      - id: TS-26-03
+        title: "Exibir mensagem de erro por operação com falha e botão de sincronização manual"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 6"
+
+  # ── Sprint 7: Revisão, decisão e qualidade ───────────────────
+
+  - id: US-27
+    title: "Revisar inspeção enviada por seção e item"
+    story: |
+      **Como** supervisor,
+      **quero** revisar o conteúdo de uma inspeção navegando por seções e itens,
+      **para** analisar respostas, observações e evidências antes de decidir.
+    acceptance_criteria:
+      - "Listagem de inspeções enviadas com filtros por técnico, cliente, estado e período"
+      - "Revisão navega pelas seções com respostas, observações e evidências"
+      - "Início formal da revisão muda estado para Em revisão com auditoria"
+      - "Visualização respeita o perfil do usuário"
+    priority: "High"
+    story_points: 8
+    iteration: "Sprint 7"
+    tasks:
+      - id: TS-27-01
+        title: "Implementar endpoint GET /inspections?status=submitted com filtros avançados (API)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-27-02
+        title: "Criar tela de listagem de inspeções enviadas com filtros no painel web"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-27-03
+        title: "Criar tela de revisão com navegação entre seções do checklist (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-27-04
+        title: "Exibir resposta, tipo, observação e evidências por item na tela de revisão (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-27-05
+        title: "Implementar endpoint POST /inspections/:id/start-review (API)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-27-06
+        title: "Registrar início de revisão na tabela de auditoria com usuário, data e estado anterior"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+
+  - id: US-28
+    title: "Aprovar inspeção revisada"
+    story: |
+      **Como** supervisor,
+      **quero** aprovar uma inspeção após a revisão,
+      **para** registrar a decisão com rastreabilidade e proteger os dados.
+    acceptance_criteria:
+      - "Aprovação registra revisor, horário e comentário opcional"
+      - "Estado muda para Aprovada e respostas ficam protegidas"
+      - "Ação auditada com data, hora e usuário"
+      - "Aprovação disponível somente para inspeções em revisão"
+    priority: "High"
+    story_points: 5
+    iteration: "Sprint 7"
+    tasks:
+      - id: TS-28-01
+        title: "Implementar endpoint POST /inspections/:id/approve na API"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-28-02
+        title: "Registrar revisor, horário e comentário na aprovação com entrada na tabela de auditoria"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-28-03
+        title: "Bloquear endpoints de edição de respostas quando inspeção estiver aprovada"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-28-04
+        title: "Implementar botão de aprovação com modal de confirmação e campo de comentário (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-28-05
+        title: "Atualizar estado da inspeção para Aprovada na listagem após ação (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+
+  - id: US-29
+    title: "Reprovar inspeção com motivo obrigatório"
+    story: |
+      **Como** supervisor,
+      **quero** reprovar uma inspeção informando o motivo,
+      **para** que o técnico receba as instruções de correção na próxima sincronização.
+    acceptance_criteria:
+      - "Reprovação sem motivo bloqueada pela API"
+      - "Estado muda para Reprovada com registro de revisor, horário e motivo"
+      - "Técnico recebe inspeção reprovada com motivo na próxima sincronização"
+      - "Ação auditada com data, hora e usuário"
+    priority: "High"
+    story_points: 5
+    iteration: "Sprint 7"
+    tasks:
+      - id: TS-29-01
+        title: "Implementar endpoint POST /inspections/:id/reject com validação de motivo obrigatório (API)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-29-02
+        title: "Registrar reprovação na tabela de auditoria com motivo e revisor"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-29-03
+        title: "Implementar formulário de reprovação com campo de motivo obrigatório no painel web"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-29-04
+        title: "Incluir inspeção reprovada com motivo no payload do endpoint de pull do técnico"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-29-05
+        title: "Exibir inspeção reprovada no mobile com motivo e instruções de correção"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+
+  - id: US-30
+    title: "Registrar e consultar histórico de mudanças de estado"
+    story: |
+      **Como** responsável por auditoria,
+      **quero** ter todas as transições de estado registradas e consultáveis,
+      **para** garantir rastreabilidade completa do ciclo de vida das inspeções.
+    acceptance_criteria:
+      - "Transições críticas registradas com data, hora, usuário e estado anterior"
+      - "Histórico mínimo consultável na revisão administrativa"
+      - "Senhas, tokens e stack traces não expostos em logs ou respostas"
+      - "Segredos não versionados no repositório"
+    priority: "High"
+    story_points: 3
+    iteration: "Sprint 7"
+    tasks:
+      - id: TS-30-01
+        title: "Criar tabela audit_log com campos: evento, entidade_id, usuario_id, estado_anterior, estado_novo, timestamp"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-30-02
+        title: "Registrar auditoria em: início, conclusão, início de revisão, aprovação, reprovação e cancelamento"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-30-03
+        title: "Implementar endpoint GET /inspections/:id/history e exibir histórico na tela de revisão (web)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+
+  - id: US-31
+    title: "Tratar estados de interface para carregamento, vazio, erro e offline"
+    story: |
+      **Como** usuário do sistema,
+      **quero** receber mensagens claras em todas as situações de interface,
+      **para** entender o estado da aplicação sem ambiguidade.
+    acceptance_criteria:
+      - "Carregamento, vazio, erro e sucesso tratados em todos os fluxos críticos"
+      - "Ausência de dados exibe estado vazio com orientação, não erro genérico"
+      - "Falha de rede no mobile não remove dados armazenados anteriormente"
+      - "API não expõe stack trace nas respostas de erro"
+    priority: "High"
+    story_points: 5
+    iteration: "Sprint 7"
+    tasks:
+      - id: TS-31-01
+        title: "Criar componente LoadingSpinner reutilizável no mobile"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-31-02
+        title: "Criar componente EmptyState com ícone e mensagem configurável no mobile"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-31-03
+        title: "Criar componente ErrorBanner com mensagem de erro e botão de retry no mobile"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-31-04
+        title: "Criar componente OfflineBanner informando ausência de conectividade (mobile)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-31-05
+        title: "Criar componentes equivalentes de estado vazio, carregamento e erro no painel web (Angular)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+
+  - id: US-32
+    title: "Implementar testes automatizados dos fluxos críticos"
+    story: |
+      **Como** equipe de desenvolvimento,
+      **quero** testes automatizados nos fluxos mais importantes,
+      **para** garantir a estabilidade do produto antes da entrega.
+    acceptance_criteria:
+      - "Componentes do checklist cobertos por testes de renderização e interação"
+      - "Endpoints críticos da API cobertos por testes de integração"
+      - "Fluxos da outbox cobertos com cenários de falha e reenvio"
+      - "Cenários de permissão negada validados"
+    priority: "High"
+    story_points: 8
+    iteration: "Sprint 7"
+    tasks:
+      - id: TS-32-01
+        title: "Configurar ambiente de testes no mobile (Jest + React Native Testing Library)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-32-02
+        title: "Escrever testes de renderização para cada componente de tipo de resposta do checklist"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-32-03
+        title: "Escrever testes de lógica para validação de conclusão (itens obrigatórios e evidências)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-32-04
+        title: "Escrever testes da outbox: enfileiramento, envio, falha e reenvio idempotente"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-32-05
+        title: "Configurar testes de integração na API com Spring Boot Test e Testcontainers"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-32-06
+        title: "Escrever testes de integração para login, criação de inspeção e execução de checklist"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+      - id: TS-32-07
+        title: "Escrever testes de autorização: técnico bloqueado em rotas administrativas, inspeção de outro técnico negada"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 7"
+
+  # ── Sprint 8: Entrega e demonstração ─────────────────────────
+
+  - id: US-33
+    title: "Preparar dados de demonstração reproduzíveis"
+    story: |
+      **Como** equipe de avaliação,
+      **quero** dados de demonstração que possam ser recriados facilmente,
+      **para** executar o fluxo ponta a ponta de forma consistente.
+    acceptance_criteria:
+      - "Script de seed cria todos os cadastros e modelo publicado"
+      - "Inspeção de exemplo criada com respostas, evidências e não conformidade"
+      - "Seed idempotente: reexecução não duplica dados"
+      - "Cobre todos os perfis: administrador, supervisor e técnico"
+    priority: "High"
+    story_points: 5
+    iteration: "Sprint 8"
+    tasks:
+      - id: TS-33-01
+        title: "Criar usuários de demonstração para cada perfil (admin, supervisor, técnico)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 8"
+      - id: TS-33-02
+        title: "Criar cliente, local e equipamentos de demonstração com QR Code"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 8"
+      - id: TS-33-03
+        title: "Criar modelo de inspeção publicado com seções e itens de tipos variados"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 8"
+      - id: TS-33-04
+        title: "Criar inspeção atribuída ao técnico de demonstração"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 8"
+      - id: TS-33-05
+        title: "Garantir idempotência do seed com verificação de existência antes de inserir"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 8"
+
+  - id: US-34
+    title: "Publicar e documentar a aplicação para demonstração final"
+    story: |
+      **Como** avaliador,
+      **quero** executar o projeto a partir do README e acessar todas as interfaces,
+      **para** avaliar o produto final sem dependência da equipe.
+    acceptance_criteria:
+      - "Build Android disponível para instalação em dispositivo físico"
+      - "Painel web publicado e acessível via URL"
+      - "API em contêiner Docker com OpenAPI acessível"
+      - "README com instruções de setup, execução e credenciais de demonstração"
+    priority: "High"
+    story_points: 8
+    iteration: "Sprint 8"
+    tasks:
+      - id: TS-34-01
+        title: "Configurar ícone, splash screen e variáveis de ambiente de produção no app mobile"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 8"
+      - id: TS-34-02
+        title: "Gerar build Android com EAS Build e publicar link de instalação (.apk ou internal track)"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 8"
+      - id: TS-34-03
+        title: "Configurar variáveis de ambiente de produção no painel web"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 8"
+      - id: TS-34-04
+        title: "Fazer build e deploy do painel web em ambiente de demonstração"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 8"
+      - id: TS-34-05
+        title: "Criar Dockerfile e docker-compose para a API com PostgreSQL"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 8"
+      - id: TS-34-06
+        title: "Publicar API com OpenAPI final acessível na URL de demonstração"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 8"
+      - id: TS-34-07
+        title: "Escrever README final com setup, execução, credenciais e fluxo completo de demonstração"
+        priority: "High"
+        story_points: 1
+        iteration: "Sprint 8"

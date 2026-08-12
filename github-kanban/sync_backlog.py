@@ -40,7 +40,9 @@ def gql(query: str, variables: dict, token: str) -> dict:
     r.raise_for_status()
     data = r.json()
     if "errors" in data:
-        raise RuntimeError(f"GraphQL errors: {data['errors']}")
+        critical = [e for e in data["errors"] if e.get("type") != "NOT_FOUND"]
+        if critical:
+            raise RuntimeError(f"GraphQL errors: {critical}")
     return data["data"]
 
 
@@ -137,7 +139,7 @@ def fetch_project_meta(owner: str, repo: str, project_number: int, token: str) -
 # ---------------------------------------------------------------------------
 def fetch_existing_issues(owner: str, repo: str, token: str) -> dict[str, dict]:
     """Retorna dict {ID: {issue_id, number, title, project_item_id?}} das issues
-    que já têm prefixo de ID (EP-, US-, TS-)."""
+    que já têm prefixo de ID (US-, TS-)."""
     result: dict[str, dict] = {}
     cursor = None
     query = """
@@ -160,7 +162,7 @@ def fetch_existing_issues(owner: str, repo: str, token: str) -> dict[str, dict]:
             title = i["title"]
             if title.startswith("[") and "]" in title:
                 item_id = title[1:title.index("]")]
-                if item_id.split("-")[0] in ("EP", "US", "TS"):
+                if item_id.split("-")[0] in ("US", "TS"):
                     result[item_id] = {
                         "issue_id": i["id"],
                         "number": i["number"],
@@ -262,17 +264,8 @@ class Item:
     fields: dict       # nome_do_campo -> valor (usa fields_map do YAML)
 
 
-def build_epic_body(epic: dict) -> str:
-    parts = [epic.get("description", "").strip()]
-    if epic.get("user_stories"):
-        parts.append("\n### User Stories\n")
-        for us in epic["user_stories"]:
-            parts.append(f"- [{us['id']}] {us['title']}")
-    return "\n".join(p for p in parts if p)
-
-
-def build_us_body(us: dict, epic_id: str) -> str:
-    parts = [f"**Épico:** {epic_id}\n", us.get("story", "").strip()]
+def build_us_body(us: dict) -> str:
+    parts = [us.get("story", "").strip()]
     ac = us.get("acceptance_criteria", [])
     if ac:
         parts.append("\n### Critérios de aceitação")
@@ -282,12 +275,11 @@ def build_us_body(us: dict, epic_id: str) -> str:
         parts.append("\n### Tasks")
         for t in us["tasks"]:
             parts.append(f"- [ ] [{t['id']}] {t['title']}")
-    return "\n".join(parts)
+    return "\n".join(p for p in parts if p)
 
 
-def build_task_body(task: dict, us_id: str, epic_id: str) -> str:
+def build_task_body(task: dict, us_id: str) -> str:
     return (
-        f"**Épico:** {epic_id}\n"
         f"**User Story:** {us_id}\n\n"
         f"{task.get('description', '').strip()}"
     ).strip()
@@ -295,46 +287,32 @@ def build_task_body(task: dict, us_id: str, epic_id: str) -> str:
 
 def flatten(backlog: dict) -> list[Item]:
     items: list[Item] = []
-    for epic in backlog.get("epics", []):
+    for us in backlog.get("user_stories", []):
         items.append(Item(
-            id=epic["id"],
-            type="Epic",
-            title=f"[{epic['id']}] {epic['name']}",
-            body=build_epic_body(epic),
+            id=us["id"],
+            type="User Story",
+            title=f"[{us['id']}] {us['title']}",
+            body=build_us_body(us),
             fields={
-                "type": "Epic",
-                "priority": epic.get("priority"),
-                "iteration": epic.get("iteration"),
+                "type": "User Story",
+                "priority": us.get("priority"),
+                "story_points": us.get("story_points"),
+                "iteration": us.get("iteration"),
             },
         ))
-        for us in epic.get("user_stories", []):
+        for task in us.get("tasks", []):
             items.append(Item(
-                id=us["id"],
-                type="User Story",
-                title=f"[{us['id']}] {us['title']}",
-                body=build_us_body(us, epic["id"]),
+                id=task["id"],
+                type="Task",
+                title=f"[{task['id']}] {task['title']}",
+                body=build_task_body(task, us["id"]),
                 fields={
-                    "type": "User Story",
-                    "priority": us.get("priority"),
-                    "story_points": us.get("story_points"),
-                    "iteration": us.get("iteration"),
-                    "epic": epic["id"],
+                    "type": "Task",
+                    "priority": task.get("priority"),
+                    "story_points": task.get("story_points"),
+                    "iteration": task.get("iteration"),
                 },
             ))
-            for task in us.get("tasks", []):
-                items.append(Item(
-                    id=task["id"],
-                    type="Task",
-                    title=f"[{task['id']}] {task['title']}",
-                    body=build_task_body(task, us["id"], epic["id"]),
-                    fields={
-                        "type": "Task",
-                        "priority": task.get("priority"),
-                        "story_points": task.get("story_points"),
-                        "iteration": task.get("iteration"),
-                        "epic": epic["id"],
-                    },
-                ))
     return items
 
 
@@ -358,7 +336,6 @@ def sync(backlog: dict, token: str, dry_run: bool = False) -> None:
 
     items = flatten(backlog)
     print(f"→ {len(items)} itens no backlog: "
-          f"{sum(1 for i in items if i.type=='Epic')} épicos, "
           f"{sum(1 for i in items if i.type=='User Story')} US, "
           f"{sum(1 for i in items if i.type=='Task')} tasks")
 

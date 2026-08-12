@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "FieldOps",
+    "slug": "fieldops",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "fieldops",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fieldops.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "O FieldOps usa a câmera para registrar evidências fotográficas dos itens da inspeção.",
+        "NSPhotoLibraryUsageDescription": "O FieldOps acessa suas fotos para anexar evidências à inspeção.",
+        "NSLocationWhenInUseUsageDescription": "O FieldOps registra a localização no início e na conclusão da inspeção."
+      }
+    },
+    "android": {
+      "package": "com.fieldops.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png",
+        "backgroundColor": "#101419"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#101419",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O FieldOps acessa suas fotos para anexar evidências à inspeção.",
+          "cameraPermission": "O FieldOps usa a câmera para registrar evidências fotográficas dos itens da inspeção."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

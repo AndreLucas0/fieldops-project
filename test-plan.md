@@ -1,5 +1,15 @@
 # Plano de Testes — FieldOps
 
+> **Atualizado para Spring Boot 4.1.0 / Java 21 / Spring Framework 7** (baseline
+> obrigatório fixado junto com `docs/dependencias-spring-initializr.md`). As
+> seções relativas à API (3.1, e as adições 3.1.1–3.1.4 abaixo) foram revisadas
+> contra a documentação oficial dessas versões; o restante do documento
+> (estrutura, convenção de rastreabilidade, backlog por marco, mobile e web)
+> permanece válido e não foi reescrito — apenas as anotações/ferramentas Java
+> citadas nas tabelas de arquivo de teste da API foram corrigidas onde
+> desatualizadas. Ver seção "Atualizações realizadas" ao final do documento
+> para o resumo do que mudou nesta revisão.
+
 Este documento cruza `docs/regras-de-negocio.md` (RN-001–RN-090),
 `docs/criterios-de-aceitacao.md` (AC-*) e `docs/casos-de-uso.md` (UC-01–UC-20)
 com os arquivos de teste que cada aplicação deve conter, organizados na mesma
@@ -50,18 +60,119 @@ seção seguindo a mesma convenção. UC-18 e UC-19 aparecem na seção 5.8 como
 
 ## 3. Estratégia de testes por aplicação
 
-### 3.1 API (Java / Spring Boot)
+### 3.1 API (Java / Spring Boot 4.1.0, Spring Framework 7, Java 21)
 
-| Camada | Ferramenta | Convenção de nome | Quando roda |
-|---|---|---|---|
-| Unit (domínio, sem contexto Spring) | JUnit 5 + Mockito + AssertJ | `*Test.java` | a cada build (Surefire) |
-| Integração (controller + banco real) | Spring Boot Test + Testcontainers (PostgreSQL) + MockMvc | `*IT.java` | build de integração (Failsafe) |
-| Conformidade de contrato | `swagger-request-validator` (ou equivalente) validando respostas contra `openapi.yaml` | incluído dentro dos `*IT.java` de cada controller | build de integração |
+| Camada | Ferramenta | Convenção de nome | Contexto Spring? | Quando roda |
+|---|---|---|---|---|
+| Unit (domínio, sem contexto Spring) | JUnit Jupiter 6 + Mockito 5 + AssertJ | `*Test.java` | Não | a cada build (Surefire) |
+| Service (regras de negócio, mocks de repositório/colaboradores) | JUnit Jupiter 6 + Mockito 5 + AssertJ, sem `@SpringBootTest` | `*Test.java` (ou `*ServiceTest.java`) | Não | a cada build (Surefire) |
+| Controller / web slice | `@WebMvcTest` + `MockMvcTester` + `@MockitoBean` | `*ControllerTest.java` (slice, opcional — ver 3.1.2) | Parcial (só camada web) | a cada build (Surefire) |
+| Repository / persistência | `@DataJpaTest` (+ Testcontainers quando o teste depende de recursos específicos do PostgreSQL) | `*RepositoryTest.java` (novo — ver 3.1.3) | Sim (fatiado) | a cada build (Surefire) ou integração, conforme 3.1.3 |
+| Integração (controller + banco real + segurança) | `@SpringBootTest` + Testcontainers (PostgreSQL) + `MockMvcTester` | `*IT.java` | Sim (completo) | build de integração (Failsafe) |
+| Segurança | Spring Security Test (`@WithMockUser`, `SecurityMockMvcRequestPostProcessors`) dentro dos `*IT.java` | incluído nos `*IT.java` de cada controller protegido | Sim | build de integração |
+| Conformidade de contrato | `swagger-request-validator` (ou equivalente) validando respostas contra `openapi.yaml` | incluído dentro dos `*IT.java` de cada controller | Sim | build de integração |
 
 Estrutura de pacotes de teste espelha `com.fieldops.<feature>` definida em
-`docs/arquitetura.md` §11.6 (`auth`, `user`, `client`, `site`, `equipment`,
-`template`, `inspection`, `evidence`, `synchronization`, `review`, `audit`,
-`shared`), com subpastas `domain/`, `application/`, `controller/`.
+`docs/arquitetura.md` §11.6, reconciliada com os pacotes efetivamente usados
+neste plano (`nonconformity`, `dashboard` — ver
+`docs/plano-implementacao-backend.md` §2): `auth`, `user`, `client`, `site`,
+`equipment`, `template`, `inspection`, `evidence`, `nonconformity`,
+`synchronization`, `review`, `audit`, `dashboard`, `shared`, com subpastas
+`domain/`, `application/`, `controller/`, `repository/`.
+
+#### 3.1.1 Dependências de teste (Spring Boot 4.1 — starters modulares)
+
+Spring Boot 4 substituiu o antigo `spring-boot-starter-test` monolítico por
+**um starter de teste companheiro para cada starter principal** (`<nome>-test`
+com escopo `test`) — confirmado empiricamente ao gerar o `pom.xml` do projeto
+em `start.spring.io` para Spring Boot 4.1.0 (ver
+`docs/dependencias-spring-initializr.md` §4). Ao selecionar as dependências
+principais do projeto, os companheiros de teste correspondentes já vêm
+automaticamente, com escopo `test`, sem seleção manual adicional:
+
+| Starter principal selecionado | Companheiro de teste adicionado automaticamente | Habilita |
+|---|---|---|
+| `spring-boot-starter-webmvc` (Spring Web) | `spring-boot-starter-webmvc-test` | `@WebMvcTest`, `MockMvc`, `MockMvcTester` |
+| `spring-boot-starter-data-jpa` | `spring-boot-starter-data-jpa-test` | `@DataJpaTest` |
+| `spring-boot-starter-security` | `spring-boot-starter-security-test` | `@WithMockUser`, `SecurityMockMvcRequestPostProcessors` |
+| `spring-boot-starter-validation` | `spring-boot-starter-validation-test` | testes de validação de bean |
+| `spring-boot-starter-flyway` | `spring-boot-starter-flyway-test` | `FlywayMigrationIT.java` (M1) |
+| Testcontainers (dependência própria) | `spring-boot-testcontainers` + `org.testcontainers:testcontainers-junit-jupiter` | `@Testcontainers`, `@ServiceConnection` |
+
+**Não existe mais uma única dependência "de teste" a adicionar manualmente** —
+cada `pom.xml` gerado já contém o necessário para as camadas acima assim que
+as dependências principais da seção 4 de `docs/dependencias-spring-initializr.md`
+são selecionadas. A única exceção é o módulo `org.testcontainers:testcontainers-postgresql`
+(nome renomeado no Testcontainers 2.0; a versão anterior chamava-se apenas
+`postgresql`), que **precisa ser adicionado manualmente** por ser específico
+do banco, não genérico o suficiente para vir com o starter — ver
+`docs/dependencias-spring-initializr.md` §7.2.
+
+#### 3.1.2 MockMvc vs. MockMvcTester vs. RestTestClient — qual usar neste projeto
+
+As três opções coexistem no Spring Framework 7 / Spring Boot 4.1 com propósitos
+diferentes (fonte: documentação oficial de testes do Spring Boot,
+`docs/dependencias-spring-initializr.md` §22):
+
+| Ferramenta | Estilo de assertiva | Quando usar no FieldOps |
+|---|---|---|
+| `MockMvc` (clássico, Hamcrest) | `mvc.perform(...).andExpect(...)` | Não usar como padrão neste projeto — mantido aqui só para leitura de exemplos legados/tutoriais; **não é a convenção adotada** |
+| **`MockMvcTester` (AssertJ, recomendado)** | `assertThat(mvc.get().uri(...)).hasStatusOk()...` | **Padrão para todo `*IT.java` de controller** — já auto-configurado por `@WebMvcTest` e por `@SpringBootTest` + `@AutoConfigureMockMvc`, e usa a mesma biblioteca de assertiva (AssertJ) já fixada na linha "Unit" desta tabela desde a primeira versão deste plano. Não simula um servidor real — roda contra o `DispatcherServlet` em memória, o que é suficiente para os `*ControllerIT.java` já listados na seção 5 |
+| `RestTestClient` (novo no Spring Framework 7) | Fluente, pode apontar tanto para `MockMvc` quanto para um servidor real (`RANDOM_PORT`) | **Reservado para o roteiro E2E `AC-RELEASE`** (M8, seção 5.8) caso a equipe decida automatizá-lo contra um servidor real subindo em porta aleatória — não é necessário para os `*ControllerIT.java` do dia a dia, que já são bem cobertos por `MockMvcTester`. Precisa de `@AutoConfigureRestTestClient` explícito — não é auto-configurado como `MockMvcTester` |
+| `TestRestTemplate` | Antigo, cliente HTTP simples | Não recomendado para código novo — `RestTestClient`/`WebTestClient` são os sucessores oficiais |
+
+**Decisão para este projeto:** todo `*ControllerIT.java` da seção 5 usa
+`MockMvcTester` (injetado via `@Autowired`, com `@SpringBootTest` +
+`@AutoConfigureMockMvc` para os testes de integração completos, ou
+`@WebMvcTest` para eventuais slices futuras de controller). Isso **não muda
+nenhuma linha do backlog da seção 5** — só precisa a ferramenta concreta por
+trás do rótulo genérico "Integração" que já estava lá.
+
+#### 3.1.3 Testes de Repository (`@DataJpaTest`) — adição a este plano
+
+A versão anterior deste documento não tinha uma camada de teste dedicada a
+`Repository` — a cobertura de persistência acontecia só implicitamente dentro
+dos `*ControllerIT.java`. Isso continua sendo suficiente para a maioria dos
+casos (RN de integridade referencial, unicidade etc. já são exercitadas
+indiretamente). `@DataJpaTest` deve ser adicionado **especificamente** para:
+
+- consultas com `Specification`/filtros compostos complexos (ex.: os filtros
+  combinados de `GET /inspections`, `docs/contrato-backend-frontend.md` §9.3);
+- verificação de mapeamento objeto-relacional (relacionamentos, `@Version`
+  para concorrência otimista) isolada da camada web;
+- casos em que reproduzir o cenário via HTTP seria desproporcionalmente mais
+  lento que testar o repositório diretamente.
+
+`@DataJpaTest` usa por padrão um banco em memória substituto — **para este
+projeto, isso deve ser desabilitado** com
+`@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)`
+combinado com `@Testcontainers` + `@ServiceConnection` apontando para
+PostgreSQL, porque o projeto usa tipos e comportamento específicos do
+PostgreSQL (`JSONB`, `CHECK` constraints — `db/schema.sql`) que um banco
+em memória genérico não reproduz fielmente. Cada método é transacional por
+padrão e sofre rollback ao final (não precisa de limpeza manual). Nenhum item
+novo de backlog foi adicionado à seção 5 por causa disso — é uma técnica
+disponível a critério de quem implementa cada `*ControllerIT.java`, não uma
+obrigação por marco.
+
+#### 3.1.4 Testes de segurança (`spring-security-test`)
+
+Todo `*ControllerIT.java` de um endpoint protegido (ou seja, praticamente
+todos, exceto `AuthControllerIT.java` nos cenários de login) deve conter, no
+mínimo, dois casos além do caminho feliz:
+
+- **perfil correto e autenticado** — `@WithMockUser(roles = "SUPERVISOR")` (ou
+  `.with(SecurityMockMvcRequestPostProcessors.user(...).roles(...))` quando o
+  teste precisa de um `id` de usuário específico para checar posse, ex.
+  RN-004/RN-033) → espera `200`/`201`, nunca `403`;
+- **perfil sem permissão** → mesmo `MockMvcTester`, trocando o `role`, espera
+  `403` sem revelar dado do recurso (AC-SECURITY).
+
+`AuthorizationBoundaryIT.java` (M8, seção 5.8) continua sendo o teste que
+consolida esses casos de forma transversal (múltiplos controllers, matriz de
+perfil × endpoint), mas isso **não substitui** o par de casos acima em cada
+`*ControllerIT.java` individual — a cobertura transversal do M8 é uma rede de
+segurança adicional, não a única linha de defesa.
 
 ### 3.2 Aplicativo mobile (Expo / React Native)
 
@@ -105,6 +216,37 @@ encontrar exatamente o teste que a protege.
 ---
 
 ## 5. Backlog de testes por marco
+
+> A matriz de testes por camada (Domain/Service/Controller/Repository/API/
+> Segurança/Banco real, com ferramenta e indicação de contexto Spring) já está
+> consolidada na tabela da seção 3.1 — não repetida aqui para não haver duas
+> versões da mesma informação.
+
+### 5.0 Visão consolidada por funcionalidade (API)
+
+Leitura cruzada das tabelas 5.1–5.8 abaixo, agrupada por funcionalidade em vez
+de por marco — útil para checar rapidamente se uma funcionalidade tem lacuna
+de camada antes de abrir um PR. `✅` = arquivo já listado nesta seção;
+`—` = camada não aplicável ou não obrigatória (ex.: `Repository` só é
+obrigatório quando a funcionalidade envolve consulta complexa, seção 3.1.3).
+
+| Funcionalidade | Unitário (domínio) | Service | Controller | Repository | Integração |
+|---|---:|---:|---:|---:|---:|
+| Autenticação/sessão | ✅ | ✅ | ✅ | — | ✅ |
+| Usuários | ✅ | — | ✅ | — | ✅ |
+| Cadastros (cliente/local/equipamento) | ✅ (QR único) | — | ✅ | — (opcional p/ filtros) | ✅ |
+| Modelos de inspeção (rascunho/publicação) | ✅ | ✅ | ✅ | — | ✅ |
+| Planejamento/agendamento | — | — | ✅ | — (opcional p/ filtros de `GET /inspections`) | ✅ |
+| Execução/checklist | ✅ | — | ✅ | — | ✅ |
+| Não conformidade | — | — | ✅ | — | ✅ |
+| Evidências/upload | ✅ | — | ✅ | — | ✅ |
+| QR Code | — | — | ✅ | — | ✅ |
+| Localização | ✅ | — | — (coberto via start/submit) | — | ✅ |
+| Sincronização | ✅ | — | ✅ | — (opcional p/ unicidade de `sync_operations`, `docs/plano-implementacao-backend.md` §4.2) | ✅ |
+| Revisão | ✅ | — | ✅ | — | ✅ |
+| Auditoria *(P1, stretch)* | — | — | ✅ | — | — |
+| Dashboard *(P1, stretch)* | — | — | ✅ | — | — |
+| Segurança transversal | — | — | — | — | ✅ |
 
 As tabelas abaixo agrupam por **arquivo de teste alvo** (não por regra
 individual) porque um arquivo real cobre várias regras relacionadas com
@@ -342,3 +484,55 @@ adicionado, alterado ou removido nos documentos de origem, a linha
 correspondente aqui deve ser atualizada no mesmo Pull Request — este plano
 não deve divergir da fonte da verdade normativa (`docs/regras-de-negocio.md`,
 `docs/criterios-de-aceitacao.md`, `docs/casos-de-uso.md`).
+
+---
+
+## 8. Atualizações realizadas (revisão Spring Boot 4.1.0 / Java 21)
+
+Resumo da revisão feita a partir da pesquisa documentada em
+`docs/dependencias-spring-initializr.md`. Não é um changelog linha a linha —
+é o suficiente para identificar o que mudou nesta passagem.
+
+**Preservado sem alteração:** a estrutura geral do documento (seções 1–7), a
+convenção de rastreabilidade RN/AC/UC no nome do teste (seção 4), o backlog
+de testes por marco M1–M8 na íntegra — nenhum arquivo de teste, nenhuma linha
+"Cobre" foi removida ou renomeada —, a estratégia de mobile (3.2) e web (3.3),
+que não usam JVM e portanto não são afetadas pela migração de versão, e a
+definição de pronto por PR (seção 6).
+
+**Atualizado:** a tabela da API em 3.1 passou de "JUnit 5" para "JUnit
+Jupiter 6" (Spring Boot 4.1 usa essa versão por padrão), de "MockMvc" para
+`MockMvcTester` como convenção padrão (3.1.2), e a referência ao módulo
+Testcontainers de PostgreSQL foi corrigida de `postgresql` para
+`testcontainers-postgresql` (renomeado no Testcontainers 2.0, que acompanha
+Spring Boot 4.1). A tabela também ganhou uma coluna "Contexto Spring?".
+`docs/plano-implementacao-backend.md` §1 foi corrigida na mesma revisão (Java
+17/Spring Boot 3.3.x eram um placeholder explicitamente marcado como decisão
+provisória; agora refletem o mandato de Java 21/Spring Boot 4.1.0).
+
+**Adicionado:** 3.1.1 (dependências de teste modulares do Spring Boot 4.1 e
+como isso elimina a necessidade de adicionar manualmente um "starter de
+teste" genérico), 3.1.2 (comparação MockMvc vs. `MockMvcTester` vs.
+`RestTestClient` e qual usar em cada situação deste projeto), 3.1.3 (testes de
+`Repository` com `@DataJpaTest`, camada que não existia neste plano), 3.1.4
+(convenção mínima de teste de segurança por controller, usando
+`spring-security-test`), e a seção 5.0 (matriz consolidada por
+funcionalidade, cruzando as tabelas de marco já existentes sem duplicar seu
+conteúdo).
+
+**Corrigido:** nenhuma recomendação da versão anterior deste documento estava
+tecnicamente incorreta para Spring Boot 3.x — a correção necessária foi
+inteiramente de **versão** (JUnit 5→6, nome do módulo Testcontainers,
+`MockMvc`→`MockMvcTester` como padrão), não de conceito. `@MockBean`/`@SpyBean`
+nunca chegaram a ser mencionados neste documento, então não havia nada a
+corrigir quanto a `@MockitoBean` além de deixar a recomendação explícita
+(3.1.2/3.1.4 já assumem `@MockitoBean` implicitamente ao citar
+`spring-security-test` e os slices de `@WebMvcTest`).
+
+**Decisões que continuam pendentes** (não resolvidas nesta revisão, listadas
+com o identificador correspondente em `docs/dependencias-spring-initializr.md`
+§7.2 e em `docs/plano-implementacao-backend.md` §19): biblioteca concreta de
+emissão/validação de JWT (jjwt vs. `oauth2-resource-server` com `JwtDecoder`
+manual), formato do cursor de sincronização, tabela `sync_operations` ainda
+não é uma migração real (só uma proposta), catálogo fechado de `code` de erro
+de negócio.

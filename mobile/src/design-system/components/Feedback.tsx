@@ -1,153 +1,74 @@
-import { ActivityIndicator, StyleSheet, View, type ViewStyle } from 'react-native';
-import { alpha, colors, fonts, fontSizes, radii, spacing } from '../tokens';
-import { Panel } from './Panel';
+import { StyleSheet, View } from 'react-native';
+
+import { alpha, colors, radii, spacing } from '../tokens';
 import { Text } from './Text';
 
+type Tone = 'error' | 'warning' | 'success' | 'info';
+
+export type FeedbackProps = {
+  tone: Tone;
+  message: string;
+  testID?: string;
+};
+
 /**
- * Estados de carregamento, vazio e erro — obrigatórios em toda listagem
- * conforme RNF-004 (docs/arquitetura.md §11.14).
+ * Aviso persistente ligado a uma ação. Os docs (§13.8) proíbem comunicar
+ * estado apenas por cor, então cada tom traz também um rótulo textual.
  */
-
-export function LoadingState({ label = 'Carregando…' }: { label?: string }) {
-  return (
-    <View style={styles.loading}>
-      <ActivityIndicator color={colors.primary} />
-      <Text variant="body" color="mutedForeground">
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-export function EmptyState({
-  icon,
-  title,
-  description,
-  action,
-}: {
-  icon?: React.ReactNode;
-  title: string;
-  description?: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <Panel style={styles.empty}>
-      {icon}
-      <Text variant="bodySemibold" center>
-        {title}
-      </Text>
-      {description && (
-        <Text variant="body" color="mutedForeground" center>
-          {description}
-        </Text>
-      )}
-      {action}
-    </Panel>
-  );
-}
-
-export function ErrorState({ message }: { message: string }) {
-  return (
-    <Panel style={styles.error}>
-      <Text variant="bodySemibold" color="destructive" center>
-        Algo deu errado
-      </Text>
-      <Text variant="body" color="mutedForeground" center>
-        {message}
-      </Text>
-    </Panel>
-  );
-}
-
-/** Etiqueta compacta de estado, usada nos cartões de inspeção. */
-export function Badge({
-  label,
-  tone = 'neutral',
-  style,
-}: {
-  label: string;
-  tone?: 'neutral' | 'primary' | 'success' | 'destructive' | 'warning';
-  style?: ViewStyle;
-}) {
-  return (
-    <View style={[styles.badge, badgeTone[tone].container, style]}>
-      <Text style={[styles.badgeLabel, badgeTone[tone].label]}>{label}</Text>
-    </View>
-  );
-}
-
-const badgeTone = {
-  neutral: {
-    container: { backgroundColor: colors.muted },
-    label: { color: colors.mutedForeground },
-  },
-  primary: {
-    container: { backgroundColor: alpha.primary15 },
-    label: { color: colors.primary },
-  },
-  success: {
-    container: { backgroundColor: alpha.successs15 },
-    label: { color: colors.success },
-  },
-  destructive: {
-    container: { backgroundColor: alpha.destructive15 },
-    label: { color: colors.destructive },
-  },
-  warning: {
-    container: { backgroundColor: alpha.primary15 },
-    label: { color: colors.warning },
-  },
-} as const;
-
-/** Barra de progresso do checklist. */
-export function ProgressBar({ value }: { value: number }) {
-  const clamped = Math.max(0, Math.min(100, value));
+export function Feedback({ tone, message, testID }: FeedbackProps) {
   return (
     <View
-      style={styles.track}
-      accessibilityRole="progressbar"
-      accessibilityValue={{ min: 0, max: 100, now: clamped }}
-    >
-      <View style={[styles.fill, { width: `${clamped}%` }]} />
+      testID={testID}
+      accessible
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
+      style={[styles.root, toneStyles[tone]]}>
+      <Text variant="caption" style={[styles.tag, tagStyles[tone]]}>
+        {LABELS[tone]}
+      </Text>
+      <Text variant="caption" style={styles.message}>
+        {message}
+      </Text>
     </View>
   );
 }
 
+const LABELS: Record<Tone, string> = {
+  error: 'ERRO',
+  warning: 'ATENÇÃO',
+  success: 'OK',
+  info: 'INFO',
+};
+
 const styles = StyleSheet.create({
-  loading: {
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing['3xl'],
-  },
-  empty: {
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing['2xl'],
-  },
-  error: {
-    alignItems: 'center',
+  root: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: spacing.sm,
-    padding: spacing.xl,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
-  badge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radii.sm,
+  tag: {
+    letterSpacing: 0.6,
   },
-  badgeLabel: {
-    fontFamily: fonts.semibold,
-    fontSize: fontSizes.xxs,
+  message: {
+    flex: 1,
+    color: colors.foreground,
   },
-  track: {
-    height: 8,
-    borderRadius: radii.full,
-    backgroundColor: colors.muted,
-    overflow: 'hidden',
-  },
-  fill: {
-    height: '100%',
-    borderRadius: radii.full,
-    backgroundColor: colors.primary,
-  },
+});
+
+const toneStyles = StyleSheet.create({
+  error: { backgroundColor: alpha.destructive15, borderColor: colors.destructive },
+  warning: { backgroundColor: alpha.warning15, borderColor: colors.warning },
+  success: { backgroundColor: alpha.success15, borderColor: colors.success },
+  info: { backgroundColor: colors.muted, borderColor: colors.border },
+});
+
+const tagStyles = StyleSheet.create({
+  error: { color: colors.destructive },
+  warning: { color: colors.warning },
+  success: { color: colors.success },
+  info: { color: colors.mutedForeground },
 });

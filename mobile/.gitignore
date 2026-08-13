@@ -30,10 +30,8 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files (RNF-010 — configuração sensível fora do repositório)
-.env
+# local env files
 .env*.local
-!.env.example
 
 # typescript
 *.tsbuildinfo

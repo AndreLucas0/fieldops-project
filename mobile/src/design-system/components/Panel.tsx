@@ -1,53 +1,51 @@
+import type { ReactNode } from 'react';
+import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
-import { colors, gradients, radii, shadows } from '../tokens';
 
-/**
- * Superfície elevada do produto — equivale ao utilitário `@utility panel` do
- * protótipo: degradê de aço, borda de 1px e sombra difusa.
- */
-export interface PanelProps extends ViewProps {
-  /** `StyleProp` para aceitar estilos condicionais (`pressed && styles.x`). */
-  style?: StyleProp<ViewStyle>;
-  /** Realce de seleção, usado na escolha do modelo na nova inspeção. */
-  selected?: boolean;
-}
+import { colors, gradients, radii, shadows, spacing } from '../tokens';
 
-export function Panel({ children, style, selected, ...rest }: PanelProps) {
+export type PanelProps = {
+  children: ReactNode;
+  /** `flat` para itens de lista; `raised` para o cartão principal da tela. */
+  tone?: 'flat' | 'raised';
+  style?: ViewStyle;
+  testID?: string;
+};
+
+export function Panel({ children, tone = 'flat', style, testID }: PanelProps) {
+  if (tone === 'raised') {
+    return (
+      <LinearGradient
+        testID={testID}
+        colors={[...gradients.steel]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={[styles.base, styles.raised, style]}>
+        {children}
+      </LinearGradient>
+    );
+  }
+
   return (
-    <LinearGradient
-      colors={[...gradients.steel]}
-      start={{ x: 0.15, y: 0 }}
-      end={{ x: 0.85, y: 1 }}
-      style={[styles.panel, selected && styles.selected, style]}
-      {...rest}
-    >
-      {children}
-    </LinearGradient>
-  );
-}
-
-/** Variante sem degradê, para quando o Panel precisa envolver conteúdo grande. */
-export function FlatPanel({ children, style, ...rest }: ViewProps) {
-  return (
-    <View {...rest} style={[styles.panel, styles.flat, style]}>
+    <View testID={testID} style={[styles.base, styles.flat, style]}>
       {children}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  panel: {
+  base: {
+    borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radii.xl,
-    overflow: 'hidden',
-    ...shadows.panel,
+    padding: spacing.xl,
   },
   flat: {
     backgroundColor: colors.surface,
   },
-  selected: {
-    borderColor: colors.primary,
+  raised: {
+    ...shadows.panel,
+    borderRadius: radii['2xl'],
+    padding: spacing['2xl'],
   },
 });

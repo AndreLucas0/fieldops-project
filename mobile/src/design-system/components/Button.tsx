@@ -1,117 +1,111 @@
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  View,
-  type PressableProps,
-  type ViewStyle,
-} from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+
 import { colors, fonts, fontSizes, radii, spacing, touchTarget } from '../tokens';
 import { Text } from './Text';
 
-/**
- * Botão do produto, com as mesmas variantes do shadcn/ui usadas no protótipo
- * (default, secondary, outline, ghost, destructive).
- */
+type Variant = 'primary' | 'secondary' | 'outline' | 'ghost';
 
-type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
-type Size = 'sm' | 'md' | 'lg';
-
-export interface ButtonProps extends Omit<PressableProps, 'style' | 'children'> {
-  title: string;
+export type ButtonProps = {
+  label: string;
+  onPress?: () => void;
   variant?: Variant;
-  size?: Size;
   loading?: boolean;
-  /** Ícone à esquerda do rótulo. */
-  icon?: React.ReactNode;
+  disabled?: boolean;
+  /** Texto lido por leitores de tela quando `label` não basta. */
+  accessibilityHint?: string;
+  testID?: string;
   style?: ViewStyle;
-}
+};
 
 export function Button({
-  title,
+  label,
+  onPress,
   variant = 'primary',
-  size = 'md',
   loading = false,
-  disabled,
-  icon,
+  disabled = false,
+  accessibilityHint,
+  testID,
   style,
-  ...rest
 }: ButtonProps) {
-  const isDisabled = disabled || loading;
+  // Enquanto carrega o botão continua visível, mas não aceita um segundo toque:
+  // evita duas tentativas de login para a mesma ação.
+  const isInactive = disabled || loading;
 
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
-      accessibilityState={{ disabled: !!isDisabled, busy: loading }}
-      disabled={isDisabled}
+      accessibilityState={{ disabled: isInactive, busy: loading }}
+      accessibilityHint={accessibilityHint}
+      disabled={isInactive}
+      onPress={onPress}
       style={({ pressed }) => [
         styles.base,
-        sizeStyles[size],
         variantStyles[variant],
-        pressed && !isDisabled && styles.pressed,
-        isDisabled && styles.disabled,
+        pressed && !isInactive && styles.pressed,
+        isInactive && styles.inactive,
         style,
-      ]}
-      {...rest}
-    >
-      {loading ? (
-        <ActivityIndicator size="small" color={textColor[variant]} />
-      ) : (
-        icon && <View style={styles.icon}>{icon}</View>
-      )}
-      <Text style={[styles.label, labelSize[size], { color: textColor[variant] }]}>{title}</Text>
+      ]}>
+      <View style={styles.content}>
+        {loading ? (
+          <ActivityIndicator
+            testID={testID ? `${testID}-loading` : undefined}
+            size="small"
+            color={variant === 'primary' ? colors.primaryForeground : colors.foreground}
+          />
+        ) : null}
+        <Text style={[styles.label, labelStyles[variant]]}>{label}</Text>
+      </View>
     </Pressable>
   );
 }
 
-/** Cor do rótulo e dos ícones por variante, exportada para os chamadores. */
-export const textColor: Record<Variant, string> = {
-  primary: colors.primaryForeground,
-  secondary: colors.secondaryForeground,
-  outline: colors.foreground,
-  ghost: colors.mutedForeground,
-  destructive: colors.destructiveForeground,
-};
-
-const variantStyles: Record<Variant, ViewStyle> = {
-  primary: { backgroundColor: colors.primary },
-  secondary: { backgroundColor: colors.secondary },
-  outline: { borderWidth: 1, borderColor: colors.border, backgroundColor: 'transparent' },
-  ghost: { backgroundColor: 'transparent' },
-  destructive: { backgroundColor: colors.destructive },
-};
-
-const sizeStyles: Record<Size, ViewStyle> = {
-  sm: { height: 36, paddingHorizontal: spacing.md },
-  md: { height: touchTarget, paddingHorizontal: spacing.lg },
-  lg: { height: 52, paddingHorizontal: spacing.xl },
-};
-
-const labelSize = StyleSheet.create({
-  sm: { fontSize: fontSizes.xs },
-  md: { fontSize: fontSizes.sm },
-  lg: { fontSize: fontSizes.base },
-});
-
 const styles = StyleSheet.create({
   base: {
+    minHeight: touchTarget,
+    borderRadius: radii.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+  },
+  content: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: spacing.sm,
-    borderRadius: radii.lg,
   },
   label: {
-    fontFamily: fonts.bold,
-  },
-  icon: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    fontFamily: fonts.semibold,
+    fontSize: fontSizes.base,
   },
   pressed: {
     opacity: 0.85,
   },
-  disabled: {
-    opacity: 0.5,
+  inactive: {
+    opacity: 0.6,
   },
+});
+
+const variantStyles = StyleSheet.create({
+  primary: {
+    backgroundColor: colors.primary,
+  },
+  secondary: {
+    backgroundColor: colors.secondary,
+  },
+  outline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  ghost: {
+    backgroundColor: 'transparent',
+  },
+});
+
+const labelStyles = StyleSheet.create({
+  primary: { color: colors.primaryForeground },
+  secondary: { color: colors.secondaryForeground },
+  outline: { color: colors.foreground },
+  ghost: { color: colors.mutedForeground },
 });

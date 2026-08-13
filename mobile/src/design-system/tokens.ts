@@ -1,9 +1,9 @@
 /**
- * Tokens do design system do FieldOps.
+ * Tokens visuais do FieldOps.
  *
- * A paleta "industrial steel + safety amber" foi transposta do protótipo
- * (task-inspector-hub/src/styles.css), convertendo cada valor OKLCH para o
- * hex sRGB equivalente — o React Native não interpreta oklch().
+ * A paleta "industrial steel + safety amber" veio do protótipo: fundo escuro
+ * de baixo brilho (uso em campo, sob sol ou em galpão) e âmbar de segurança
+ * reservado à ação principal.
  */
 
 export const colors = {
@@ -12,9 +12,6 @@ export const colors = {
 
   surface: '#191f25',
   surface2: '#232a31',
-
-  card: '#191f25',
-  cardForeground: '#eff2f5',
 
   primary: '#f3a51b',
   primaryForeground: '#22150a',
@@ -32,38 +29,29 @@ export const colors = {
   destructiveForeground: '#f6f9fc',
 
   success: '#3bb974',
-  successForeground: '#06150c',
-
   warning: '#eab532',
-  warningForeground: '#1c1505',
 
   border: '#2f363d',
   input: '#2f363d',
   ring: '#f3a51b',
 } as const;
 
-/**
- * Superfícies com leve degradê, equivalentes à `--gradient-steel` e
- * `--gradient-amber` do protótipo. Usados com expo-linear-gradient.
- */
+/** Superfícies com leve degradê, usadas com expo-linear-gradient. */
 export const gradients = {
   steel: ['#1d252d', '#12171b'] as const,
   amber: ['#f7b828', '#ea8a18'] as const,
 };
 
-/**
- * Cor de fundo translúcida derivada da primária — substitui utilitários
- * como `bg-primary/15` do Tailwind, que não existem aqui.
- */
+/** Fundos translúcidos derivados das cores base (não há `bg-primary/15` aqui). */
 export const alpha = {
   primary15: 'rgba(243, 165, 27, 0.15)',
   primary25: 'rgba(243, 165, 27, 0.25)',
   destructive15: 'rgba(234, 59, 72, 0.15)',
-  successs15: 'rgba(59, 185, 116, 0.15)',
-  overlay: 'rgba(16, 20, 25, 0.85)',
+  success15: 'rgba(59, 185, 116, 0.15)',
+  warning15: 'rgba(234, 181, 50, 0.15)',
 } as const;
 
-/** Escala de espaçamento em passos de 4px, como no Tailwind. */
+/** Escala de espaçamento em passos de 4px. */
 export const spacing = {
   xs: 4,
   sm: 8,
@@ -72,9 +60,9 @@ export const spacing = {
   xl: 20,
   '2xl': 24,
   '3xl': 32,
+  '4xl': 40,
 } as const;
 
-/** `--radius: 0.75rem` = 12px, com as variações derivadas do protótipo. */
 export const radii = {
   sm: 8,
   md: 10,
@@ -85,12 +73,12 @@ export const radii = {
 } as const;
 
 export const fonts = {
-  /** Barlow — texto corrido (`--font-sans`). */
+  /** Barlow — texto corrido. */
   regular: 'Barlow_400Regular',
   medium: 'Barlow_500Medium',
   semibold: 'Barlow_600SemiBold',
   bold: 'Barlow_700Bold',
-  /** Archivo — títulos (`--font-display`, aplicado a h1/h2/h3). */
+  /** Archivo — títulos. */
   display: 'Archivo_700Bold',
   displayExtra: 'Archivo_800ExtraBold',
 } as const;
@@ -103,10 +91,10 @@ export const fontSizes = {
   lg: 18,
   xl: 20,
   '2xl': 24,
+  '3xl': 28,
   '4xl': 34,
 } as const;
 
-/** `--shadow-panel: 0 18px 40px -24px` — aproximado para as duas plataformas. */
 export const shadows = {
   panel: {
     shadowColor: '#000',
@@ -117,5 +105,8 @@ export const shadows = {
   },
 } as const;
 
-/** Altura mínima de alvo de toque (docs/aplicativo-mobile.md §13.9). */
-export const touchTarget = 44;
+/**
+ * Alvo mínimo de toque — docs/aplicativo-mobile.md §13.9 exige botões
+ * confortáveis para uso com luva.
+ */
+export const touchTarget = 48;

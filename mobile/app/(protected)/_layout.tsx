@@ -1,26 +1,33 @@
+import { ActivityIndicator } from 'react-native';
 import { Redirect, Stack } from 'expo-router';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { colors } from '@/design-system';
+
+import { colors, Screen } from '@/design-system';
+import { canUseFieldApp } from '@/domain/auth';
 import { useSession } from '@/features/auth/session-context';
 
 /**
- * Proteção de rota (docs/aplicativo-mobile.md §13.11).
- *
- * Enquanto a sessão persistida está sendo lida não redirecionamos — caso
- * contrário o app piscaria o login a cada abertura, mesmo com sessão válida.
+ * Barreira de rota do aplicativo. A API continua validando cada requisição
+ * (docs/perfis-de-usuario.md §5.3) — isto aqui é conveniência de interface.
  */
 export default function ProtectedLayout() {
-  const { session, loading } = useSession();
+  const { status, session } = useSession();
 
-  if (loading) {
+  if (status === 'loading') {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
+      <Screen scroll={false} center testID="protected-loading">
+        <ActivityIndicator size="large" color={colors.primary} />
+      </Screen>
     );
   }
 
-  if (!session) return <Redirect href="/login" />;
+  if (status === 'signedOut' || !session) {
+    return <Redirect href="/login" />;
+  }
+
+  // Perfis sem acesso ao app de campo (ex.: CLIENT_VIEWER) não passam daqui.
+  if (!canUseFieldApp(session.user.role)) {
+    return <Redirect href="/login" />;
+  }
 
   return (
     <Stack
@@ -31,12 +38,3 @@ export default function ProtectedLayout() {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-  },
-});

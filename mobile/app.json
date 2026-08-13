@@ -7,33 +7,26 @@
     "icon": "./assets/icon.png",
     "scheme": "fieldops",
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#101419",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fieldops.mobile",
-      "infoPlist": {
-        "NSCameraUsageDescription": "O FieldOps usa a câmera para registrar evidências fotográficas dos itens da inspeção.",
-        "NSPhotoLibraryUsageDescription": "O FieldOps acessa suas fotos para anexar evidências à inspeção.",
-        "NSLocationWhenInUseUsageDescription": "O FieldOps registra a localização no início e na conclusão da inspeção."
-      }
+      "bundleIdentifier": "com.fieldops.mobile"
     },
     "android": {
       "package": "com.fieldops.mobile",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png",
-        "backgroundColor": "#101419"
-      },
       "edgeToEdgeEnabled": true,
-      "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
-      ]
+      "predictiveBackGestureEnabled": false,
+      "adaptiveIcon": {
+        "backgroundColor": "#101419",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "single"
     },
     "plugins": [
       "expo-router",
@@ -44,19 +37,13 @@
         {
           "backgroundColor": "#101419",
           "image": "./assets/splash-icon.png",
-          "imageWidth": 200
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "O FieldOps acessa suas fotos para anexar evidências à inspeção.",
-          "cameraPermission": "O FieldOps usa a câmera para registrar evidências fotográficas dos itens da inspeção."
+          "imageWidth": 180
         }
       ]
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "tsconfigPaths": true
     }
   }
 }

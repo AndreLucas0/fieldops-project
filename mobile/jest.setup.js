@@ -1,65 +1,68 @@
-// Dublês dos módulos nativos que não existem no ambiente de teste.
-
-// Sinaliza ao React que estamos em ambiente de teste, para que as atualizações
-// de estado disparadas por efeitos sejam agrupadas em act().
-global.IS_REACT_ACT_ENVIRONMENT = true;
-
-// As fontes do Google não são baixadas nos testes; `useFonts` responde
-// imediatamente como carregado para que as telas rendereizem.
-jest.mock('@expo-google-fonts/barlow', () => ({
-  useFonts: () => [true, null],
-  Barlow_400Regular: 'Barlow_400Regular',
-  Barlow_500Medium: 'Barlow_500Medium',
-  Barlow_600SemiBold: 'Barlow_600SemiBold',
-  Barlow_700Bold: 'Barlow_700Bold',
-}));
-
-jest.mock('@expo-google-fonts/archivo', () => ({
-  Archivo_700Bold: 'Archivo_700Bold',
-  Archivo_800ExtraBold: 'Archivo_800ExtraBold',
+// As fontes do Google são baixadas em tempo de execução; nos testes basta
+// declarar que já carregaram para o layout raiz seguir adiante.
+jest.mock('expo-font', () => ({
+  useFonts: jest.fn(),
+  isLoaded: () => true,
+  isLoading: () => false,
+  loadAsync: jest.fn(),
+  unloadAsync: jest.fn(),
 }));
 
 jest.mock('expo-splash-screen', () => ({
-  preventAutoHideAsync: jest.fn(() => Promise.resolve()),
-  hideAsync: jest.fn(() => Promise.resolve()),
+  preventAutoHideAsync: jest.fn(async () => {}),
+  hideAsync: jest.fn(async () => {}),
+  setOptions: jest.fn(),
 }));
 
-// Armazenamento seguro em memória, para exercitar o fluxo de sessão.
+// SecureStore não existe no ambiente de teste: um mapa em memória reproduz o
+// contrato (get/set/delete) sem tocar no keychain nativo.
 jest.mock('expo-secure-store', () => {
   const store = new Map();
   return {
-    setItemAsync: jest.fn((key, value) => {
-      store.set(key, value);
-      return Promise.resolve();
-    }),
-    getItemAsync: jest.fn((key) => Promise.resolve(store.get(key) ?? null)),
-    deleteItemAsync: jest.fn((key) => {
-      store.delete(key);
-      return Promise.resolve();
-    }),
     __store: store,
+    isAvailableAsync: jest.fn(),
+    getItemAsync: jest.fn(),
+    setItemAsync: jest.fn(),
+    deleteItemAsync: jest.fn(),
   };
 });
 
-jest.mock('expo-crypto', () => {
-  let counter = 0;
-  return {
-    randomUUID: jest.fn(() => {
-      counter += 1;
-      return `00000000-0000-4000-8000-${String(counter).padStart(12, '0')}`;
-    }),
-  };
-});
+// Fora do device não existem métricas de área segura; o mock oficial fornece
+// valores estáveis (inclusive `initialWindowMetrics`).
+jest.mock('react-native-safe-area-context', () =>
+  require('react-native-safe-area-context/jest/mock').default,
+);
 
-jest.mock('expo-image-picker', () => ({
-  requestCameraPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
-  launchCameraAsync: jest.fn(() =>
-    Promise.resolve({ canceled: false, assets: [{ uri: 'file:///foto-de-teste.jpg' }] }),
-  ),
-}));
-
-// O degradê vira uma View simples; o que importa nos testes é o conteúdo.
 jest.mock('expo-linear-gradient', () => {
   const { View } = require('react-native');
   return { LinearGradient: View };
+});
+
+beforeEach(() => {
+  const Font = require('expo-font');
+  Font.useFonts.mockReset().mockReturnValue([true, null]);
+  Font.loadAsync.mockReset().mockResolvedValue(undefined);
+  Font.unloadAsync.mockReset().mockResolvedValue(undefined);
+
+  const Splash = require('expo-splash-screen');
+  Splash.preventAutoHideAsync.mockClear();
+  Splash.hideAsync.mockClear();
+
+  const SecureStore = require('expo-secure-store');
+  SecureStore.__store.clear();
+
+  // As implementações são reinstaladas a cada teste: assim um
+  // `mockImplementationOnce` de um caso não vaza para o seguinte.
+  SecureStore.isAvailableAsync.mockReset().mockResolvedValue(true);
+  SecureStore.getItemAsync
+    .mockReset()
+    .mockImplementation(async (key) =>
+      SecureStore.__store.has(key) ? SecureStore.__store.get(key) : null,
+    );
+  SecureStore.setItemAsync.mockReset().mockImplementation(async (key, value) => {
+    SecureStore.__store.set(key, value);
+  });
+  SecureStore.deleteItemAsync.mockReset().mockImplementation(async (key) => {
+    SecureStore.__store.delete(key);
+  });
 });

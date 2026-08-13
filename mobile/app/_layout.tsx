@@ -1,82 +1,65 @@
-import {
-  Archivo_700Bold,
-  Archivo_800ExtraBold,
-} from '@expo-google-fonts/archivo';
+import { useCallback, useEffect } from 'react';
+import { View } from 'react-native';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
+import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
+import { Archivo_700Bold, Archivo_800ExtraBold } from '@expo-google-fonts/archivo';
 import {
   Barlow_400Regular,
   Barlow_500Medium,
   Barlow_600SemiBold,
   Barlow_700Bold,
-  useFonts,
 } from '@expo-google-fonts/barlow';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { colors } from '@/design-system';
+
 import { SessionProvider } from '@/features/auth/session-context';
+import { colors } from '@/design-system';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
-  // Em alguns ambientes a splash já foi escondida; não é um erro fatal.
-});
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // O técnico trabalha em rede instável: evitamos refetch agressivo e
-      // mantemos o dado em cache por mais tempo (docs §13.6).
-      staleTime: 30_000,
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
+  // Em alguns ambientes a splash já foi ocultada; não é motivo para falhar.
 });
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
+    Archivo_700Bold,
+    Archivo_800ExtraBold,
     Barlow_400Regular,
     Barlow_500Medium,
     Barlow_600SemiBold,
     Barlow_700Bold,
-    Archivo_700Bold,
-    Archivo_800ExtraBold,
   });
-  const [splashHidden, setSplashHidden] = useState(false);
 
-  // Falha ao baixar a fonte não pode impedir o app de abrir — o sistema
-  // assume a tipografia e o técnico segue trabalhando.
+  // Falha de fonte não pode travar o app em campo: seguimos com a fonte do
+  // sistema em vez de deixar a splash aberta indefinidamente.
   const ready = fontsLoaded || !!fontError;
 
-  useEffect(() => {
-    if (ready && !splashHidden) {
-      SplashScreen.hideAsync()
-        .catch(() => undefined)
-        .finally(() => setSplashHidden(true));
-    }
-  }, [ready, splashHidden]);
+  const hideSplash = useCallback(async () => {
+    await SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
-  if (!ready) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+  useEffect(() => {
+    if (ready) void hideSplash();
+  }, [ready, hideSplash]);
+
+  if (!ready) {
+    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+  }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
-      <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
-          <SessionProvider>
-            <StatusBar style="light" />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: colors.background },
-                animation: 'slide_from_right',
-              }}
-            />
-          </SessionProvider>
-        </QueryClientProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    // Sem as métricas iniciais o provider renderiza vazio no primeiro quadro,
+    // o que aparece como um piscar em branco ao abrir o app.
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <SessionProvider>
+        <StatusBar style="light" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.background },
+            animation: 'fade',
+          }}
+        />
+      </SessionProvider>
+    </SafeAreaProvider>
   );
 }

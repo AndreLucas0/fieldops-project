@@ -1,83 +1,107 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+
 import {
-  clearSession,
-  loadSession,
-  saveSession,
+  AuthError,
+  isSessionValid,
+  type AuthFailureCode,
+  type Credentials,
   type Session,
-} from '@/infrastructure/storage/session-store';
+} from '@/domain/auth';
+import { mockAuthService, type AuthService } from './auth-service';
+import { sessionStore } from './session-store';
 
 /**
- * Sessão do técnico.
- *
- * No protótipo isso era o Supabase Auth. Aqui a autenticação é simulada
- * localmente: o formato do retorno já é o da API (docs/api-rest.md §12.4),
- * então trocar por uma chamada a POST /auth/login altera só `signIn`.
+ * `loading` cobre a leitura da sessão gravada no dispositivo: sem esse estado
+ * a área protegida piscaria a tela de login a cada abertura do app.
  */
+export type SessionStatus = 'loading' | 'signedOut' | 'signedIn';
 
-interface SessionContextValue {
+export type SessionContextValue = {
+  status: SessionStatus;
   session: Session | null;
-  /** `true` enquanto a sessão persistida ainda está sendo lida. */
-  loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
-}
+  signIn(credentials: Credentials): Promise<void>;
+  signOut(): Promise<void>;
+};
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-export function SessionProvider({ children }: { children: ReactNode }) {
+export type SessionProviderProps = {
+  children: ReactNode;
+  /** Injetável para testes e para a futura troca pelo cliente HTTP real. */
+  authService?: AuthService;
+};
+
+export function SessionProvider({ children, authService = mockAuthService }: SessionProviderProps) {
+  const [status, setStatus] = useState<SessionStatus>('loading');
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    loadSession()
-      .then((stored) => {
-        if (active) setSession(stored);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+
+    (async () => {
+      const stored = await sessionStore.load();
+      if (!active) return;
+
+      // Uma sessão expirada é descartada aqui; a renovação por refresh token
+      // entra junto com o cliente HTTP.
+      if (isSessionValid(stored)) {
+        setSession(stored);
+        setStatus('signedIn');
+      } else {
+        if (stored) await sessionStore.clear();
+        setSession(null);
+        setStatus('signedOut');
+      }
+    })();
+
     return () => {
       active = false;
     };
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    if (!email.trim()) throw new Error('Informe o e-mail');
-    if (password.length < 6) throw new Error('A senha deve ter ao menos 6 caracteres');
-
-    // Substituir por POST /api/v1/auth/login quando a API estiver disponível.
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    const next: Session = {
-      accessToken: 'token-de-desenvolvimento',
-      user: {
-        id: '8a50e30d-2a58-4a24-944e-10a9948abf01',
-        name: 'Carlos Técnico',
-        email: email.trim(),
-        role: 'TECHNICIAN',
-      },
-    };
-    await saveSession(next);
-    setSession(next);
-  }, []);
+  const signIn = useCallback(
+    async (credentials: Credentials) => {
+      const created = await authService.signIn(credentials);
+      await sessionStore.save(created);
+      setSession(created);
+      setStatus('signedIn');
+    },
+    [authService],
+  );
 
   const signOut = useCallback(async () => {
-    await clearSession();
+    const current = session;
     setSession(null);
-  }, []);
+    setStatus('signedOut');
+    await sessionStore.clear();
 
-  const value = useMemo(
-    () => ({ session, loading, signIn, signOut }),
-    [session, loading, signIn, signOut],
+    if (current) {
+      // O logout no servidor é melhor esforço: sem rede, a sessão local já saiu.
+      try {
+        await authService.signOut(current);
+      } catch {
+        // Silencioso de propósito — o usuário já está fora do aplicativo.
+      }
+    }
+  }, [authService, session]);
+
+  const value = useMemo<SessionContextValue>(
+    () => ({ status, session, signIn, signOut }),
+    [status, session, signIn, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
-export function useSession() {
+export function useSession(): SessionContextValue {
   const context = useContext(SessionContext);
-  if (!context) throw new Error('useSession precisa estar dentro de SessionProvider');
+  if (!context) {
+    throw new Error('useSession precisa estar dentro de <SessionProvider>.');
+  }
   return context;
+}
+
+/** Converte qualquer falha de login no código que a interface sabe exibir. */
+export function toAuthFailureCode(error: unknown): AuthFailureCode {
+  return error instanceof AuthError ? error.code : 'UNEXPECTED';
 }

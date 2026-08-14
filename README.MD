@@ -88,7 +88,7 @@ npm start
 ## 👥 Integrantes
 
 * André Lucas Ferreira
-* CAIQUE LEANDRO TESSAROTO
+* Caique Leandro Tessaroto
 * Cauã Rodrigues Mesquita
 * João Pedro Américo Matias
 * João Victor Machado

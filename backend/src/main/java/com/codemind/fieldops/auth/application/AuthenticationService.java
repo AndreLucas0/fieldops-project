@@ -21,6 +21,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthenticationService {
@@ -70,6 +71,7 @@ public class AuthenticationService {
 		return issueTokens(user);
 	}
 
+	@Transactional
 	public void logout(UUID userId) {
 		userRepository.findById(userId).ifPresent(User::invalidateSessions);
 	}

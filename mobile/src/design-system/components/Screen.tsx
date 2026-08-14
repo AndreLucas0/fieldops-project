@@ -17,15 +17,27 @@ export type ScreenProps = {
   scroll?: boolean;
   /** Centraliza verticalmente o conteúdo (landing e login). */
   center?: boolean;
+  /**
+   * `false` em telas sob o cabeçalho nativo: ele já respeita a área segura, e
+   * somar o recorte de novo abriria um vão sob a barra de status.
+   */
+  insetTop?: boolean;
   contentStyle?: ViewStyle;
   testID?: string;
 };
 
-export function Screen({ children, scroll = true, center = false, contentStyle, testID }: ScreenProps) {
+export function Screen({
+  children,
+  scroll = true,
+  center = false,
+  insetTop = true,
+  contentStyle,
+  testID,
+}: ScreenProps) {
   const insets = useSafeAreaInsets();
 
   const padding: ViewStyle = {
-    paddingTop: insets.top + spacing.lg,
+    paddingTop: (insetTop ? insets.top : 0) + spacing.lg,
     paddingBottom: insets.bottom + spacing['2xl'],
     paddingHorizontal: spacing.xl,
   };

@@ -19,9 +19,17 @@ export const routerMock = {
   setParams: jest.fn(),
 };
 
+/** Parâmetros de rota vistos por `useLocalSearchParams`. */
+let searchParams: Record<string, string> = {};
+
+export function setSearchParams(params: Record<string, string>) {
+  searchParams = params;
+}
+
 export function resetRouterMock() {
   Object.values(routerMock).forEach((fn) => fn.mockClear());
   routerMock.canGoBack.mockReturnValue(false);
+  searchParams = {};
 }
 
 export const router = routerMock;
@@ -31,7 +39,7 @@ export function useRouter() {
 }
 
 export function useLocalSearchParams() {
-  return {};
+  return searchParams;
 }
 
 export function useSegments() {

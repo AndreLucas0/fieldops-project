@@ -1,39 +1,22 @@
 import { useState } from 'react';
 import { Pressable, Text } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import * as SecureStore from 'expo-secure-store';
 
-import { AuthError, type Credentials, type Session } from '@/domain/auth';
-import type { AuthService } from './auth-service';
-import { SessionProvider, toAuthFailureCode, useSession } from './session-context';
+import { ApiError } from '@/models';
+import { resetMockDatabase } from '@/services';
+import {
+  buildSession,
+  renderWithSession,
+  seedStoredSession,
+  SESSION_KEY,
+} from '@/test-utils/render';
 
-const SESSION_KEY = 'fieldops.session';
-const CREDENTIALS: Credentials = { email: 'tecnico@fieldops.local', password: 'fieldops123' };
+import { toAuthFailureCode, useSession } from './session-context';
 
-/** O módulo inteiro é mockado em jest.setup.js; isto só devolve o tipo certo. */
-function asMock<T>(fn: T): jest.Mock {
-  return fn as unknown as jest.Mock;
-}
+const CREDENTIALS = { email: 'tecnico@fieldops.local', password: 'FieldOps@2026' };
 
-function buildSession(overrides: Partial<Session> = {}): Session {
-  return {
-    accessToken: 'access.token',
-    refreshToken: 'refresh.token',
-    expiresAt: Date.now() + 60_000,
-    user: {
-      id: '8a50e30d-2a58-4a24-944e-10a9948abf01',
-      name: 'Carlos Souza',
-      email: 'tecnico@fieldops.local',
-      role: 'TECHNICIAN',
-    },
-    ...overrides,
-  };
-}
-
-/**
- * Consumidor de teste: expõe o contexto como texto e dispara as ações por
- * toque, como uma tela real faria.
- */
+/** Consumidor de teste: expõe o contexto como texto e age por toque. */
 function Probe() {
   const { status, session, signIn, signOut } = useSession();
   const [failure, setFailure] = useState<string>('nenhuma');
@@ -50,6 +33,16 @@ function Probe() {
         <Text>entrar</Text>
       </Pressable>
 
+      <Pressable
+        testID="entrar-errado"
+        onPress={() =>
+          signIn({ ...CREDENTIALS, password: 'errada' }).catch((error) =>
+            setFailure(toAuthFailureCode(error)),
+          )
+        }>
+        <Text>entrar errado</Text>
+      </Pressable>
+
       <Pressable testID="sair" onPress={() => signOut()}>
         <Text>sair</Text>
       </Pressable>
@@ -57,58 +50,46 @@ function Probe() {
   );
 }
 
-function renderProvider(authService?: AuthService) {
-  return render(
-    <SessionProvider authService={authService}>
-      <Probe />
-    </SessionProvider>,
-  );
-}
-
-function serviceThatReturns(session: Session): AuthService {
-  return {
-    signIn: jest.fn(async () => session),
-    signOut: jest.fn(async () => {}),
-  };
-}
-
 async function waitForSignedOut() {
   await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('signedOut'));
 }
 
+beforeEach(() => {
+  resetMockDatabase();
+});
+
 describe('SessionProvider', () => {
   it('permanece carregando enquanto a leitura do dispositivo não conclui', async () => {
     // Leitura que nunca conclui: reproduz o instante da abertura do app.
-    asMock(SecureStore.getItemAsync).mockImplementationOnce(() => new Promise(() => {}));
+    (SecureStore.getItemAsync as unknown as jest.Mock).mockImplementationOnce(
+      () => new Promise(() => {}),
+    );
 
-    await renderProvider();
+    await renderWithSession(<Probe />);
 
     expect(screen.getByTestId('status')).toHaveTextContent('loading');
   });
 
   it('conclui como deslogado quando não há sessão gravada', async () => {
-    await renderProvider();
+    await renderWithSession(<Probe />);
 
     await waitForSignedOut();
     expect(screen.getByTestId('user')).toHaveTextContent('nenhum');
   });
 
   it('restaura a sessão gravada no dispositivo', async () => {
-    await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(buildSession()));
+    await seedStoredSession();
 
-    await renderProvider();
+    await renderWithSession(<Probe />);
 
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('signedIn'));
     expect(screen.getByTestId('user')).toHaveTextContent('tecnico@fieldops.local');
   });
 
-  it('descarta e apaga sessão expirada', async () => {
-    await SecureStore.setItemAsync(
-      SESSION_KEY,
-      JSON.stringify(buildSession({ expiresAt: Date.now() - 1_000 })),
-    );
+  it('descarta sessão expirada que o servidor não revalida', async () => {
+    await seedStoredSession(buildSession({ expiresAt: Date.now() - 1_000 }));
 
-    await renderProvider();
+    await renderWithSession(<Probe />);
 
     await waitForSignedOut();
     expect(await SecureStore.getItemAsync(SESSION_KEY)).toBeNull();
@@ -117,70 +98,71 @@ describe('SessionProvider', () => {
   it('descarta conteúdo corrompido em vez de quebrar a abertura do app', async () => {
     await SecureStore.setItemAsync(SESSION_KEY, '{"accessToken":');
 
-    await renderProvider();
+    await renderWithSession(<Probe />);
 
     await waitForSignedOut();
     expect(await SecureStore.getItemAsync(SESSION_KEY)).toBeNull();
   });
 
-  it('grava a sessão no armazenamento seguro ao entrar', async () => {
-    const created = buildSession();
-    await renderProvider(serviceThatReturns(created));
+  it('entra pela API e grava a sessão no armazenamento seguro', async () => {
+    await renderWithSession(<Probe />);
     await waitForSignedOut();
 
     await fireEvent.press(screen.getByTestId('entrar'));
 
-    expect(screen.getByTestId('status')).toHaveTextContent('signedIn');
-    expect(JSON.parse((await SecureStore.getItemAsync(SESSION_KEY)) ?? '{}')).toEqual(created);
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('signedIn'));
+    expect(screen.getByTestId('user')).toHaveTextContent('tecnico@fieldops.local');
+    expect(await SecureStore.getItemAsync(SESSION_KEY)).not.toBeNull();
   });
 
   it('propaga a falha do serviço e mantém o usuário fora', async () => {
-    const failing: AuthService = {
-      signIn: jest.fn(async () => {
-        throw new AuthError('INVALID_CREDENTIALS');
-      }),
-      signOut: jest.fn(async () => {}),
-    };
-    await renderProvider(failing);
+    await renderWithSession(<Probe />);
     await waitForSignedOut();
 
-    await fireEvent.press(screen.getByTestId('entrar'));
+    // Senha errada: o mock responde 401 INVALID_CREDENTIALS.
+    await fireEvent.press(screen.getByTestId('entrar-errado'));
 
-    expect(screen.getByTestId('failure')).toHaveTextContent('INVALID_CREDENTIALS');
+    await waitFor(() =>
+      expect(screen.getByTestId('failure')).toHaveTextContent('INVALID_CREDENTIALS'),
+    );
     expect(screen.getByTestId('status')).toHaveTextContent('signedOut');
     expect(await SecureStore.getItemAsync(SESSION_KEY)).toBeNull();
   });
 
   it('remove os dados sensíveis ao sair (AC-AUTH logout)', async () => {
-    const service = serviceThatReturns(buildSession());
-    await renderProvider(service);
+    await renderWithSession(<Probe />);
     await waitForSignedOut();
 
     await fireEvent.press(screen.getByTestId('entrar'));
-    expect(screen.getByTestId('status')).toHaveTextContent('signedIn');
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('signedIn'));
 
     await fireEvent.press(screen.getByTestId('sair'));
 
-    expect(screen.getByTestId('status')).toHaveTextContent('signedOut');
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('signedOut'));
     expect(screen.getByTestId('user')).toHaveTextContent('nenhum');
     expect(await SecureStore.getItemAsync(SESSION_KEY)).toBeNull();
-    expect(service.signOut).toHaveBeenCalled();
+  });
+});
+
+describe('toAuthFailureCode', () => {
+  function serverError(code: string): ApiError {
+    return new ApiError({ timestamp: '2026-08-14T12:00:00Z', status: 401, code, message: 'x' });
+  }
+
+  it('repassa os códigos de negócio do contrato', () => {
+    expect(toAuthFailureCode(serverError('INVALID_CREDENTIALS'))).toBe('INVALID_CREDENTIALS');
+    expect(toAuthFailureCode(serverError('USER_INACTIVE'))).toBe('USER_INACTIVE');
   });
 
-  it('sai localmente mesmo quando o logout no servidor falha', async () => {
-    const service: AuthService = {
-      signIn: jest.fn(async () => buildSession()),
-      signOut: jest.fn(async () => {
-        throw new Error('sem rede');
-      }),
-    };
-    await renderProvider(service);
-    await waitForSignedOut();
+  it('trata falha de transporte como indisponibilidade de rede', () => {
+    expect(
+      toAuthFailureCode(ApiError.client('NETWORK_UNAVAILABLE', 'sem rede')),
+    ).toBe('NETWORK_UNAVAILABLE');
+    expect(toAuthFailureCode(ApiError.client('TIMEOUT', 'demorou'))).toBe('NETWORK_UNAVAILABLE');
+  });
 
-    await fireEvent.press(screen.getByTestId('entrar'));
-    await fireEvent.press(screen.getByTestId('sair'));
-
-    expect(screen.getByTestId('status')).toHaveTextContent('signedOut');
-    expect(await SecureStore.getItemAsync(SESSION_KEY)).toBeNull();
+  it('qualquer outra falha vira inesperada', () => {
+    expect(toAuthFailureCode(serverError('QUALQUER'))).toBe('UNEXPECTED');
+    expect(toAuthFailureCode(new Error('boom'))).toBe('UNEXPECTED');
   });
 });

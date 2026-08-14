@@ -17,6 +17,8 @@ export const ICON_PATHS = {
   camera: [
     'M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z',
   ],
+  user: ['M20 21a8 8 0 0 0-16 0'],
+  filter: ['M3 5h18', 'M7 12h10', 'M10 19h4'],
   offline: [
     'M12 20h.01',
     'M8.5 16.4a5 5 0 0 1 7 0',
@@ -53,6 +55,7 @@ export function Icon({ name, size = 22, color = colors.primary, testID }: IconPr
       {name === 'camera' ? (
         <Circle cx={12} cy={13} r={3.4} stroke={color} strokeWidth={1.8} />
       ) : null}
+      {name === 'user' ? <Circle cx={12} cy={7} r={4} stroke={color} strokeWidth={1.8} /> : null}
     </Svg>
   );
 }

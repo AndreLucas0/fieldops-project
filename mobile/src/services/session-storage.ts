@@ -1,14 +1,21 @@
+/**
+ * Guarda da sessão no armazenamento seguro do aparelho.
+ *
+ * Usa a mesma chave e o mesmo formato de `features/auth/session-store`, de
+ * modo que as duas leituras sempre enxerguem a mesma sessão gravada.
+ */
+
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-import type { Session } from '@/domain/auth';
+import type { AuthSession } from '@/models';
 
-const SESSION_KEY = 'fieldops.session';
+export const SESSION_KEY = 'fieldops.session';
 
 /**
- * O SecureStore não existe na web. Ali a sessão fica em memória: some ao
- * recarregar, o que é aceitável porque a web serve apenas para desenvolvimento
- * (o alvo obrigatório é Android — docs/visao-geral.md §1.8).
+ * O Secure Store não existe na web (SDK 57). Ali a sessão fica em memória e
+ * some ao recarregar — aceitável porque a web serve só para desenvolvimento; o
+ * alvo obrigatório é Android (docs/visao-geral.md §1.8).
  */
 const memoryStore = new Map<string, string>();
 const useSecureStore = Platform.OS !== 'web';
@@ -34,10 +41,10 @@ async function removeRaw(key: string): Promise<void> {
   await SecureStore.deleteItemAsync(key);
 }
 
-/** Guarda mínima contra dado corrompido ou de uma versão anterior do app. */
-function parseSession(raw: string): Session | null {
+/** Guarda contra dado corrompido ou gravado por uma versão anterior do app. */
+function parseSession(raw: string): AuthSession | null {
   try {
-    const parsed = JSON.parse(raw) as Partial<Session>;
+    const parsed = JSON.parse(raw) as Partial<AuthSession>;
     if (
       typeof parsed?.accessToken === 'string' &&
       typeof parsed?.refreshToken === 'string' &&
@@ -46,7 +53,7 @@ function parseSession(raw: string): Session | null {
       typeof parsed.user.id === 'string' &&
       typeof parsed.user.email === 'string'
     ) {
-      return parsed as Session;
+      return parsed as AuthSession;
     }
   } catch {
     // Formato inválido é tratado como ausência de sessão.
@@ -54,12 +61,13 @@ function parseSession(raw: string): Session | null {
   return null;
 }
 
-export const sessionStore = {
-  async load(): Promise<Session | null> {
+export const sessionStorage = {
+  async load(): Promise<AuthSession | null> {
     const raw = await readRaw(SESSION_KEY);
     if (!raw) return null;
 
     const session = parseSession(raw);
+    // Conteúdo ilegível é apagado: manter lixo só faria o app falhar de novo.
     if (!session) {
       await removeRaw(SESSION_KEY);
       return null;
@@ -67,7 +75,7 @@ export const sessionStore = {
     return session;
   },
 
-  async save(session: Session): Promise<void> {
+  async save(session: AuthSession): Promise<void> {
     await writeRaw(SESSION_KEY, JSON.stringify(session));
   },
 
@@ -76,3 +84,5 @@ export const sessionStore = {
     await removeRaw(SESSION_KEY);
   },
 };
+
+export type SessionStorage = typeof sessionStorage;

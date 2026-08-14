@@ -1,1 +1,34 @@
-/* You can add global styles to this file, and also import other style files */
+@use '@angular/material' as mat;
+
+/**
+ * Tema da interface administrativa (Angular Material 3).
+ *
+ * A escolha da biblioteca está registrada em `src/app/shared/components/README.md`:
+ * Angular Material, primeira parte do Angular, na mesma linha de versão (21.x).
+ */
+html {
+  color-scheme: light;
+
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$blue-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font-family: Roboto, 'Helvetica Neue', sans-serif;
+}

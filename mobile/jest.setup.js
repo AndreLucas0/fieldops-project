@@ -38,6 +38,32 @@ jest.mock('expo-linear-gradient', () => {
   return { LinearGradient: View };
 });
 
+// O seletor de data é um componente nativo; nos testes basta um marcador que
+// permita disparar `onChange` como o diálogo real faria.
+jest.mock('@react-native-community/datetimepicker', () => {
+  const { View } = require('react-native');
+  return { __esModule: true, default: View };
+});
+
+// O GPS não existe no ambiente de teste. O padrão concede a permissão e
+// devolve uma posição fixa; cada teste sobrescreve o que precisar.
+jest.mock('expo-location', () => ({
+  Accuracy: { Balanced: 3, High: 4 },
+  requestForegroundPermissionsAsync: jest.fn(),
+  getCurrentPositionAsync: jest.fn(),
+}));
+
+beforeEach(() => {
+  const Location = require('expo-location');
+  Location.requestForegroundPermissionsAsync
+    .mockReset()
+    .mockResolvedValue({ granted: true, status: 'granted' });
+  Location.getCurrentPositionAsync.mockReset().mockResolvedValue({
+    coords: { latitude: -23.3556, longitude: -46.8781, accuracy: 12 },
+    timestamp: Date.parse('2026-08-14T12:00:00Z'),
+  });
+});
+
 beforeEach(() => {
   const Font = require('expo-font');
   Font.useFonts.mockReset().mockReturnValue([true, null]);
@@ -65,4 +91,16 @@ beforeEach(() => {
   SecureStore.deleteItemAsync.mockReset().mockImplementation(async (key) => {
     SecureStore.__store.delete(key);
   });
+});
+
+// `expo-crypto` usa API nativa; nos testes basta um gerador incremental para
+// os identificadores de resposta ficarem previsíveis.
+jest.mock('expo-crypto', () => {
+  let counter = 0;
+  return {
+    randomUUID: jest.fn(() => {
+      counter += 1;
+      return `00000000-0000-4000-8000-${String(counter).padStart(12, '0')}`;
+    }),
+  };
 });

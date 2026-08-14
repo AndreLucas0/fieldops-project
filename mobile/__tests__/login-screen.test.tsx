@@ -4,17 +4,18 @@ import * as SecureStore from 'expo-secure-store';
 jest.mock('expo-router', () => require('@/test-utils/expo-router-mock'));
 
 import LoginScreen from '../app/(public)/login';
-import { AUTH_ERROR_MESSAGES, MIN_PASSWORD_LENGTH, type Session } from '@/domain/auth';
-import { configureMockAuth } from '@/features/auth/auth-service';
+import { AUTH_ERROR_MESSAGES, MIN_PASSWORD_LENGTH } from '@/domain/auth';
+import { ApiError } from '@/models';
+import { ApiClient, AuthService, resetMockDatabase, sessionStorage } from '@/services';
+import type { HttpResponse } from '@/services';
 import { resetRouterMock, routerMock } from '@/test-utils/expo-router-mock';
-import { buildSession, renderWithSession, SESSION_KEY } from '@/test-utils/render';
+import { renderWithSession, SESSION_KEY, TEST_API_CONFIG } from '@/test-utils/render';
 
-const VALID = { email: 'tecnico@fieldops.local', password: 'fieldops123' };
+const VALID = { email: 'tecnico@fieldops.local', password: 'FieldOps@2026' };
 
 beforeEach(() => {
   resetRouterMock();
-  // Sem latência artificial os testes não dependem de tempo real.
-  configureMockAuth({ latencyMs: 0, online: true });
+  resetMockDatabase();
 });
 
 async function fillCredentials(email: string, password: string) {
@@ -24,6 +25,24 @@ async function fillCredentials(email: string, password: string) {
 
 async function submit() {
   await fireEvent.press(screen.getByTestId('login-submit'));
+}
+
+/**
+ * `AuthService` real ligado a um backend fictício controlado pelo teste — o
+ * provider exige a classe, então falsificar o serviço inteiro não serve.
+ */
+function buildAuthService(handler: (request: unknown) => Promise<HttpResponse> | never) {
+  const client = new ApiClient({
+    getConfig: () => TEST_API_CONFIG,
+    storage: sessionStorage,
+    mockHandler: handler as never,
+  });
+
+  return new AuthService({
+    client,
+    storage: sessionStorage,
+    navigation: { toLogin: () => {} },
+  });
 }
 
 describe('Tela de login', () => {
@@ -130,8 +149,11 @@ describe('Tela de login', () => {
   });
 
   it('avisa sobre a falta de rede como alerta, não como erro de credencial', async () => {
-    configureMockAuth({ online: false });
-    await renderWithSession(<LoginScreen />);
+    await renderWithSession(<LoginScreen />, {
+      service: buildAuthService(() => {
+        throw ApiError.client('NETWORK_UNAVAILABLE', 'Sem conexão com o servidor.');
+      }),
+    });
 
     await fillCredentials(VALID.email, VALID.password);
     await submit();
@@ -157,17 +179,18 @@ describe('Tela de login', () => {
   });
 
   it('bloqueia o botão e não repete a tentativa enquanto autentica', async () => {
-    let release: ((session: Session) => void) | undefined;
-    const pending = new Promise<Session>((resolve) => {
+    let release: ((response: HttpResponse) => void) | undefined;
+    const pending = new Promise<HttpResponse>((resolve) => {
       release = resolve;
     });
 
-    const slowService = {
-      signIn: jest.fn(() => pending),
-      signOut: jest.fn(async () => {}),
-    };
+    let requests = 0;
+    const service = buildAuthService(() => {
+      requests += 1;
+      return pending;
+    });
 
-    await renderWithSession(<LoginScreen />, { authService: slowService });
+    await renderWithSession(<LoginScreen />, { service });
 
     await fillCredentials(VALID.email, VALID.password);
     // `fireEvent` aguarda o handler terminar; aqui o envio fica pendente de
@@ -179,11 +202,24 @@ describe('Tela de login', () => {
 
     // Um segundo toque durante o envio não pode gerar nova tentativa.
     await submit();
-    expect(slowService.signIn).toHaveBeenCalledTimes(1);
+    expect(requests).toBe(1);
 
     // A conclusão do login altera estado: precisa acontecer dentro de `act`.
     await act(async () => {
-      release?.(buildSession());
+      release?.({
+        status: 200,
+        body: {
+          accessToken: 'access.token',
+          refreshToken: 'refresh.token',
+          expiresIn: 900,
+          user: {
+            id: '8a50e30d-2a58-4a24-944e-10a9948abf01',
+            name: 'Carlos Souza',
+            email: VALID.email,
+            role: 'TECHNICIAN',
+          },
+        },
+      });
       await firstPress;
     });
 

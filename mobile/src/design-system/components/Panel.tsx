@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, View, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { colors, gradients, radii, shadows, spacing } from '../tokens';
@@ -8,7 +8,7 @@ export type PanelProps = {
   children: ReactNode;
   /** `flat` para itens de lista; `raised` para o cartão principal da tela. */
   tone?: 'flat' | 'raised';
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   testID?: string;
 };
 

@@ -1,25 +1,54 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
-import * as SecureStore from 'expo-secure-store';
 
 jest.mock('expo-router', () => require('@/test-utils/expo-router-mock'));
 
-import InicioScreen from '../app/(protected)/inicio';
-import { resetRouterMock } from '@/test-utils/expo-router-mock';
-import { renderWithSession, seedStoredSession, SESSION_KEY } from '@/test-utils/render';
+import InicioScreen from '../app/(protected)/(tabs)/inicio';
+import { resetRouterMock, routerMock } from '@/test-utils/expo-router-mock';
+import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/test-utils/render';
+import { getMockDatabase, resetMockDatabase } from '@/services';
+
+/** O técnico das inspeções fictícias — o mesmo id da sessão semeada. */
+const TECHNICIAN_ID = '8a50e30d-2a58-4a24-944e-10a9948abf01';
 
 beforeEach(() => {
   resetRouterMock();
+  resetMockDatabase();
 });
 
-describe('Tela de início', () => {
-  it('saúda o técnico autenticado e mostra o perfil', async () => {
-    await seedStoredSession();
+/**
+ * A sessão gravada precisa de um token que o backend fictício aceite, senão a
+ * busca das inspeções responde 401.
+ */
+async function signedInSession() {
+  const database = getMockDatabase();
+  const accessToken = 'mock-access.teste';
+  database.accessTokens.set(accessToken, TECHNICIAN_ID);
 
-    await renderWithSession(<InicioScreen />);
+  await seedStoredSession({
+    accessToken,
+    refreshToken: 'mock-refresh.teste',
+    expiresAt: Date.now() + 15 * 60 * 1000,
+    user: {
+      id: TECHNICIAN_ID,
+      name: 'Carlos Souza',
+      email: 'tecnico@fieldops.local',
+      role: 'TECHNICIAN',
+    },
+  });
+}
 
-    await waitFor(() => expect(screen.getByTestId('inicio-screen')).toBeOnTheScreen());
+async function renderInicio() {
+  await signedInSession();
+  const result = await renderWithSession(<InicioScreen />, { service: buildTestAuthService() });
+  await waitFor(() => expect(screen.queryByTestId('inicio-loading')).toBeNull());
+  return result;
+}
+
+describe('FE-M02 — Início', () => {
+  it('saúda o técnico autenticado', async () => {
+    await renderInicio();
+
     expect(screen.getByText('Olá, Carlos.')).toBeOnTheScreen();
-    expect(screen.getByText('Técnico de campo')).toBeOnTheScreen();
     expect(screen.getByText('tecnico@fieldops.local')).toBeOnTheScreen();
   });
 
@@ -29,15 +58,78 @@ describe('Tela de início', () => {
     await waitFor(() => expect(screen.queryByTestId('inicio-screen')).toBeNull());
   });
 
-  it('apaga a sessão do dispositivo ao sair (AC-AUTH logout)', async () => {
-    await seedStoredSession();
+  it('separa atrasadas, em andamento e de hoje', async () => {
+    await renderInicio();
 
-    await renderWithSession(<InicioScreen />);
-    await waitFor(() => expect(screen.getByTestId('inicio-signout')).toBeOnTheScreen());
+    // O backend fictício semeia uma inspeção em andamento agendada para 90
+    // minutos atrás: ela é, ao mesmo tempo, atrasada, em andamento e de hoje.
+    expect(screen.getByTestId('inicio-overdue')).toBeOnTheScreen();
+    expect(screen.getByTestId('inicio-in-progress')).toBeOnTheScreen();
+    expect(screen.getByTestId('inicio-today')).toBeOnTheScreen();
+  });
 
-    await fireEvent.press(screen.getByTestId('inicio-signout'));
+  it('lista apenas inspeções em andamento no grupo correspondente', async () => {
+    await renderInicio();
 
-    await waitFor(async () => expect(await SecureStore.getItemAsync(SESSION_KEY)).toBeNull());
-    expect(screen.queryByTestId('inicio-screen')).toBeNull();
+    const emAndamento = getMockDatabase().inspections.filter(
+      (inspection) => inspection.status === 'IN_PROGRESS',
+    );
+
+    for (const inspection of emAndamento) {
+      expect(screen.getByTestId(`inicio-in-progress-card-${inspection.id}`)).toBeOnTheScreen();
+    }
+  });
+
+  it('abre o detalhe ao tocar no cartão', async () => {
+    await renderInicio();
+
+    const emAndamento = getMockDatabase().inspections.find(
+      (inspection) => inspection.status === 'IN_PROGRESS',
+    );
+
+    await fireEvent.press(screen.getByTestId(`inicio-in-progress-card-${emAndamento?.id}`));
+
+    expect(routerMock.push).toHaveBeenCalledWith({
+      pathname: '/inspections/[inspectionId]',
+      params: { inspectionId: emAndamento?.id },
+    });
+  });
+
+  it('navega para o leitor de QR Code', async () => {
+    await renderInicio();
+
+    await fireEvent.press(screen.getByTestId('inicio-scanner'));
+
+    expect(routerMock.push).toHaveBeenCalledWith('/scanner');
+  });
+
+  it('mostra o estado vazio quando nada está atribuído', async () => {
+    const database = getMockDatabase();
+    database.inspections.length = 0;
+
+    await renderInicio();
+
+    expect(screen.getByTestId('inicio-empty')).toBeOnTheScreen();
+    expect(screen.queryByTestId('inicio-today')).toBeNull();
+  });
+
+  it('mostra o erro e permite tentar de novo quando a busca falha', async () => {
+    // Sem token válido no backend fictício, a listagem responde 401.
+    await seedStoredSession({
+      accessToken: 'token-que-o-mock-nao-conhece',
+      refreshToken: 'refresh-invalido',
+      expiresAt: Date.now() + 15 * 60 * 1000,
+      user: {
+        id: TECHNICIAN_ID,
+        name: 'Carlos Souza',
+        email: 'tecnico@fieldops.local',
+        role: 'TECHNICIAN',
+      },
+    });
+
+    await renderWithSession(<InicioScreen />, { service: buildTestAuthService() });
+
+    await waitFor(() => expect(screen.getByTestId('inicio-error')).toBeOnTheScreen());
+    expect(screen.getByTestId('inicio-error-retry')).toBeOnTheScreen();
   });
 });

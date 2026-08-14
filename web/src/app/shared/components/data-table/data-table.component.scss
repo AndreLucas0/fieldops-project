@@ -1,0 +1,87 @@
+:host {
+  display: block;
+}
+
+.fo-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 0.5rem;
+  background: var(--mat-sys-surface);
+  overflow: hidden;
+}
+
+.fo-table__filters {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.fo-table__filter-label {
+  font-weight: 500;
+}
+
+/* Tabela larga rola sozinha, sem empurrar a página inteira. */
+.fo-table__viewport {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+}
+
+th.align-center,
+td.align-center {
+  text-align: center;
+}
+
+th.align-end,
+td.align-end {
+  text-align: right;
+}
+
+td a {
+  color: var(--mat-sys-primary);
+  text-decoration: none;
+}
+
+td a:hover,
+td a:focus-visible {
+  text-decoration: underline;
+}
+
+.fo-table__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.fo-table__error-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 2.5rem;
+  color: var(--mat-sys-error);
+}
+
+.fo-table__error-message {
+  margin: 0;
+  color: var(--mat-sys-on-surface);
+  font-size: 1rem;
+}
+
+.fo-table__error-id {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.75rem;
+}
+
+.fo-table__error button {
+  margin-top: 0.75rem;
+}

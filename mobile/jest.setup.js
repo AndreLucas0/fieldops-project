@@ -104,3 +104,18 @@ jest.mock('expo-crypto', () => {
     }),
   };
 });
+
+// A câmera e o seletor de imagem dependem de módulo nativo. Os testes usam a
+// permissão negada por padrão (o caminho de fallback, que é o testável) e
+// controlam o retorno da galeria caso a caso.
+jest.mock('expo-camera', () => {
+  const { View } = require('react-native');
+  return {
+    CameraView: View,
+    useCameraPermissions: jest.fn(() => [{ granted: false }, jest.fn()]),
+  };
+});
+
+jest.mock('expo-image-picker', () => ({
+  launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: [] })),
+}));

@@ -185,8 +185,8 @@ describe('FE-M08 — Checklist', () => {
 
     expect(routerMock.push).toHaveBeenCalledWith(
       expect.objectContaining({
-        pathname: '/inspections/[inspectionId]/evidence',
-        params: expect.objectContaining({ inspectionItemId: item.id }),
+        pathname: '/evidence/capture',
+        params: expect.objectContaining({ inspectionItemId: item.id, origin: 'checklist' }),
       }),
     );
   });

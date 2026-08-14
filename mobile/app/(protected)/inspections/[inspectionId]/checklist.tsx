@@ -115,9 +115,10 @@ export default function ChecklistScreen() {
     const responseId = checklist.responses.get(item.id)?.id;
 
     router.push({
-      pathname: '/inspections/[inspectionId]/evidence',
+      pathname: '/evidence/capture',
       params: {
         inspectionId: detail.id,
+        origin: 'checklist',
         inspectionItemId: item.id,
         ...(responseId ? { responseId } : {}),
       },

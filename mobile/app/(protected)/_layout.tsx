@@ -63,10 +63,8 @@ export default function ProtectedLayout() {
         name="inspections/[inspectionId]/checklist"
         options={{ title: 'Checklist' }}
       />
-      <Stack.Screen
-        name="inspections/[inspectionId]/evidence"
-        options={{ title: 'Evidência' }}
-      />
+      <Stack.Screen name="evidence/capture" options={{ title: 'Nova evidência' }} />
+      <Stack.Screen name="evidence/preview" options={{ title: 'Conferir evidência' }} />
       <Stack.Screen
         name="inspections/[inspectionId]/non-conformities"
         options={{ title: 'Não conformidades' }}

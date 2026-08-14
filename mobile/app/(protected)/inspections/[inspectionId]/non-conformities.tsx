@@ -85,8 +85,12 @@ export default function NonConformitiesScreen() {
 
   function openEvidence(nonConformity: NonConformity): void {
     router.push({
-      pathname: '/inspections/[inspectionId]/evidence',
-      params: { inspectionId: detail.id, nonConformityId: nonConformity.id },
+      pathname: '/evidence/capture',
+      params: {
+        inspectionId: detail.id,
+        origin: 'non-conformities',
+        nonConformityId: nonConformity.id,
+      },
     });
   }
 

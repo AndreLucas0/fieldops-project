@@ -247,8 +247,8 @@ describe('FE-M10 — Não conformidades', () => {
     await fireEvent.press(screen.getByTestId(`nc-evidencia-${nc?.id}`));
 
     expect(routerMock.push).toHaveBeenCalledWith({
-      pathname: '/inspections/[inspectionId]/evidence',
-      params: { inspectionId: id, nonConformityId: nc?.id },
+      pathname: '/evidence/capture',
+      params: { inspectionId: id, origin: 'non-conformities', nonConformityId: nc?.id },
     });
   });
 

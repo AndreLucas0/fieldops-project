@@ -21,9 +21,12 @@ const EDITABLE_STATUSES = ['IN_PROGRESS', 'REJECTED'];
  */
 export default function ChecklistScreen() {
   const router = useRouter();
-  const { inspectionId, highlight } = useLocalSearchParams<{
+  const { inspectionId, highlight, focus } = useLocalSearchParams<{
     inspectionId: string;
+    /** Itens apontados na reprovação — destaque de correção. */
     highlight?: string;
+    /** Item vindo da lista de pendências do resumo — rola até ele. */
+    focus?: string;
   }>();
 
   const { inspection, loading, error, reload } = useInspectionDetail(inspectionId);
@@ -36,7 +39,9 @@ export default function ChecklistScreen() {
    * responder tudo, e abrir uma a uma seria trabalho extra.
    */
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
-  const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
+  const [focusedItemId, setFocusedItemId] = useState<string | null>(focus ?? null);
+  /** Garante que a rolagem automática para o item focado aconteça uma só vez. */
+  const scrolledToFocus = useRef(false);
 
   const itemsToCorrect = new Set(highlight ? highlight.split(',').filter(Boolean) : []);
 
@@ -87,6 +92,21 @@ export default function ChecklistScreen() {
 
   function rememberOffset(key: string, event: LayoutChangeEvent): void {
     sectionOffsets.current.set(key, event.nativeEvent.layout.y);
+
+    // Chegou do resumo apontando um item: rola até ele quando a posição da
+    // seção correspondente ficar conhecida.
+    if (!focusedItemId || scrolledToFocus.current) return;
+
+    const section = checklist.sections.find(
+      (entry) => entry.key === key && entry.items.some((item) => item.id === focusedItemId),
+    );
+    if (!section) return;
+
+    scrolledToFocus.current = true;
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, event.nativeEvent.layout.y - spacing.lg),
+      animated: true,
+    });
   }
 
   function openEvidence(item: InspectionItemSnapshot): void {

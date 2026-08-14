@@ -10,7 +10,14 @@
 
 /** Conjunto de valores ao qual a etiqueta pertence. */
 export type BadgeContext =
-  'inspection' | 'template' | 'user' | 'equipment' | 'priority' | 'severity' | 'conformity';
+  | 'inspection'
+  | 'template'
+  | 'user'
+  | 'equipment'
+  | 'priority'
+  | 'severity'
+  | 'conformity'
+  | 'nonConformity';
 
 /**
  * Cor lógica da etiqueta. Nomes de cor, e não de significado, porque o mesmo
@@ -93,8 +100,14 @@ const CONFORMITY: ContextCatalog = {
   NOT_APPLICABLE: { label: 'Não aplicável', tone: 'gray' },
 };
 
+/** `NonConformityStatus` — no MVP só existe `OPEN` (RN-057). */
+const NON_CONFORMITY: ContextCatalog = {
+  OPEN: { label: 'Aberta', tone: 'orange' },
+};
+
 export const STATUS_CATALOG: Readonly<Record<BadgeContext, ContextCatalog>> = {
   inspection: INSPECTION,
+  nonConformity: NON_CONFORMITY,
   template: TEMPLATE,
   user: USER,
   equipment: EQUIPMENT,

@@ -41,7 +41,13 @@ export {
   type ChoiceOption,
 } from './checklist-value';
 
-export { DateField, toIsoDate, type DateFieldProps } from './DateField';
+export {
+  DateField,
+  maskBrDate,
+  parseBrDate,
+  toIsoDate,
+  type DateFieldProps,
+} from './DateField';
 
 export {
   EvidenceThumbnailGrid,

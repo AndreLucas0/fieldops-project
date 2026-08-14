@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
-import { colors, radii, spacing, Text, touchTarget } from '@/design-system';
+import { colors, fonts, fontSizes, radii, spacing, Text, touchTarget } from '@/design-system';
 
 import { formatDate, parseIsoDate } from './relative-date';
 
@@ -18,11 +18,18 @@ export type DateFieldProps = {
 };
 
 /**
- * Campo de data com seletor nativo.
+ * Campo de data.
  *
- * O valor circula como `yyyy-MM-dd` (formato `date` do contrato) e é exibido
- * como `dd/MM/yyyy`. A conversão é feita em horário local de propósito: a data
- * de uma manutenção é a do calendário do técnico, não a do UTC.
+ * No aparelho usa o seletor nativo. Na web ele não existe —
+ * `@react-native-community/datetimepicker` publica apenas ios, android e
+ * windows —, então ali o campo vira digitação com máscara `dd/mm/aaaa`. A web
+ * serve só para desenvolvimento (o alvo obrigatório é Android,
+ * `docs/visao-geral.md` §1.8), mas sem isto a data ficaria impossível de
+ * preencher durante o desenvolvimento.
+ *
+ * O valor circula como `yyyy-MM-dd` e é exibido como `dd/MM/yyyy`. A conversão
+ * é feita em horário local de propósito: a data de uma manutenção é a do
+ * calendário do técnico, não a do UTC.
  */
 export function DateField({
   value,
@@ -34,6 +41,7 @@ export function DateField({
   testID,
 }: DateFieldProps) {
   const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState<string | null>(null);
 
   const selected = parseIsoDate(value ? `${value}T00:00:00` : null);
   const label = selected ? formatDate(selected) : placeholder;
@@ -44,6 +52,40 @@ export function DateField({
 
     if (event.type === 'dismissed' || !date) return;
     onChange(toIsoDate(date));
+  }
+
+  if (Platform.OS === 'web') {
+    // `typed` guarda o que está sendo digitado enquanto ainda não forma uma
+    // data válida; sem isso o campo apagaria os dígitos a cada tecla.
+    const text = typed ?? (selected ? formatDate(selected) : '');
+
+    return (
+      <View style={styles.root}>
+        <TextInput
+          testID={testID}
+          accessibilityLabel={accessibilityLabel ?? 'Data'}
+          editable={!disabled}
+          inputMode="numeric"
+          placeholder="dd/mm/aaaa"
+          placeholderTextColor={colors.mutedForeground}
+          value={text}
+          maxLength={10}
+          onChangeText={(next) => {
+            const masked = maskBrDate(next);
+            setTyped(masked);
+
+            const iso = parseBrDate(masked);
+            if (iso) {
+              setTyped(null);
+              onChange(iso);
+            } else if (masked === '') {
+              onChange(null);
+            }
+          }}
+          style={[styles.input, invalid && styles.invalid, disabled && styles.disabled]}
+        />
+      </View>
+    );
   }
 
   return (
@@ -93,6 +135,39 @@ export function toIsoDate(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+/** Insere as barras conforme a pessoa digita: `14082026` → `14/08/2026`. */
+export function maskBrDate(text: string): string {
+  const digits = text.replace(/\D/g, '').slice(0, 8);
+
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+/**
+ * `dd/mm/aaaa` → `yyyy-MM-dd`, ou `null` enquanto a data não estiver completa
+ * ou não existir no calendário (31/02, por exemplo).
+ */
+export function parseBrDate(text: string): string | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text.trim());
+  if (!match) return null;
+
+  const [, day, month, year] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+
+  // O construtor "acerta" datas inexistentes (31/02 vira 03/03); comparar de
+  // volta é o que revela isso.
+  if (
+    date.getFullYear() !== Number(year) ||
+    date.getMonth() !== Number(month) - 1 ||
+    date.getDate() !== Number(day)
+  ) {
+    return null;
+  }
+
+  return toIsoDate(date);
+}
+
 const styles = StyleSheet.create({
   root: {
     gap: spacing.sm,
@@ -107,6 +182,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.input,
     backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  input: {
+    minHeight: touchTarget,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.input,
+    backgroundColor: colors.background,
+    color: colors.foreground,
+    fontFamily: fonts.regular,
+    fontSize: fontSizes.base,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },

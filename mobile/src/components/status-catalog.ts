@@ -14,6 +14,7 @@ import type {
   EquipmentStatus,
   InspectionPriority,
   InspectionStatus,
+  NonConformityStatus,
   Severity,
   TemplateStatus,
   UserStatus,
@@ -26,7 +27,8 @@ export type BadgeContext =
   | 'equipment'
   | 'priority'
   | 'severity'
-  | 'conformity';
+  | 'conformity'
+  | 'nonConformity';
 
 /**
  * Cor lógica da etiqueta. Nomes de cor, e não de significado, porque o mesmo
@@ -102,8 +104,14 @@ const CONFORMITY: Record<Conformity, BadgeDescriptor> = {
   NOT_APPLICABLE: { label: 'Não aplicável', tone: 'gray' },
 };
 
+/** `NonConformityStatus` — no MVP só existe `OPEN` (RN-057). */
+const NON_CONFORMITY: Record<NonConformityStatus, BadgeDescriptor> = {
+  OPEN: { label: 'Aberta', tone: 'orange' },
+};
+
 export const STATUS_CATALOG: Record<BadgeContext, Record<string, BadgeDescriptor>> = {
   inspection: INSPECTION,
+  nonConformity: NON_CONFORMITY,
   template: TEMPLATE,
   user: USER,
   equipment: EQUIPMENT,

@@ -30,6 +30,7 @@ import type {
   LoginResponse,
   NonConformity,
   NonConformityCreateRequest,
+  NonConformityUpdateRequest,
   Page,
   RefreshTokenRequest,
   StartInspectionRequest,
@@ -602,6 +603,35 @@ const routes: Route[] = [
 
       ctx.db.nonConformities.push(nonConformity);
       return created(nonConformity);
+    },
+  },
+
+  {
+    method: 'PUT',
+    pattern: '/non-conformities/:id',
+    handle: (ctx) => {
+      requireAccount(ctx);
+      const found = ctx.db.nonConformities.find((item) => item.id === ctx.params.id);
+      if (!found) return fail(404, 'NOT_FOUND', 'Não conformidade não encontrada.', ctx.path);
+
+      const request = asRecord(ctx.body) as Partial<NonConformityUpdateRequest>;
+      const fieldErrors = [
+        !request.title ? { field: 'title', message: 'Informe o título.' } : null,
+        !request.description ? { field: 'description', message: 'Descreva a não conformidade.' } : null,
+        !request.severity ? { field: 'severity', message: 'Informe a severidade.' } : null,
+      ].filter((item): item is { field: string; message: string } => item !== null);
+
+      if (fieldErrors.length > 0) {
+        return fail(400, 'BAD_REQUEST', 'Dados incompletos.', ctx.path, fieldErrors);
+      }
+
+      found.title = request.title ?? found.title;
+      found.description = request.description ?? found.description;
+      found.severity = request.severity ?? found.severity;
+      found.updatedAt = nowIso();
+      found.version += 1;
+
+      return ok(found);
     },
   },
 

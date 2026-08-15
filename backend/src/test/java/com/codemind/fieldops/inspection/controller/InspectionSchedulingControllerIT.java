@@ -8,7 +8,9 @@ import com.codemind.fieldops.client.domain.Client;
 import com.codemind.fieldops.client.domain.ClientStatus;
 import com.codemind.fieldops.client.repository.ClientRepository;
 import com.codemind.fieldops.inspection.repository.InspectionRepository;
+import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
+import com.codemind.fieldops.nonconformity.repository.NonConformityRepository;
 import com.codemind.fieldops.shared.security.JwtClaims;
 import com.codemind.fieldops.site.domain.InspectionSite;
 import com.codemind.fieldops.site.domain.SiteStatus;
@@ -61,6 +63,12 @@ class InspectionSchedulingControllerIT {
     private ItemSnapshotRepository itemSnapshotRepository;
 
     @Autowired
+    private InspectionResponseRepository inspectionResponseRepository;
+
+    @Autowired
+    private NonConformityRepository nonConformityRepository;
+
+    @Autowired
     private InspectionTemplateRepository templateRepository;
 
     @Autowired
@@ -91,6 +99,8 @@ class InspectionSchedulingControllerIT {
 
     @BeforeEach
     void setUp() {
+        nonConformityRepository.deleteAll();
+        inspectionResponseRepository.deleteAll();
         itemSnapshotRepository.deleteAll();
         inspectionRepository.deleteAll();
         templateVersionRepository.deleteAll();

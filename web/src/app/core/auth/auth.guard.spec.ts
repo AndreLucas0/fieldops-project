@@ -10,7 +10,7 @@ import {
 } from '@angular/router';
 
 import type { Session } from '../models/session.model';
-import type { UserRole } from '../models/user.model';
+import type { UserRole } from '../models/domain';
 import { NotificationService, type AppNotification } from '../notifications/notification.service';
 import { ACCESS_DENIED_MESSAGE, FORBIDDEN_REDIRECT_URL, authGuard, guestGuard } from './auth.guard';
 import { AuthStore } from './auth.store';

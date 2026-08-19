@@ -1,4 +1,4 @@
-import type { UserRole, UserSummary } from './user.model';
+import type { UserRole, UserSummary } from './domain';
 
 /** Corpo de `POST /auth/login` (contrato-backend-frontend.md §3.2). */
 export interface LoginRequest {

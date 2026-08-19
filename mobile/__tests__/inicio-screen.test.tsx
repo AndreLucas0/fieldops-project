@@ -1,3 +1,4 @@
+import { USER_IDS } from '@fieldops/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 jest.mock('expo-router', () => require('@/test-utils/expo-router-mock'));
@@ -8,7 +9,7 @@ import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/te
 import { getMockDatabase, resetMockDatabase } from '@/services';
 
 /** O técnico das inspeções fictícias — o mesmo id da sessão semeada. */
-const TECHNICIAN_ID = '8a50e30d-2a58-4a24-944e-10a9948abf01';
+const TECHNICIAN_ID = USER_IDS.technician;
 
 beforeEach(() => {
   resetRouterMock();

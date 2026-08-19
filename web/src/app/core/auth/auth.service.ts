@@ -13,7 +13,7 @@ import {
   type RefreshTokenResponse,
   type Session,
 } from '../models/session.model';
-import type { UserSummary } from '../models/user.model';
+import type { UserSummary } from '../models/domain';
 import { AuthStore } from './auth.store';
 import { TokenStorageService } from './token-storage.service';
 

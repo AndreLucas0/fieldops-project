@@ -1,3 +1,4 @@
+import { USER_IDS } from '@fieldops/shared';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import * as SecureStore from 'expo-secure-store';
 
@@ -213,7 +214,7 @@ describe('Tela de login', () => {
           refreshToken: 'refresh.token',
           expiresIn: 900,
           user: {
-            id: '8a50e30d-2a58-4a24-944e-10a9948abf01',
+            id: USER_IDS.technician,
             name: 'Carlos Souza',
             email: VALID.email,
             role: 'TECHNICIAN',

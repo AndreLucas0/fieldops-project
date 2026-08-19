@@ -5,7 +5,7 @@ export * from './core.providers';
 export * from './models/api-error.model';
 export * from './models/page.model';
 export * from './models/session.model';
-export * from './models/user.model';
+export * from './models/domain';
 
 export * from './http/api.service';
 export * from './http/auth.interceptor';
@@ -19,3 +19,6 @@ export * from './auth/permissions';
 export * from './auth/token-storage.service';
 
 export * from './notifications/notification.service';
+
+export * from './services/resources';
+export * from './mocks/mock-services';

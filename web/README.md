@@ -1,59 +1,64 @@
-# Web
+# FieldOps — interface administrativa
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.21.
+Aplicação Angular 21 usada por administradores e supervisores para cadastrar,
+agendar, acompanhar e revisar inspeções.
 
-## Development server
+Documentação normativa do produto em `../docs/`; o contrato de dados vive em
+`../shared/`.
 
-To start a local development server, run:
-
-```bash
-ng serve
-```
-
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## Rodar
 
 ```bash
-ng generate component component-name
+npm install     # só na primeira vez, ou após mudar dependências
+npm start       # http://localhost:4200 (a raiz redireciona para /dashboard)
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+**Não precisa de backend.** O `ng serve` usa a configuração `development`, que
+liga o backend fictício (`environment.mockApi = true`) com os dados de
+`../shared/src/mocks` — os mesmos do aplicativo mobile.
+
+Requer Node ≥ 20.19 ou ≥ 22.12. (O Angular 22 exigiria 22.22.3+; por isso o
+projeto está no 21.)
+
+## Comandos
 
 ```bash
-ng generate --help
+npm test                                   # 167 testes (Vitest)
+npm run build                              # produção — mockApi: false
+npx ng build --configuration development   # build com o mock ligado
 ```
 
-## Building
+## Estrutura
 
-To build the project run:
-
-```bash
-ng build
+```
+src/app/
+├── core/               HTTP, sessão, autorização, serviços de domínio e mocks
+├── shared/components/  DataTable, StatusBadge, ConfirmDialog, PageHeader…
+└── features/
+    └── dashboard/      FE-W02 — painel
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+Cada camada tem seu próprio README com as decisões: `core/README.md` e
+`shared/components/README.md`.
 
-## Running unit tests
+## Estado das telas
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+Implementada: **FE-W02 — Painel** (`/dashboard`).
 
-```bash
-ng test
-```
+**FE-W01 (login) ainda não existe.** Como o `authGuard` manda ao `/login` quem
+não tem sessão, o modo fictício abre uma sessão de supervisor automaticamente
+(`core/mocks/mock-session.ts`) para as telas protegidas serem alcançáveis. Esse
+andaime sai quando o login entrar.
 
-## Running end-to-end tests
+As demais telas do inventário estão em `../docs/telas-frontend.md` §2.
 
-For end-to-end (e2e) testing, run:
+## Ligar na API real
 
-```bash
-ng e2e
-```
+1. `environment.development.ts`: `mockApi: false`.
+2. Aponte `apiBaseUrl` para o backend, ou configure um proxy encaminhando
+   `/api/v1` (sem proxy, o CORS da API precisa liberar a origem do `ng serve`).
+3. Implemente FE-W01 e remova `provideMockSession()` de `core.providers.ts`.
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+O `ApiService`, os interceptadores e os guards já estão prontos para isso: a
+renovação de token em `401` e a repetição única da requisição original já
+funcionam.

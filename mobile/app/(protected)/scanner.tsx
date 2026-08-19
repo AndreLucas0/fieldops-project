@@ -13,7 +13,7 @@ import { getApiConfig } from '@/services';
 import type { Equipment } from '@/models';
 
 /** Código de um equipamento do backend fictício, para a leitura simulada. */
-const SAMPLE_QR_CODE = 'FIELDOPS-EQ-0001';
+const SAMPLE_QR_CODE = 'GD001';
 
 /**
  * FE-M11 — Scanner QR.
@@ -123,7 +123,7 @@ export default function ScannerScreen() {
             <Field
               testID="scanner-codigo"
               label="Código do equipamento"
-              placeholder="Ex.: FIELDOPS-EQ-0001"
+              placeholder="Ex.: GD001"
               autoCapitalize="characters"
               autoCorrect={false}
               value={manualCode}

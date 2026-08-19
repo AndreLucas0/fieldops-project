@@ -1,4 +1,4 @@
-import type { UserRole } from '../models/user.model';
+import type { UserRole } from '../models/domain';
 import { canAccessRoute, canWrite, hasAnyRole, rolesForRoute } from './permissions';
 
 describe('rolesForRoute', () => {

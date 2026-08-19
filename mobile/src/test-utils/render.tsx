@@ -1,3 +1,4 @@
+import { USER_IDS } from '@fieldops/shared';
 import type { ReactElement } from 'react';
 import { render, type RenderOptions } from '@testing-library/react-native';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
@@ -29,7 +30,7 @@ export function buildSession(overrides: Partial<AuthSession> = {}): AuthSession 
     refreshToken: 'refresh.token',
     expiresAt: Date.now() + 15 * 60 * 1000,
     user: {
-      id: '8a50e30d-2a58-4a24-944e-10a9948abf01',
+      id: USER_IDS.technician,
       name: 'Carlos Souza',
       email: 'tecnico@fieldops.local',
       role: 'TECHNICIAN',

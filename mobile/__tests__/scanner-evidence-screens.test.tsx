@@ -1,3 +1,4 @@
+import { USER_IDS } from '@fieldops/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -10,7 +11,7 @@ import { resetRouterMock, routerMock, setSearchParams } from '@/test-utils/expo-
 import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/test-utils/render';
 import { configureApi, getMockDatabase, resetApiConfig, resetMockDatabase } from '@/services';
 
-const TECHNICIAN_ID = '8a50e30d-2a58-4a24-944e-10a9948abf01';
+const TECHNICIAN_ID = USER_IDS.technician;
 
 function asMock<T>(fn: T): jest.Mock {
   return fn as unknown as jest.Mock;
@@ -60,16 +61,16 @@ describe('FE-M11 — Scanner QR', () => {
   it('encontra o equipamento e exibe os dados do cadastro', async () => {
     await render(<ScannerScreen />);
 
-    await fireEvent.changeText(screen.getByTestId('scanner-codigo'), 'FIELDOPS-EQ-0001');
+    await fireEvent.changeText(screen.getByTestId('scanner-codigo'), 'GD001');
     await fireEvent.press(screen.getByTestId('scanner-buscar'));
 
     await waitFor(() => expect(screen.getByTestId('scanner-equipamento')).toBeOnTheScreen());
 
     const card = screen.getByTestId('scanner-equipamento');
-    expect(card).toHaveTextContent(/Compressor de ar CP-100/);
-    expect(card).toHaveTextContent(/PAT-004512/);
-    expect(card).toHaveTextContent(/CP100-2019-8842/);
-    expect(card).toHaveTextContent(/Atlas/);
+    expect(card).toHaveTextContent(/Gerador GD-001/);
+    expect(card).toHaveTextContent(/PAT-000001/);
+    expect(card).toHaveTextContent(/GD001-2021-4471/);
+    expect(card).toHaveTextContent(/Stemac/);
     expect(card).toHaveTextContent(/Ativo/);
   });
 
@@ -102,7 +103,7 @@ describe('FE-M11 — Scanner QR', () => {
   });
 
   it('não alerta quando o equipamento é o esperado', async () => {
-    const esperado = getMockDatabase().equipment.find((item) => item.qrCode === 'FIELDOPS-EQ-0001');
+    const esperado = getMockDatabase().equipment.find((item) => item.qrCode === 'GD001');
     await render(<ScannerScreen />, { expectedEquipmentId: esperado?.id ?? '' });
 
     await fireEvent.press(screen.getByTestId('scanner-simular'));

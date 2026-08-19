@@ -1,3 +1,4 @@
+import { USER_IDS } from '@fieldops/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 jest.mock('expo-router', () => require('@/test-utils/expo-router-mock'));
@@ -9,7 +10,7 @@ import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/te
 import { configureApi, getMockDatabase, resetApiConfig, resetMockDatabase } from '@/services';
 import type { InspectionItemSnapshot, InspectionStatus } from '@/models';
 
-const TECHNICIAN_ID = '8a50e30d-2a58-4a24-944e-10a9948abf01';
+const TECHNICIAN_ID = USER_IDS.technician;
 
 beforeEach(() => {
   resetRouterMock();
@@ -122,11 +123,13 @@ describe('FE-M09 — Resumo e conclusão', () => {
 
   it('cada pendência abre o item no checklist', async () => {
     const id = inspectionWith('IN_PROGRESS');
-    // O mock já responde os três primeiros itens; o de texto curto da segunda
-    // seção é obrigatório e continua em branco.
-    const pendente = itemsOf(id).find(
-      (item) => item.required && item.responseType === 'TEXT_SHORT',
+    // O conjunto fictício responde só os primeiros itens: a pendência é o
+    // primeiro item obrigatório que ficou sem resposta. Derivar em vez de fixar
+    // o tipo mantém o teste válido se o conjunto mudar de novo.
+    const respondidos = new Set(
+      (getMockDatabase().responses[id] ?? []).map((resposta) => resposta.inspectionItemId),
     );
+    const pendente = itemsOf(id).find((item) => item.required && !respondidos.has(item.id));
     await renderSummary(id);
 
     await fireEvent.press(screen.getByTestId(`resumo-pendencia-${pendente?.itemCode}`));
@@ -179,7 +182,7 @@ describe('FE-M10 — Não conformidades', () => {
     await renderNonConformities(id);
 
     const nc = getMockDatabase().nonConformities[0];
-    expect(screen.getByTestId(`nc-item-${nc?.id}`)).toHaveTextContent(/Obstrução na área/);
+    expect(screen.getByTestId(`nc-item-${nc?.id}`)).toHaveTextContent(/Trinca na proteção lateral/);
     expect(screen.getByTestId(`nc-item-${nc?.id}`)).toHaveTextContent(/Aberta/);
   });
 

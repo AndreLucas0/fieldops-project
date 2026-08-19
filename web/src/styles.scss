@@ -21,6 +21,17 @@ html {
   );
 }
 
+/*
+ * Sem isto o padding de qualquer cartão soma por fora da largura da coluna e
+ * a tela estoura na horizontal em telas estreitas — o Angular Material não
+ * aplica a regra aos elementos da aplicação.
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html,
 body {
   height: 100%;

@@ -184,7 +184,7 @@ const routes: Route[] = [
     handle: (ctx) => {
       const { email, password } = asRecord(ctx.body) as Partial<LoginRequest>;
       const normalized = (email ?? '').trim().toLowerCase();
-      const account = ctx.db.accounts.find((candidate) => candidate.email === normalized);
+      const account = ctx.db.users.find((candidate) => candidate.email === normalized);
 
       // Conta inexistente e senha errada dão a mesma resposta: AC-AUTH exige
       // que a mensagem não revele se o e-mail está cadastrado.
@@ -857,7 +857,7 @@ export async function handleMockRequest(request: MockRequest): Promise<HttpRespo
     let account: MockAccount | null = null;
     if (route.auth !== false) {
       const accountId = request.accessToken ? db.accessTokens.get(request.accessToken) : undefined;
-      account = db.accounts.find((candidate) => candidate.id === accountId) ?? null;
+      account = db.users.find((candidate) => candidate.id === accountId) ?? null;
 
       // Sem token válido o mock responde 401, que é o gatilho do refresh no
       // `ApiClient` — o fluxo de renovação é exercitado igual ao da API real.

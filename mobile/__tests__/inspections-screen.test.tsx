@@ -1,3 +1,4 @@
+import { USER_IDS } from '@fieldops/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 jest.mock('expo-router', () => require('@/test-utils/expo-router-mock'));
@@ -7,7 +8,7 @@ import { resetRouterMock, routerMock } from '@/test-utils/expo-router-mock';
 import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/test-utils/render';
 import { getMockDatabase, resetMockDatabase } from '@/services';
 
-const TECHNICIAN_ID = '8a50e30d-2a58-4a24-944e-10a9948abf01';
+const TECHNICIAN_ID = USER_IDS.technician;
 
 beforeEach(() => {
   resetRouterMock();
@@ -58,7 +59,7 @@ describe('FE-M03 — Lista de inspeções', () => {
     const primeira = getMockDatabase().inspections[0];
     await waitFor(() =>
       expect(screen.getByTestId(`inspections-card-${primeira?.id}`)).toHaveTextContent(
-        /Metalúrgica Horizonte/,
+        /Indústria Alfa/,
       ),
     );
   });

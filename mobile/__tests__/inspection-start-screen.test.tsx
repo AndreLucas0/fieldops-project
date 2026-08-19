@@ -1,3 +1,4 @@
+import { USER_IDS } from '@fieldops/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import * as Location from 'expo-location';
 
@@ -9,7 +10,7 @@ import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/te
 import { configureApi, getMockDatabase, resetApiConfig, resetMockDatabase } from '@/services';
 import type { InspectionStatus } from '@/models';
 
-const TECHNICIAN_ID = '8a50e30d-2a58-4a24-944e-10a9948abf01';
+const TECHNICIAN_ID = USER_IDS.technician;
 
 function asMock<T>(fn: T): jest.Mock {
   return fn as unknown as jest.Mock;
@@ -67,7 +68,7 @@ describe('FE-M07 — Iniciar inspeção', () => {
 
     expect(screen.getByTestId('iniciar-resumo')).toHaveTextContent(/Atribuída/);
     await waitFor(() =>
-      expect(screen.getByTestId('iniciar-resumo')).toHaveTextContent(/Metalúrgica Horizonte/),
+      expect(screen.getByTestId('iniciar-resumo')).toHaveTextContent(/Indústria Alfa/),
     );
   });
 

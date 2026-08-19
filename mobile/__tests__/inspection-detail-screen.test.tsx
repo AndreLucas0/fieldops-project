@@ -1,3 +1,4 @@
+import { USER_IDS } from '@fieldops/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 jest.mock('expo-router', () => require('@/test-utils/expo-router-mock'));
@@ -12,7 +13,7 @@ import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/te
 import { getMockDatabase, resetMockDatabase } from '@/services';
 import type { InspectionStatus } from '@/models';
 
-const TECHNICIAN_ID = '8a50e30d-2a58-4a24-944e-10a9948abf01';
+const TECHNICIAN_ID = USER_IDS.technician;
 
 beforeEach(() => {
   resetRouterMock();
@@ -60,9 +61,9 @@ describe('FE-M06 — Detalhes da inspeção', () => {
 
     expect(screen.getByTestId('detalhe-screen')).toHaveTextContent(/Em andamento/);
     await waitFor(() =>
-      expect(screen.getByTestId('detalhe-local')).toHaveTextContent(/Metalúrgica Horizonte/),
+      expect(screen.getByTestId('detalhe-local')).toHaveTextContent(/Indústria Alfa/),
     );
-    expect(screen.getByTestId('detalhe-local')).toHaveTextContent(/Unidade Norte/);
+    expect(screen.getByTestId('detalhe-local')).toHaveTextContent(/Planta São Paulo/);
   });
 
   it('calcula o progresso cruzando itens e respostas (RN-040)', async () => {
@@ -111,7 +112,7 @@ describe('FE-M06 — Detalhes da inspeção', () => {
     await renderDetail(id);
 
     expect(screen.getByTestId('detalhe-acao')).toHaveTextContent(/Corrigir/);
-    expect(screen.getByTestId('detalhe-reprovacao')).toHaveTextContent(/Foto do item OPE-01/);
+    expect(screen.getByTestId('detalhe-reprovacao')).toHaveTextContent(/Fotos insuficientes/);
   });
 
   it('estados finais ficam em somente leitura', async () => {
@@ -125,7 +126,7 @@ describe('FE-M06 — Detalhes da inspeção', () => {
     const id = inspectionWith('IN_PROGRESS');
     await renderDetail(id);
 
-    expect(screen.getByTestId('detalhe-nc')).toHaveTextContent(/Obstrução na área/);
+    expect(screen.getByTestId('detalhe-nc')).toHaveTextContent(/Trinca na proteção lateral/);
   });
 
   it('mostra erro com nova tentativa quando a inspeção não existe', async () => {

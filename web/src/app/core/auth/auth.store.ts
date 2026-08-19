@@ -7,7 +7,7 @@ import {
   type AuthState,
   type Session,
 } from '../models/session.model';
-import type { UserRole, UserSummary } from '../models/user.model';
+import type { UserRole, UserSummary } from '../models/domain';
 
 /**
  * Estado da sessão.

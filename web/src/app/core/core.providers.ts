@@ -2,9 +2,13 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAppInitializer, inject, type EnvironmentProviders, type Provider } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
+import { environment } from '../../environments/environment';
 import { AuthService } from './auth/auth.service';
 import { authInterceptor } from './http/auth.interceptor';
 import { errorInterceptor } from './http/error.interceptor';
+import { MOCK_RESOURCE_PROVIDERS } from './mocks/mock-services';
+import { provideMockSession } from './mocks/mock-session';
+import { HTTP_RESOURCE_PROVIDERS } from './services/resources';
 
 /**
  * Infraestrutura HTTP e de sessão da aplicação.
@@ -19,8 +23,23 @@ import { errorInterceptor } from './http/error.interceptor';
 export function provideCore(): (Provider | EnvironmentProviders)[] {
   return [
     provideHttpClient(withInterceptors([errorInterceptor, authInterceptor])),
+    ...provideResources(),
     provideSessionBootstrap(),
+    // Andaime do modo fictício: abre sessão para as rotas protegidas serem
+    // alcançáveis enquanto a tela de login (FE-W01) não existe.
+    provideMockSession(),
   ];
+}
+
+/**
+ * Escolhe entre a API real e o backend fictício.
+ *
+ * A decisão acontece uma vez, aqui: as telas injetam `InspectionsService` e não
+ * sabem de onde vieram os dados. Trocar `mockApi` no environment não deve
+ * exigir mudança em nenhum componente.
+ */
+export function provideResources(useMock: boolean = environment.mockApi): Provider[] {
+  return useMock ? [...MOCK_RESOURCE_PROVIDERS] : [...HTTP_RESOURCE_PROVIDERS];
 }
 
 /**

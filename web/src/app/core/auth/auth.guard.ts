@@ -12,7 +12,7 @@ import {
 } from '@angular/router';
 
 import { isSessionValid } from '../models/session.model';
-import type { UserRole } from '../models/user.model';
+import type { UserRole } from '../models/domain';
 import { NotificationService } from '../notifications/notification.service';
 import { AuthService, LOGIN_ROUTE } from './auth.service';
 import { AuthStore } from './auth.store';

@@ -20,9 +20,18 @@ core/
 │   ├── auth.interceptor.ts      Bearer + renovação silenciosa
 │   ├── error.interceptor.ts     normalização de erro + aviso ao usuário
 │   └── http-context.ts          SKIP_AUTH, RETRIED_AFTER_REFRESH, SKIP_ERROR_NOTIFICATION
-├── models/                      Page<T>, PageParams, ApiError, Session, User
+├── models/
+│   ├── domain.ts                reexporta o contrato de shared/src/domain
+│   ├── page.model.ts            Page<T>, PageParams, filtros tipados
+│   ├── api-error.model.ts       ApiError normalizado
+│   └── session.model.ts         sessão da web (tokens, estado)
+├── services/
+│   └── resources.ts             contratos de domínio + implementações HTTP
+├── mocks/
+│   ├── mock-services.ts         implementações fictícias sobre o conjunto compartilhado
+│   └── mock-session.ts          andaime de sessão (ver o fim deste arquivo)
 ├── notifications/               canal de mensagens (sem UI)
-└── core.providers.ts            provideCore()
+└── core.providers.ts            provideCore(), provideResources()
 ```
 
 ## Registro
@@ -41,7 +50,8 @@ então o `authInterceptor` precisa estar mais próximo do backend para ver o
 token expirado geraria um aviso indevido de "sessão expirada".
 
 `provideCore()` também registra um inicializador que tenta restaurar a sessão
-antes do primeiro render (ver "Onde os tokens ficam").
+antes do primeiro render (ver "Onde os tokens ficam") e escolhe entre os
+serviços reais e os fictícios (ver "Serviços de domínio").
 
 ## ApiService
 
@@ -130,6 +140,62 @@ fluxo — sem isso a renovação chamaria a si mesma.
 Nada é registrado em log pelo interceptador de autenticação (RN-007: tokens e
 credenciais nunca em log).
 
+## Serviços de domínio
+
+Oito recursos: `UsersService`, `ClientsService`, `SitesService`,
+`EquipmentService`, `TemplatesService`, `InspectionsService`,
+`NonConformitiesService` e `DashboardService`.
+
+Cada um é declarado como **classe abstrata**, que serve ao mesmo tempo de
+contrato e de token de injeção. A tela injeta o contrato e não sabe se está
+falando com a API ou com o backend fictício:
+
+```ts
+export class InspectionsListComponent {
+  private readonly inspections = inject(InspectionsService);
+
+  readonly page = toSignal(this.inspections.list({ status: 'SUBMITTED', size: 20 }));
+}
+```
+
+A escolha acontece uma vez, em `provideResources()`, pelo `environment.mockApi`:
+
+| `mockApi` | Implementação |
+|---|---|
+| `true` (desenvolvimento) | `MOCK_RESOURCE_PROVIDERS` — dados de `shared/src/mocks` |
+| `false` (produção) | `HTTP_RESOURCE_PROVIDERS` — chamadas reais via `ApiService` |
+
+Os mocks não são apenas leitura: as mutações ficam em memória e a tela reflete
+na hora. E recusam o que a API recusaria, para a tela não passar no fictício e
+quebrar na integração — QR duplicado responde `409` (RN-011), equipamento
+descomissionado em nova inspeção `422` (RN-012), cancelar inspeção aprovada
+`409` (RN-030), reprovar sem motivo `422` (RN-080).
+
+Nos testes, injete a latência zero e volte o conjunto ao estado semeado:
+
+```ts
+beforeEach(() => {
+  resetMockStore();
+  TestBed.configureTestingModule({
+    providers: [...provideResources(true), { provide: MOCK_LATENCY_MS, useValue: 0 }],
+  });
+});
+```
+
+## Contrato de domínio
+
+`core/models/domain.ts` reexporta `shared/src/domain` — os tipos são os mesmos
+que o aplicativo Expo usa. Manter uma cópia aqui já custou divergência:
+`UserRole` era declarado nos dois lados e nada garantia que continuassem iguais.
+
+Ficam **fora** desse reexporte, de propósito:
+
+- `Page`/`PageQuery` — a web tem um modelo próprio em `page.model.ts`, com
+  filtros tipados e limites do contrato, usado pelo `ApiService`. O envelope é
+  compatível com o do pacote compartilhado.
+- `ApiError` e os modelos de sessão — específicos desta aplicação
+  (interceptador, store, storage de token).
+
 ## Erros
 
 Todo erro HTTP vira `ApiError`, com a estrutura de `§5.1`:
@@ -214,6 +280,19 @@ readonly podeEditar = computed(() => canWrite('clients', this.store.role()));
 Isto é conveniência de interface. `perfis-de-usuario.md` §5.3 é explícito:
 a UI não é barreira suficiente, a API valida a autorização de novo em cada
 requisição.
+
+## Andaime de sessão do modo fictício
+
+`mocks/mock-session.ts` abre uma sessão de supervisor direto no `AuthStore`
+quando `mockApi` está ligado.
+
+Existe por um motivo específico: as rotas administrativas são protegidas pelo
+`authGuard`, que manda ao `/login` quem não tem sessão — e **FE-W01 ainda não
+foi implementada**. Sem isso nenhuma tela protegida renderiza e não dá para
+conferir nada localmente. O backend fictício cobre os recursos de domínio, não
+os endpoints de `/auth`, então a sessão é aberta sem passar pela rede.
+
+**Não é um caminho de autenticação. Apagar quando FE-W01 entrar.**
 
 ## Pendências do contrato que afetam esta camada
 

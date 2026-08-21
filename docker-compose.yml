@@ -11,11 +11,17 @@
 ###   docker compose up -d
 ###   docker compose --profile tools up -d   # inclui o Adminer (opcional)
 ###
-### O banco sobe com o schema de validação (db/schema.sql) e o dataset de
-### demonstração (db/seed.sql) já aplicados na primeira inicialização, via
-### docker-entrypoint-initdb.d — isso só roda quando o volume é criado pela
-### primeira vez. Para reaplicar depois de alterar o seed:
-###   docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /docker-entrypoint-initdb.d/20-seed.sql
+### O schema agora é responsabilidade das migrações Flyway da API
+### (api/src/main/resources/db/migration/V1..V7 — ver docs/plano-implementacao-backend.md
+### §4.1), não mais deste compose: db/schema.sql passou a ser só o arquivo de
+### referência histórico citado em seu próprio cabeçalho ("deve ser dividido
+### em versões e removido daqui" quando as migrações existirem — já
+### aconteceu). O banco sobe vazio; rode a API uma vez para aplicar as
+### migrações e só então aplique o dataset de demonstração manualmente
+### (db/seed.sql não fica mais montado em docker-entrypoint-initdb.d — se
+### ficasse, rodaria automaticamente na primeira inicialização, antes de
+### existir qualquer tabela, e quebraria o container):
+###   docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" < db/seed.sql
 
 services:
   db:
@@ -29,8 +35,6 @@ services:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - fieldops_db_data:/var/lib/postgresql/data
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
-      - ./db/seed.sql:/docker-entrypoint-initdb.d/20-seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-fieldops} -d ${DB_NAME:-fieldops}"]
       interval: 5s

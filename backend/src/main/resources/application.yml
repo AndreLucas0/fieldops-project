@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: fieldops
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /api/v1
+
+fieldops:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:troque-este-valor-antes-de-subir-qualquer-ambiente-compartilhado}
+      access-token-expiration-seconds: ${JWT_ACCESS_TOKEN_EXPIRATION_SECONDS:900}
+      refresh-token-expiration-seconds: ${JWT_REFRESH_TOKEN_EXPIRATION_SECONDS:604800}

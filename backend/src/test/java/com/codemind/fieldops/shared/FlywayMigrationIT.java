@@ -31,7 +31,7 @@ class FlywayMigrationIT {
 		assertThat(flyway.info().all()).isNotEmpty();
 		assertThat(flyway.info().all())
 			.allSatisfy(migration -> assertThat(migration.getState()).isEqualTo(MigrationState.SUCCESS));
-		assertThat(flyway.info().current().getVersion().toString()).isEqualTo("8");
+		assertThat(flyway.info().current().getVersion().toString()).isEqualTo("9");
 	}
 
 	@Test
@@ -46,7 +46,7 @@ class FlywayMigrationIT {
 			"users", "clients", "inspection_sites", "equipment",
 			"inspection_templates", "inspection_template_versions", "template_sections", "template_items",
 			"inspections", "inspection_item_snapshots", "inspection_responses",
-			"evidence", "non_conformities", "inspection_reviews", "audit_events");
+			"non_conformities", "inspection_reviews", "audit_events");
 	}
 
 }

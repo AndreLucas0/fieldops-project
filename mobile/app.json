@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "FieldOps",
+    "slug": "fieldops",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "fieldops",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#101419",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fieldops.mobile"
+    },
+    "android": {
+      "package": "com.fieldops.mobile",
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "adaptiveIcon": {
+        "backgroundColor": "#101419",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#101419",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "tsconfigPaths": true
+    }
+  }
+}

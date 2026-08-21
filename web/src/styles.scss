@@ -1,0 +1,45 @@
+@use '@angular/material' as mat;
+
+/**
+ * Tema da interface administrativa (Angular Material 3).
+ *
+ * A escolha da biblioteca está registrada em `src/app/shared/components/README.md`:
+ * Angular Material, primeira parte do Angular, na mesma linha de versão (21.x).
+ */
+html {
+  color-scheme: light;
+
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$blue-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
+}
+
+/*
+ * Sem isto o padding de qualquer cartão soma por fora da largura da coluna e
+ * a tela estoura na horizontal em telas estreitas — o Angular Material não
+ * aplica a regra aos elementos da aplicação.
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font-family: Roboto, 'Helvetica Neue', sans-serif;
+}

@@ -1,2 +1,16 @@
-# Segredos locais — nunca commitar (RNF-010 / RN-007, .env.example)
+# Configuração sensível — RNF-010 / RN-007.
 .env
+.env.local
+!.env.example
+
+# Dependências
+node_modules/
+
+# Protótipo do Lovable, mantido apenas como referência visual.
+# Ele traz o próprio .git, e versioná-lo aqui criaria um gitlink quebrado.
+# Para versionar de fato: remova esta linha e `rm -rf task-inspector-hub/.git`.
+task-inspector-hub/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db

@@ -1,0 +1,30 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "types": [
+      "jest"
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@fieldops/shared": [
+        "../shared/src/index.ts"
+      ],
+      "@fieldops/shared/*": [
+        "../shared/src/*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "../shared/src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

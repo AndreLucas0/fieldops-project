@@ -1,0 +1,9 @@
+{
+  "name": "@fieldops/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Contrato de dados e dados fictícios compartilhados entre mobile (Expo) e web (Angular).",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "sideEffects": false
+}

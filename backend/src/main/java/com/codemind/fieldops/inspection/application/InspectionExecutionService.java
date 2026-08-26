@@ -4,16 +4,20 @@ import com.codemind.fieldops.inspection.domain.Inspection;
 import com.codemind.fieldops.inspection.domain.InspectionResponse;
 import com.codemind.fieldops.inspection.domain.InspectionStatus;
 import com.codemind.fieldops.inspection.domain.ItemSnapshot;
+import com.codemind.fieldops.inspection.dto.GeoLocationRequest;
 import com.codemind.fieldops.inspection.dto.InspectionResponseCreateRequest;
 import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
+import com.codemind.fieldops.shared.audit.AuditEventPublisher;
 import com.codemind.fieldops.shared.error.BusinessRuleViolationException;
 import com.codemind.fieldops.shared.error.ResourceNotFoundException;
 import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.repository.UserRepository;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,19 +39,22 @@ public class InspectionExecutionService {
     private final ItemSnapshotRepository itemSnapshotRepository;
     private final InspectionResponseRepository responseRepository;
     private final UserRepository userRepository;
+    private final AuditEventPublisher auditEventPublisher;
 
     public InspectionExecutionService(InspectionRepository inspectionRepository,
                                        ItemSnapshotRepository itemSnapshotRepository,
                                        InspectionResponseRepository responseRepository,
-                                       UserRepository userRepository) {
+                                       UserRepository userRepository,
+                                       AuditEventPublisher auditEventPublisher) {
         this.inspectionRepository = inspectionRepository;
         this.itemSnapshotRepository = itemSnapshotRepository;
         this.responseRepository = responseRepository;
         this.userRepository = userRepository;
+        this.auditEventPublisher = auditEventPublisher;
     }
 
     @Transactional
-    public Inspection start(UUID inspectionId) {
+    public Inspection start(UUID inspectionId, UUID actorId, Instant startedAtDevice, GeoLocationRequest location) {
         Inspection inspection = getInspection(inspectionId);
 
         if (inspection.getStatus() != InspectionStatus.DRAFT
@@ -57,12 +64,19 @@ public class InspectionExecutionService {
         }
 
         inspection.setStatus(InspectionStatus.IN_PROGRESS);
+        inspection.setStartedAtDevice(startedAtDevice);
         inspection.setStartedAtServer(Instant.now());
-        return inspectionRepository.save(inspection);
+        Inspection saved = inspectionRepository.save(inspection);
+
+        auditEventPublisher.record("INSPECTION_STARTED", "INSPECTION", inspectionId, inspectionId, actorId, null,
+            Map.of("status", InspectionStatus.IN_PROGRESS.name()), locationMetadata(location));
+
+        return saved;
     }
 
     @Transactional
-    public Inspection submit(UUID inspectionId, UUID userId, boolean isTechnician) {
+    public Inspection submit(UUID inspectionId, UUID userId, boolean isTechnician, Instant completedAtDevice,
+            GeoLocationRequest location) {
         Inspection inspection = getInspection(inspectionId);
 
         if (isTechnician && !inspection.getTechnician().getId().equals(userId)) {
@@ -93,8 +107,26 @@ public class InspectionExecutionService {
         }
 
         inspection.setStatus(InspectionStatus.SUBMITTED);
+        inspection.setCompletedAtDevice(completedAtDevice);
         inspection.setSubmittedAtServer(Instant.now());
-        return inspectionRepository.save(inspection);
+        Inspection saved = inspectionRepository.save(inspection);
+
+        auditEventPublisher.record("INSPECTION_SUBMITTED", "INSPECTION", inspectionId, inspectionId, userId, null,
+            Map.of("status", InspectionStatus.SUBMITTED.name()), locationMetadata(location));
+
+        return saved;
+    }
+
+    private static Map<String, Object> locationMetadata(GeoLocationRequest location) {
+        if (location == null || location.latitude() == null || location.longitude() == null) {
+            return null;
+        }
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("latitude", location.latitude());
+        metadata.put("longitude", location.longitude());
+        metadata.put("accuracyMeters", location.accuracyMeters());
+        metadata.put("capturedAt", location.capturedAt() != null ? location.capturedAt().toString() : null);
+        return metadata;
     }
 
     @Transactional

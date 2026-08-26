@@ -15,6 +15,7 @@ import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
 import com.codemind.fieldops.nonconformity.repository.NonConformityRepository;
+import com.codemind.fieldops.shared.audit.AuditEventRepository;
 import com.codemind.fieldops.shared.security.JwtClaims;
 import com.codemind.fieldops.site.domain.InspectionSite;
 import com.codemind.fieldops.site.domain.SiteStatus;
@@ -62,6 +63,7 @@ class InspectionExecutionControllerIT {
     @Autowired private ItemSnapshotRepository itemSnapshotRepository;
     @Autowired private InspectionResponseRepository inspectionResponseRepository;
     @Autowired private NonConformityRepository nonConformityRepository;
+    @Autowired private AuditEventRepository auditEventRepository;
     @Autowired private InspectionTemplateRepository templateRepository;
     @Autowired private TemplateVersionRepository templateVersionRepository;
     @Autowired private InspectionSiteRepository siteRepository;
@@ -82,6 +84,7 @@ class InspectionExecutionControllerIT {
 
     @BeforeEach
     void setUp() {
+        auditEventRepository.deleteAll();
         nonConformityRepository.deleteAll();
         inspectionResponseRepository.deleteAll();
         itemSnapshotRepository.deleteAll();
@@ -211,6 +214,32 @@ class InspectionExecutionControllerIT {
     }
 
     @Test
+    void startWithDeviceLocationRecordsAuditMetadata() {
+        Inspection inspection = createDraftInspection();
+        String payload = """
+            {
+              "startedAtDevice": "2026-08-26T10:00:00Z",
+              "location": {"latitude": -23.55052, "longitude": -46.633308, "accuracyMeters": 5.0, "capturedAt": "2026-08-26T10:00:00Z"}
+            }""";
+
+        assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/start")
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.startedAtDevice").asString().isEqualTo("2026-08-26T10:00:00Z");
+
+        List<com.codemind.fieldops.shared.audit.AuditEvent> events =
+            auditEventRepository.findByInspectionIdOrderByOccurredAtAsc(inspection.getId(),
+                org.springframework.data.domain.Pageable.unpaged()).getContent();
+        assertThat(events).anySatisfy(event -> {
+            assertThat(event.getAction()).isEqualTo("INSPECTION_STARTED");
+            assertThat(event.getMetadataJson()).containsEntry("accuracyMeters", 5.0);
+        });
+    }
+
+    @Test
     void supervisorCanStartAssignedInspection() {
         Inspection inspection = createAssignedInspection();
 
@@ -333,5 +362,33 @@ class InspectionExecutionControllerIT {
             .hasStatusOk()
             .bodyJson()
             .extractingPath("$.status").asString().isEqualTo("SUBMITTED");
+    }
+
+    @Test
+    void submitWithDeviceLocationRecordsAuditMetadata() {
+        Inspection inspection = createInProgressInspection();
+        itemSnapshotRepository.deleteAll(
+            itemSnapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspection.getId()));
+        String payload = """
+            {
+              "completedAtDevice": "2026-08-26T11:00:00Z",
+              "location": {"latitude": -23.55052, "longitude": -46.633308, "accuracyMeters": 8.0, "capturedAt": "2026-08-26T11:00:00Z"}
+            }""";
+
+        assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/submit")
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.completedAtDevice").asString().isEqualTo("2026-08-26T11:00:00Z");
+
+        List<com.codemind.fieldops.shared.audit.AuditEvent> events =
+            auditEventRepository.findByInspectionIdOrderByOccurredAtAsc(inspection.getId(),
+                org.springframework.data.domain.Pageable.unpaged()).getContent();
+        assertThat(events).anySatisfy(event -> {
+            assertThat(event.getAction()).isEqualTo("INSPECTION_SUBMITTED");
+            assertThat(event.getMetadataJson()).containsEntry("accuracyMeters", 8.0);
+        });
     }
 }

@@ -58,6 +58,16 @@ public class NonConformityService {
 
     @Transactional
     public NonConformity create(UUID inspectionId, UUID reportedByUserId, NonConformityCreateRequest request) {
+        return create(null, inspectionId, reportedByUserId, request);
+    }
+
+    /**
+     * Used by the synchronization push handler, which needs the persisted id
+     * to match the client-generated {@code entityId} so a later pull
+     * recognizes the record as the one it created offline.
+     */
+    @Transactional
+    public NonConformity create(UUID id, UUID inspectionId, UUID reportedByUserId, NonConformityCreateRequest request) {
         Inspection inspection = inspectionRepository.findById(inspectionId)
             .orElseThrow(() -> new ResourceNotFoundException(INSPECTION_NOT_FOUND_CODE, "Inspection not found"));
 
@@ -82,6 +92,7 @@ public class NonConformityService {
         }
 
         NonConformity nc = NonConformity.builder()
+            .id(id)
             .inspection(inspection)
             .snapshot(snapshot)
             .response(response)

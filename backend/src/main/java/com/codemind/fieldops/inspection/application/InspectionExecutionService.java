@@ -57,10 +57,16 @@ public class InspectionExecutionService {
     public Inspection start(UUID inspectionId, UUID actorId, Instant startedAtDevice, GeoLocationRequest location) {
         Inspection inspection = getInspection(inspectionId);
 
+        // REJECTED is accepted here too: fluxo-geral.md 7.7 models "reopen for
+        // correction" as a transition straight back to IN_PROGRESS, and
+        // RN-083 only requires that the review history (InspectionReview
+        // rows) stay intact across the cycle — which happens naturally since
+        // this method never deletes them.
         if (inspection.getStatus() != InspectionStatus.DRAFT
-                && inspection.getStatus() != InspectionStatus.ASSIGNED) {
+                && inspection.getStatus() != InspectionStatus.ASSIGNED
+                && inspection.getStatus() != InspectionStatus.REJECTED) {
             throw new BusinessRuleViolationException(INSPECTION_CANNOT_BE_STARTED_CODE,
-                "Only DRAFT or ASSIGNED inspections can be started");
+                "Only DRAFT, ASSIGNED or REJECTED inspections can be started");
         }
 
         inspection.setStatus(InspectionStatus.IN_PROGRESS);

@@ -60,7 +60,7 @@ export default function InicioScreen() {
     try {
       refresh();
       await new Promise((resolve) => setTimeout(resolve, SYNC_SIMULATION_MS));
-      setSyncedAt(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+      setSyncedAt('Lista atualizada');
     } finally {
       setSyncing(false);
     }
@@ -108,7 +108,7 @@ export default function InicioScreen() {
 
       {syncedAt && !syncing ? (
         <Text testID="inicio-synced-at" variant="caption" tone="success">
-          Sincronizado às {syncedAt}.
+          {syncedAt}
         </Text>
       ) : null}
 

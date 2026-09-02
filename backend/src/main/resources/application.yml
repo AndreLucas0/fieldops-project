@@ -1,6 +1,10 @@
 spring:
   application:
     name: fieldops
+  servlet:
+    multipart:
+      max-file-size: 12MB
+      max-request-size: 12MB
 
 server:
   port: ${SERVER_PORT:8080}
@@ -13,3 +17,11 @@ fieldops:
       secret: ${JWT_SECRET:troque-este-valor-antes-de-subir-qualquer-ambiente-compartilhado}
       access-token-expiration-seconds: ${JWT_ACCESS_TOKEN_EXPIRATION_SECONDS:900}
       refresh-token-expiration-seconds: ${JWT_REFRESH_TOKEN_EXPIRATION_SECONDS:604800}
+  storage:
+    evidence:
+      endpoint: ${EVIDENCE_STORAGE_ENDPOINT:http://localhost:9000}
+      region: ${EVIDENCE_STORAGE_REGION:us-east-1}
+      bucket: ${EVIDENCE_STORAGE_BUCKET:fieldops-evidence}
+      access-key: ${EVIDENCE_STORAGE_ACCESS_KEY:fieldops}
+      secret-key: ${EVIDENCE_STORAGE_SECRET_KEY:fieldops123}
+      max-upload-size-bytes: ${EVIDENCE_MAX_UPLOAD_SIZE_BYTES:10485760}

@@ -86,4 +86,6 @@ public class EquipmentController {
         return equipmentMapper.toResponse(equipmentService.getByQrCode(qrCode));
     }
 
-}
+} 
+
+//CRUD Equipamentos 

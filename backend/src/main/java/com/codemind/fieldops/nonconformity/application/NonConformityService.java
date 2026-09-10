@@ -1,5 +1,6 @@
 package com.codemind.fieldops.nonconformity.application;
 
+import com.codemind.fieldops.evidence.repository.EvidenceRepository;
 import com.codemind.fieldops.inspection.domain.Inspection;
 import com.codemind.fieldops.inspection.domain.InspectionResponse;
 import com.codemind.fieldops.inspection.domain.ItemSnapshot;
@@ -7,15 +8,21 @@ import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
 import com.codemind.fieldops.nonconformity.domain.NonConformity;
+import com.codemind.fieldops.nonconformity.domain.NonConformityEvidenceValidator;
+import com.codemind.fieldops.nonconformity.domain.NonConformitySeverity;
 import com.codemind.fieldops.nonconformity.domain.NonConformityStatus;
 import com.codemind.fieldops.nonconformity.dto.NonConformityCreateRequest;
 import com.codemind.fieldops.nonconformity.dto.NonConformityStatusUpdateRequest;
+import com.codemind.fieldops.nonconformity.dto.NonConformityUpdateRequest;
 import com.codemind.fieldops.nonconformity.repository.NonConformityRepository;
 import com.codemind.fieldops.shared.error.ResourceNotFoundException;
 import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.repository.UserRepository;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,21 +40,34 @@ public class NonConformityService {
     private final ItemSnapshotRepository itemSnapshotRepository;
     private final InspectionResponseRepository responseRepository;
     private final UserRepository userRepository;
+    private final EvidenceRepository evidenceRepository;
 
     public NonConformityService(NonConformityRepository nonConformityRepository,
                                  InspectionRepository inspectionRepository,
                                  ItemSnapshotRepository itemSnapshotRepository,
                                  InspectionResponseRepository responseRepository,
-                                 UserRepository userRepository) {
+                                 UserRepository userRepository,
+                                 EvidenceRepository evidenceRepository) {
         this.nonConformityRepository = nonConformityRepository;
         this.inspectionRepository = inspectionRepository;
         this.itemSnapshotRepository = itemSnapshotRepository;
         this.responseRepository = responseRepository;
         this.userRepository = userRepository;
+        this.evidenceRepository = evidenceRepository;
     }
 
     @Transactional
     public NonConformity create(UUID inspectionId, UUID reportedByUserId, NonConformityCreateRequest request) {
+        return create(null, inspectionId, reportedByUserId, request);
+    }
+
+    /**
+     * Used by the synchronization push handler, which needs the persisted id
+     * to match the client-generated {@code entityId} so a later pull
+     * recognizes the record as the one it created offline.
+     */
+    @Transactional
+    public NonConformity create(UUID id, UUID inspectionId, UUID reportedByUserId, NonConformityCreateRequest request) {
         Inspection inspection = inspectionRepository.findById(inspectionId)
             .orElseThrow(() -> new ResourceNotFoundException(INSPECTION_NOT_FOUND_CODE, "Inspection not found"));
 
@@ -72,6 +92,7 @@ public class NonConformityService {
         }
 
         NonConformity nc = NonConformity.builder()
+            .id(id)
             .inspection(inspection)
             .snapshot(snapshot)
             .response(response)
@@ -104,6 +125,28 @@ public class NonConformityService {
     public NonConformity updateStatus(UUID id, NonConformityStatusUpdateRequest request) {
         NonConformity nc = getById(id);
         nc.setStatus(request.status());
+        return nonConformityRepository.save(nc);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<NonConformity> list(UUID inspectionId, NonConformitySeverity severity, NonConformityStatus status,
+            Pageable pageable) {
+        Specification<NonConformity> specification = Specification
+            .where(NonConformitySpecifications.hasInspectionId(inspectionId))
+            .and(NonConformitySpecifications.hasSeverity(severity))
+            .and(NonConformitySpecifications.hasStatus(status));
+        return nonConformityRepository.findAll(specification, pageable);
+    }
+
+    @Transactional
+    public NonConformity update(UUID id, NonConformityUpdateRequest request) {
+        NonConformity nc = getById(id);
+        boolean hasEvidence = evidenceRepository.existsByNonConformityId(id);
+        NonConformityEvidenceValidator.validate(request.severity(), hasEvidence);
+
+        nc.setTitle(request.title());
+        nc.setDescription(request.description());
+        nc.setSeverity(request.severity());
         return nonConformityRepository.save(nc);
     }
 

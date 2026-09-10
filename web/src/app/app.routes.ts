@@ -18,6 +18,15 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
   },
+  {
+    path: 'inspection-templates',
+    canActivate: [authGuard],
+    title: 'Modelos de inspeção — FieldOps',
+    loadComponent: () =>
+      import('./features/templates/templates-list.component').then(
+        (m) => m.TemplatesListComponent,
+      ),
+  },
   // As demais telas entram aqui conforme forem implementadas. Enquanto isso,
   // um destino desconhecido volta para o painel em vez de deixar a tela vazia.
   { path: '**', redirectTo: 'dashboard' },

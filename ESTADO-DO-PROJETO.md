@@ -159,7 +159,7 @@ Ligado por padrão nos dois. Mesmos dados, mesma origem.
 | Projeto | Chave | Padrão |
 |---|---|---|
 | mobile | `EXPO_PUBLIC_API_MOCK` | `true` |
-| mobile | `EXPO_PUBLIC_API_BASE_URL` | `http://localhost:8080/api/v1` |
+| mobile | `EXPO_PUBLIC_API_BASE_URL` | `http://localhost:8090/api/v1` |
 | mobile | `EXPO_PUBLIC_API_MOCK_LATENCY_MS` | `450` |
 | web | `environment.mockApi` | `true` em desenvolvimento, `false` em produção |
 

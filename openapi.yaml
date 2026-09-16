@@ -51,7 +51,7 @@ info:
     explícito).
 
 servers:
-  - url: http://localhost:8080/api/v1
+  - url: http://localhost:8090/api/v1
     description: Ambiente local de desenvolvimento
   - url: https://api-integracao.fieldops.local/api/v1
     description: Ambiente de integração contínua

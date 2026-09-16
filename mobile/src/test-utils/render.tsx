@@ -18,7 +18,7 @@ export const SESSION_KEY = 'fieldops.session';
 
 /** Backend fictício sem latência — os testes não esperam por relógio. */
 export const TEST_API_CONFIG: ApiConfig = {
-  baseUrl: 'http://localhost:8080/api/v1',
+  baseUrl: 'http://localhost:8090/api/v1',
   mockEnabled: true,
   mockLatencyMs: 0,
   timeoutMs: 1_000,

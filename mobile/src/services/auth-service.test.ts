@@ -11,7 +11,7 @@ import { getMockDatabase, resetMockDatabase } from './mock/mock-data';
 import { SESSION_KEY, sessionStorage } from './session-storage';
 
 const MOCK_CONFIG: ApiConfig = {
-  baseUrl: 'http://localhost:8080/api/v1',
+  baseUrl: 'http://localhost:8090/api/v1',
   mockEnabled: true,
   mockLatencyMs: 0,
   timeoutMs: 1_000,

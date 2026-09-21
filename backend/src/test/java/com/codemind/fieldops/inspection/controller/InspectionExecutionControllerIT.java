@@ -75,9 +75,11 @@ class InspectionExecutionControllerIT {
     private User adminUser;
     private User supervisorUser;
     private User technicianUser;
+    private User otherTechnicianUser;
     private String adminToken;
     private String supervisorToken;
     private String technicianToken;
+    private String otherTechnicianToken;
     private Client testClient;
     private InspectionSite testSite;
     private TemplateVersion activeTemplateVersion;
@@ -98,9 +100,11 @@ class InspectionExecutionControllerIT {
         adminUser = userRepository.save(newUser("Admin", "admin.exec@fieldops.local", UserRole.ADMIN));
         supervisorUser = userRepository.save(newUser("Supervisor", "supervisor.exec@fieldops.local", UserRole.SUPERVISOR));
         technicianUser = userRepository.save(newUser("Technician", "tech.exec@fieldops.local", UserRole.TECHNICIAN));
+        otherTechnicianUser = userRepository.save(newUser("Other Technician", "other.tech.exec@fieldops.local", UserRole.TECHNICIAN));
         adminToken = mintAccessToken(adminUser);
         supervisorToken = mintAccessToken(supervisorUser);
         technicianToken = mintAccessToken(technicianUser);
+        otherTechnicianToken = mintAccessToken(otherTechnicianUser);
 
         testClient = clientRepository.save(Client.builder().name("Exec Client").status(ClientStatus.ACTIVE).build());
         testSite = siteRepository.save(InspectionSite.builder().client(testClient).name("Exec Site").status(SiteStatus.ACTIVE).build());
@@ -267,11 +271,24 @@ class InspectionExecutionControllerIT {
     }
 
     @Test
-    void technicianCannotStartInspection() {
-        Inspection inspection = createDraftInspection();
+    void assignedTechnicianCanStartAssignedInspection() {
+        // INT-005: TECHNICIAN is the assigned user and must be allowed to start
+        Inspection inspection = createAssignedInspection();
 
         assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/start")
             .header("Authorization", bearer(technicianToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.status").asString().isEqualTo("IN_PROGRESS");
+    }
+
+    @Test
+    void unassignedTechnicianCannotStartOtherTechnicianInspection() {
+        // INT-005: a technician who is NOT assigned to the inspection must be blocked
+        Inspection inspection = createAssignedInspection(); // assigned to technicianUser
+
+        assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/start")
+            .header("Authorization", bearer(otherTechnicianToken)))
             .hasStatus(HttpStatus.FORBIDDEN);
     }
 

@@ -216,8 +216,8 @@ public class SynchronizationService {
         }
 
         Inspection result = switch (payload.status()) {
-            case IN_PROGRESS -> inspectionExecutionService.start(inspectionId, userId, payload.startedAtDevice(),
-                payload.location());
+            case IN_PROGRESS -> inspectionExecutionService.start(inspectionId, userId, true,
+                payload.startedAtDevice(), payload.location());
             case SUBMITTED -> inspectionExecutionService.submit(inspectionId, userId, true, payload.completedAtDevice(),
                 payload.location());
             default -> throw new BusinessRuleViolationException(UNSUPPORTED_TRANSITION_CODE,

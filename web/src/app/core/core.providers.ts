@@ -7,7 +7,6 @@ import { AuthService } from './auth/auth.service';
 import { authInterceptor } from './http/auth.interceptor';
 import { errorInterceptor } from './http/error.interceptor';
 import { MOCK_RESOURCE_PROVIDERS } from './mocks/mock-services';
-import { provideMockSession } from './mocks/mock-session';
 import { HTTP_RESOURCE_PROVIDERS } from './services/resources';
 
 /**
@@ -25,9 +24,6 @@ export function provideCore(): (Provider | EnvironmentProviders)[] {
     provideHttpClient(withInterceptors([errorInterceptor, authInterceptor])),
     ...provideResources(),
     provideSessionBootstrap(),
-    // Andaime do modo fictício: abre sessão para as rotas protegidas serem
-    // alcançáveis enquanto a tela de login (FE-W01) não existe.
-    provideMockSession(),
   ];
 }
 

@@ -3,6 +3,8 @@ package com.codemind.fieldops.inspection.domain;
 import com.codemind.fieldops.user.domain.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -65,8 +67,18 @@ public class InspectionResponse {
     @Column(name = "observation")
     private String observation;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "conformity", length = 20)
+    private Conformity conformity;
+
+    @Column(name = "answered_at_device")
+    private Instant answeredAtDevice;
+
     @Column(name = "responded_at", nullable = false)
     private Instant respondedAt;
+
+    @Column(name = "server_received_at")
+    private Instant serverReceivedAt;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;

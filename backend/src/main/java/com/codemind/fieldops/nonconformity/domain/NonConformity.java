@@ -66,6 +66,12 @@ public class NonConformity {
     @Column(nullable = false, length = 20)
     private NonConformityStatus status;
 
+    @Column(name = "created_at_device")
+    private Instant createdAtDevice;
+
+    @Column(name = "server_received_at")
+    private Instant serverReceivedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

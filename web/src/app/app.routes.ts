@@ -1,6 +1,7 @@
 import type { Routes } from '@angular/router';
 
 import { authGuard } from './core/auth/auth.guard';
+import { guestGuard } from './core/auth/auth.guard';
 
 /**
  * Rotas da interface administrativa.
@@ -11,6 +12,13 @@ import { authGuard } from './core/auth/auth.guard';
  */
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+  {
+    path: 'login',
+    canActivate: [guestGuard],
+    title: 'Entrar — FieldOps',
+    loadComponent: () =>
+      import('./features/login/login.component').then((m) => m.LoginComponent),
+  },
   {
     path: 'dashboard',
     canActivate: [authGuard],

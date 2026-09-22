@@ -9,12 +9,17 @@ import com.codemind.fieldops.client.domain.ClientStatus;
 import com.codemind.fieldops.client.repository.ClientRepository;
 import com.codemind.fieldops.inspection.domain.Inspection;
 import com.codemind.fieldops.inspection.domain.InspectionPriority;
+import com.codemind.fieldops.inspection.domain.InspectionResponse;
 import com.codemind.fieldops.inspection.domain.InspectionStatus;
 import com.codemind.fieldops.inspection.domain.ItemSnapshot;
 import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
+import com.codemind.fieldops.nonconformity.domain.NonConformity;
+import com.codemind.fieldops.nonconformity.domain.NonConformitySeverity;
+import com.codemind.fieldops.nonconformity.domain.NonConformityStatus;
 import com.codemind.fieldops.nonconformity.repository.NonConformityRepository;
+import com.codemind.fieldops.review.repository.InspectionReviewRepository;
 import com.codemind.fieldops.shared.security.JwtClaims;
 import com.codemind.fieldops.site.domain.InspectionSite;
 import com.codemind.fieldops.site.domain.SiteStatus;
@@ -61,6 +66,7 @@ class MobileInspectionControllerIT {
     @Autowired private ItemSnapshotRepository itemSnapshotRepository;
     @Autowired private InspectionResponseRepository inspectionResponseRepository;
     @Autowired private NonConformityRepository nonConformityRepository;
+    @Autowired private InspectionReviewRepository inspectionReviewRepository;
     @Autowired private InspectionTemplateRepository templateRepository;
     @Autowired private TemplateVersionRepository templateVersionRepository;
     @Autowired private InspectionSiteRepository siteRepository;
@@ -80,6 +86,7 @@ class MobileInspectionControllerIT {
     private InspectionSite testSite;
     private TemplateVersion activeTemplateVersion;
     private Inspection technicianInspection;
+    private ItemSnapshot technicianSnapshot;
 
     @BeforeEach
     void setUp() {
@@ -143,7 +150,6 @@ class MobileInspectionControllerIT {
         version.setSections(List.of(section));
         activeTemplateVersion = templateVersionRepository.save(version);
 
-        // Create inspection assigned to technicianUser
         technicianInspection = inspectionRepository.save(Inspection.builder()
             .templateVersion(activeTemplateVersion)
             .client(testClient)
@@ -155,8 +161,7 @@ class MobileInspectionControllerIT {
             .scheduledFor(Instant.now().plusSeconds(3600))
             .build());
 
-        // Create snapshot
-        itemSnapshotRepository.save(ItemSnapshot.builder()
+        technicianSnapshot = itemSnapshotRepository.save(ItemSnapshot.builder()
             .inspection(technicianInspection)
             .sectionTitle("Section 1")
             .sectionOrder(1)
@@ -195,9 +200,10 @@ class MobileInspectionControllerIT {
         return "Bearer " + token;
     }
 
+    // ---- Authorization ----
+
     @Test
     void technicianSeesOnlyOwnInspections() {
-        // Create inspection for another technician
         inspectionRepository.save(Inspection.builder()
             .templateVersion(activeTemplateVersion)
             .client(testClient)
@@ -215,7 +221,6 @@ class MobileInspectionControllerIT {
             .bodyJson()
             .extractingPath("$.content").asList().hasSizeGreaterThanOrEqualTo(1);
 
-        // Also verify the content only has the technician's inspection
         assertThat(mvc.get().uri("/mobile/inspections")
             .header("Authorization", bearer(technicianToken)))
             .hasStatusOk()
@@ -259,15 +264,6 @@ class MobileInspectionControllerIT {
     }
 
     @Test
-    void getMobileInspectionDetailContainsSnapshots() {
-        assertThat(mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
-            .header("Authorization", bearer(technicianToken)))
-            .hasStatusOk()
-            .bodyJson()
-            .extractingPath("$.snapshots").asList().isNotEmpty();
-    }
-
-    @Test
     void getMobileNonExistentInspectionReturns404() {
         assertThat(mvc.get().uri("/mobile/inspections/" + UUID.randomUUID())
             .header("Authorization", bearer(technicianToken)))
@@ -279,4 +275,145 @@ class MobileInspectionControllerIT {
         assertThat(mvc.get().uri("/mobile/inspections"))
             .hasStatus(HttpStatus.UNAUTHORIZED);
     }
+
+    // ---- Contract: items (was snapshots) ----
+
+    @Test
+    void getMobileInspectionDetailContainsItems() {
+        // Contract requires "items" not "snapshots" (contrato-backend-frontend.md §4.2)
+        assertThat(mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.items").asList().isNotEmpty();
+    }
+
+    @Test
+    void getMobileInspectionDetailItemsHaveContractFields() {
+        // items[n] must include sourceTemplateItemId and sectionDescription per contract
+        assertThat(mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.items[0].inspectionId").asString()
+            .isEqualTo(technicianInspection.getId().toString());
+    }
+
+    // ---- Contract: responses ----
+
+    @Test
+    void getMobileInspectionDetailResponsesIsEmptyArrayWhenNoneExist() {
+        // responses must be an empty array [], never absent or null
+        assertThat(mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.responses").asList().isEmpty();
+    }
+
+    @Test
+    void getMobileInspectionDetailWithResponseContainsInspectionItemId() {
+        // InspectionResponse must expose inspectionItemId (not snapshotId) per contract §4.2
+        InspectionResponse response = InspectionResponse.builder()
+            .id(UUID.randomUUID())
+            .inspection(technicianInspection)
+            .snapshot(technicianSnapshot)
+            .respondedBy(technicianUser)
+            .valueBoolean(true)
+            .build();
+        inspectionResponseRepository.save(response);
+
+        assertThat(mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.responses[0].inspectionItemId").asString()
+            .isEqualTo(technicianSnapshot.getId().toString());
+    }
+
+    @Test
+    void getMobileInspectionDetailResponseDoesNotExposeSnapshotId() {
+        // "snapshotId" must NOT appear in the response — only "inspectionItemId"
+        InspectionResponse response = InspectionResponse.builder()
+            .id(UUID.randomUUID())
+            .inspection(technicianInspection)
+            .snapshot(technicianSnapshot)
+            .respondedBy(technicianUser)
+            .valueBoolean(false)
+            .build();
+        inspectionResponseRepository.save(response);
+
+        assertThat(mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.responses[0].snapshotId").isNull();
+    }
+
+    // ---- Contract: nonConformities ----
+
+    @Test
+    void getMobileInspectionDetailNonConformitiesIsEmptyArrayWhenNoneExist() {
+        assertThat(mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.nonConformities").asList().isEmpty();
+    }
+
+    @Test
+    void getMobileInspectionDetailWithNonConformityContainsInspectionItemId() {
+        // NonConformity must expose inspectionItemId (not snapshotId) per contract §4.2
+        NonConformity nc = NonConformity.builder()
+            .id(UUID.randomUUID())
+            .inspection(technicianInspection)
+            .snapshot(technicianSnapshot)
+            .reportedBy(technicianUser)
+            .title("Test NC")
+            .description("A test non-conformity")
+            .severity(NonConformitySeverity.LOW)
+            .status(NonConformityStatus.OPEN)
+            .build();
+        nonConformityRepository.save(nc);
+
+        assertThat(mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.nonConformities[0].inspectionItemId").asString()
+            .isEqualTo(technicianSnapshot.getId().toString());
+    }
+
+    @Test
+    void getMobileInspectionDetailNonConformityDoesNotExposeSnapshotId() {
+        NonConformity nc = NonConformity.builder()
+            .id(UUID.randomUUID())
+            .inspection(technicianInspection)
+            .snapshot(technicianSnapshot)
+            .reportedBy(technicianUser)
+            .title("Test NC")
+            .description("A test non-conformity")
+            .severity(NonConformitySeverity.LOW)
+            .status(NonConformityStatus.OPEN)
+            .build();
+        nonConformityRepository.save(nc);
+
+        assertThat(mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.nonConformities[0].snapshotId").isNull();
+    }
+
+    // ---- Contract: reviews ----
+
+    @Test
+    void getMobileInspectionDetailReviewsIsEmptyArrayWhenNoneExist() {
+        assertThat(mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.reviews").asList().isEmpty();
+    }
+
 }

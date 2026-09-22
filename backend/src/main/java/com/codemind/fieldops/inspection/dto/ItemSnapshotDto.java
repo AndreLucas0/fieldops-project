@@ -6,7 +6,9 @@ import java.util.UUID;
 public record ItemSnapshotDto(
     UUID id,
     UUID inspectionId,
+    UUID sourceTemplateItemId,
     String sectionTitle,
+    String sectionDescription,
     Integer sectionOrder,
     String itemCode,
     String itemTitle,

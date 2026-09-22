@@ -231,10 +231,10 @@ export class HttpTemplatesService extends TemplatesService {
   private readonly api = inject(ApiService);
 
   list(query: PageQuery<TemplateFilters> = {}) {
-    return this.api.getPage<InspectionTemplate, TemplateFilters>('/inspection-templates', query);
+    return this.api.getPage<InspectionTemplate, TemplateFilters>('/templates', query);
   }
   get(id: Uuid) {
-    return this.api.get<InspectionTemplate>(`/inspection-templates/${id}`);
+    return this.api.get<InspectionTemplate>(`/templates/${id}`);
   }
   listVersions(templateId: Uuid) {
     return this.api.get<InspectionTemplateVersionDetail[]>(

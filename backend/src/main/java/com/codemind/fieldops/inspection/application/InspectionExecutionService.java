@@ -54,8 +54,15 @@ public class InspectionExecutionService {
     }
 
     @Transactional
-    public Inspection start(UUID inspectionId, UUID actorId, Instant startedAtDevice, GeoLocationRequest location) {
+    public Inspection start(UUID inspectionId, UUID actorId, boolean isTechnician,
+                            Instant startedAtDevice, GeoLocationRequest location) {
         Inspection inspection = getInspection(inspectionId);
+
+        // RN-033: only the assigned technician may start the inspection;
+        // ADMIN and SUPERVISOR are exempt (administrative permission).
+        if (isTechnician && !inspection.getTechnician().getId().equals(actorId)) {
+            throw new AccessDeniedException("You do not have access to this inspection");
+        }
 
         // REJECTED is accepted here too: fluxo-geral.md 7.7 models "reopen for
         // correction" as a transition straight back to IN_PROGRESS, and

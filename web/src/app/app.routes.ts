@@ -31,8 +31,15 @@ export const routes: Routes = [
     canActivate: [authGuard],
     title: 'Modelos de inspeção — FieldOps',
     loadComponent: () =>
-      import('./features/templates/templates-list.component').then(
-        (m) => m.TemplatesListComponent,
+      import('./features/templates/templates-list.component').then((m) => m.TemplatesListComponent),
+  },
+  {
+    path: 'inspection-templates/:templateId/edit',
+    canActivate: [authGuard],
+    title: 'Construtor de modelo — FieldOps',
+    loadComponent: () =>
+      import('./features/templates/template-builder.component').then(
+        (m) => m.TemplateBuilderComponent,
       ),
   },
   // As demais telas entram aqui conforme forem implementadas. Enquanto isso,

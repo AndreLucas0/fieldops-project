@@ -39,6 +39,8 @@ import type {
   NonConformity,
   SeverityCount,
   StatusCount,
+  TemplateItem,
+  TemplateSection,
   TemplateSectionDetail,
   InspectionTemplate,
   InspectionTemplateVersionDetail,
@@ -155,9 +157,7 @@ export class MockUsersService extends MockBase implements UsersService {
   }
 
   update(id: Uuid, input: Partial<User>): Observable<User> {
-    return this.respond(() =>
-      this.require(updateEntity(this.db.users, id, input), '/users', id),
-    );
+    return this.respond(() => this.require(updateEntity(this.db.users, id, input), '/users', id));
   }
 
   setStatus(id: Uuid, status: UserStatus): Observable<User> {
@@ -259,9 +259,7 @@ export class MockSitesService extends MockBase implements SitesService {
   update(id: Uuid, input: Partial<InspectionSite>): Observable<InspectionSite> {
     // `clientId` é imutável após a criação (decisão de normalização do contrato).
     const { clientId: _ignored, ...rest } = input;
-    return this.respond(() =>
-      this.require(updateEntity(this.db.sites, id, rest), '/sites', id),
-    );
+    return this.respond(() => this.require(updateEntity(this.db.sites, id, rest), '/sites', id));
   }
 }
 
@@ -276,9 +274,7 @@ export class MockEquipmentService extends MockBase implements EquipmentService {
   }
 
   listBySite(siteId: Uuid): Observable<Equipment[]> {
-    return this.respond(() =>
-      this.db.equipment.filter((equipment) => equipment.siteId === siteId),
-    );
+    return this.respond(() => this.db.equipment.filter((equipment) => equipment.siteId === siteId));
   }
 
   get(id: Uuid): Observable<Equipment> {
@@ -358,6 +354,17 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
     );
   }
 
+  update(id: Uuid, input: Partial<InspectionTemplate>): Observable<InspectionTemplate> {
+    return this.respond(() => {
+      const template = this.requireDraftTemplate(id);
+      return this.require(
+        updateEntity(this.db.templates, template.id, input),
+        '/inspection-templates',
+        id,
+      );
+    });
+  }
+
   listVersions(templateId: Uuid): Observable<InspectionTemplateVersionDetail[]> {
     return this.respond(() =>
       this.db.templateVersions.filter((version) => version.templateId === templateId),
@@ -376,6 +383,142 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
 
   listDraftSections(templateId: Uuid): Observable<TemplateSectionDetail[]> {
     return this.respond(() => this.db.draftSections[templateId] ?? []);
+  }
+
+  createSection(
+    templateId: Uuid,
+    input: Partial<TemplateSection>,
+  ): Observable<TemplateSectionDetail> {
+    return this.respond(() => {
+      this.requireDraftTemplate(templateId);
+      const sections = this.draftSectionsOf(templateId);
+
+      const section: TemplateSectionDetail = {
+        id: nextMockId('5600'),
+        templateVersionId: templateId,
+        title: input.title ?? 'Nova seção',
+        description: input.description ?? null,
+        displayOrder: input.displayOrder ?? sections.length + 1,
+        createdAt: nowIso(),
+        items: [],
+      };
+      sections.push(section);
+      return section;
+    });
+  }
+
+  updateSection(
+    templateId: Uuid,
+    sectionId: Uuid,
+    input: Partial<TemplateSection>,
+  ): Observable<TemplateSectionDetail> {
+    return this.respond(() => {
+      this.requireDraftTemplate(templateId);
+      const section = this.require(
+        findById(this.draftSectionsOf(templateId), sectionId),
+        '/inspection-templates/sections',
+        sectionId,
+      );
+      Object.assign(section, {
+        title: input.title ?? section.title,
+        description: input.description !== undefined ? input.description : section.description,
+        displayOrder: input.displayOrder ?? section.displayOrder,
+      });
+      return section;
+    });
+  }
+
+  createItem(
+    templateId: Uuid,
+    sectionId: Uuid,
+    input: Partial<TemplateItem>,
+  ): Observable<TemplateItem> {
+    return this.respond(() => {
+      this.requireDraftTemplate(templateId);
+      const section = this.require(
+        findById(this.draftSectionsOf(templateId), sectionId),
+        '/inspection-templates/sections',
+        sectionId,
+      );
+      if (!input.responseType) {
+        throw new ApiError({
+          kind: 'UNPROCESSABLE',
+          status: 422,
+          code: 'ITEM_RESPONSE_TYPE_REQUIRED',
+          userMessage: 'Selecione o tipo de resposta do item.',
+          fieldErrors: [{ field: 'responseType', message: 'Campo obrigatório.' }],
+        });
+      }
+
+      const items = (section.items ??= []);
+      const item: TemplateItem = {
+        id: nextMockId('5700'),
+        sectionId: section.id,
+        code: input.code ?? null,
+        title: input.title ?? 'Novo item',
+        description: input.description ?? null,
+        responseType: input.responseType,
+        required: input.required ?? false,
+        observationRequiredOnFailure: input.observationRequiredOnFailure ?? false,
+        evidenceRequiredOnFailure: input.evidenceRequiredOnFailure ?? false,
+        optionsJson: input.optionsJson ?? null,
+        displayOrder: input.displayOrder ?? items.length + 1,
+        createdAt: nowIso(),
+      };
+      items.push(item);
+      return item;
+    });
+  }
+
+  updateItem(
+    templateId: Uuid,
+    itemId: Uuid,
+    input: Partial<TemplateItem>,
+  ): Observable<TemplateItem> {
+    return this.respond(() => {
+      this.requireDraftTemplate(templateId);
+      for (const section of this.draftSectionsOf(templateId)) {
+        const item = (section.items ?? []).find((candidate) => candidate.id === itemId);
+        if (!item) continue;
+        Object.assign(item, {
+          code: input.code !== undefined ? input.code : item.code,
+          title: input.title ?? item.title,
+          description: input.description !== undefined ? input.description : item.description,
+          responseType: input.responseType ?? item.responseType,
+          required: input.required ?? item.required,
+          observationRequiredOnFailure:
+            input.observationRequiredOnFailure ?? item.observationRequiredOnFailure,
+          evidenceRequiredOnFailure:
+            input.evidenceRequiredOnFailure ?? item.evidenceRequiredOnFailure,
+          optionsJson: input.optionsJson !== undefined ? input.optionsJson : item.optionsJson,
+          displayOrder: input.displayOrder ?? item.displayOrder,
+        });
+        return item;
+      }
+      throw notFound('/inspection-templates/items', itemId);
+    });
+  }
+
+  /** RN-018: só modelos DRAFT têm versão rascunho editável. */
+  private requireDraftTemplate(templateId: Uuid): InspectionTemplate {
+    const template = this.require(
+      findById(this.db.templates, templateId),
+      '/inspection-templates',
+      templateId,
+    );
+    if (template.status !== 'DRAFT') {
+      throw new ApiError({
+        kind: 'CONFLICT',
+        status: 409,
+        code: 'TEMPLATE_NOT_DRAFT',
+        userMessage: 'O modelo não possui uma versão em rascunho editável.',
+      });
+    }
+    return template;
+  }
+
+  private draftSectionsOf(templateId: Uuid): TemplateSectionDetail[] {
+    return (this.db.draftSections[templateId] ??= []);
   }
 }
 

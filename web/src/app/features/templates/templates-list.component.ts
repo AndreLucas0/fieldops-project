@@ -146,7 +146,7 @@ export class TemplatesListComponent {
       label: 'Título',
       sortable: true,
       type: 'link',
-      link: (row) => ['/inspection-templates', row.id],
+      link: (row) => ['/inspection-templates', row.id, 'edit'],
     },
     { field: 'category', label: 'Categoria', sortable: true },
     {

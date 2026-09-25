@@ -12,6 +12,7 @@ import com.codemind.fieldops.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -141,9 +142,14 @@ class UserControllerIT {
 	}
 
 	@Test
+	@DisplayName("RN-003, AC-SECURITY - técnico não gerencia usuários nem recebe dados administrativos")
 	void technicianCannotAccessUserManagementEndpoints() {
-		assertThat(mvc.get().uri("/users").header("Authorization", bearer(technicianToken)))
-			.hasStatus(HttpStatus.FORBIDDEN);
+		var result = mvc.get().uri("/users").header("Authorization", bearer(technicianToken)).exchange();
+
+		assertThat(result).hasStatus(HttpStatus.FORBIDDEN);
+		assertThat(result).bodyJson().doesNotHavePath("$.content");
+		assertThat(result).bodyJson().doesNotHavePath("$.email");
+		assertThat(result).bodyJson().doesNotHavePath("$.name");
 	}
 
 	@Test

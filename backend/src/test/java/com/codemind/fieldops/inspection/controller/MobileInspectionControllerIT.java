@@ -40,6 +40,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -237,6 +238,7 @@ class MobileInspectionControllerIT {
     }
 
     @Test
+    @DisplayName("RN-004, AC-SECURITY - técnico acessa a própria inspeção autorizada")
     void technicianCanGetOwnInspectionDetail() {
         assertThat(mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
             .header("Authorization", bearer(technicianToken)))
@@ -246,6 +248,7 @@ class MobileInspectionControllerIT {
     }
 
     @Test
+    @DisplayName("RN-004, AC-SECURITY - técnico não acessa inspeção de outro técnico pela URL")
     void technicianCannotAccessOtherTechnicianInspectionDetail() {
         Inspection otherInspection = inspectionRepository.save(Inspection.builder()
             .templateVersion(activeTemplateVersion)
@@ -258,9 +261,14 @@ class MobileInspectionControllerIT {
             .scheduledFor(Instant.now().plusSeconds(3600))
             .build());
 
-        assertThat(mvc.get().uri("/mobile/inspections/" + otherInspection.getId())
-            .header("Authorization", bearer(technicianToken)))
-            .hasStatus(HttpStatus.FORBIDDEN);
+        var result = mvc.get().uri("/mobile/inspections/" + otherInspection.getId())
+            .header("Authorization", bearer(technicianToken)).exchange();
+
+        assertThat(result).hasStatus(HttpStatus.FORBIDDEN);
+        assertThat(result).bodyJson().doesNotHavePath("$.id");
+        assertThat(result).bodyJson().doesNotHavePath("$.title");
+        assertThat(result).bodyJson().doesNotHavePath("$.technicianId");
+        assertThat(result).bodyJson().doesNotHavePath("$.snapshots");
     }
 
     @Test

@@ -88,4 +88,3 @@ public class EquipmentController {
 
 } 
 
-//CRUD Equipamentos 

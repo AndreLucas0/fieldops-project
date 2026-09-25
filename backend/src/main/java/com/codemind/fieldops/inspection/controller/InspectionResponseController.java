@@ -66,4 +66,3 @@ public class InspectionResponseController {
     }
 
 }
-//CRUD Inspections

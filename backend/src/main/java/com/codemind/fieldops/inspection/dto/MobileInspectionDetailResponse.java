@@ -2,6 +2,8 @@ package com.codemind.fieldops.inspection.dto;
 
 import com.codemind.fieldops.inspection.domain.InspectionPriority;
 import com.codemind.fieldops.inspection.domain.InspectionStatus;
+import com.codemind.fieldops.nonconformity.dto.MobileNonConformityDto;
+import com.codemind.fieldops.review.dto.InspectionReviewResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -22,5 +24,8 @@ public record MobileInspectionDetailResponse(
     Instant submittedAtServer,
     Instant createdAt,
     Instant updatedAt,
-    List<ItemSnapshotDto> snapshots) {
+    List<ItemSnapshotDto> items,
+    List<MobileInspectionResponseDto> responses,
+    List<MobileNonConformityDto> nonConformities,
+    List<InspectionReviewResponse> reviews) {
 }

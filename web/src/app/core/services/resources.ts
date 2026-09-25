@@ -30,6 +30,8 @@ import type {
   SeverityCount,
   Severity,
   StatusCount,
+  TemplateItem,
+  TemplateSection,
   TemplateSectionDetail,
   User,
   UserRole,
@@ -105,10 +107,33 @@ export abstract class EquipmentService {
 export abstract class TemplatesService {
   abstract list(query?: PageQuery<TemplateFilters>): Observable<Page<InspectionTemplate>>;
   abstract get(id: Uuid): Observable<InspectionTemplate>;
+  /** Dados gerais (título, descrição, categoria) — só vale para modelos DRAFT (RN-018). */
+  abstract update(id: Uuid, input: Partial<InspectionTemplate>): Observable<InspectionTemplate>;
   abstract listVersions(templateId: Uuid): Observable<InspectionTemplateVersionDetail[]>;
   abstract getVersion(versionId: Uuid): Observable<InspectionTemplateVersionDetail>;
   /** Seções do rascunho, editadas pelo construtor (FE-W15). */
   abstract listDraftSections(templateId: Uuid): Observable<TemplateSectionDetail[]>;
+  /** 409 se o modelo não tiver uma versão rascunho editável (RN-019). */
+  abstract createSection(
+    templateId: Uuid,
+    input: Partial<TemplateSection>,
+  ): Observable<TemplateSectionDetail>;
+  abstract updateSection(
+    templateId: Uuid,
+    sectionId: Uuid,
+    input: Partial<TemplateSection>,
+  ): Observable<TemplateSectionDetail>;
+  /** `responseType` restrito aos 7 valores do MVP (RN-023). */
+  abstract createItem(
+    templateId: Uuid,
+    sectionId: Uuid,
+    input: Partial<TemplateItem>,
+  ): Observable<TemplateItem>;
+  abstract updateItem(
+    templateId: Uuid,
+    itemId: Uuid,
+    input: Partial<TemplateItem>,
+  ): Observable<TemplateItem>;
 }
 
 export abstract class InspectionsService {
@@ -231,10 +256,13 @@ export class HttpTemplatesService extends TemplatesService {
   private readonly api = inject(ApiService);
 
   list(query: PageQuery<TemplateFilters> = {}) {
-    return this.api.getPage<InspectionTemplate, TemplateFilters>('/inspection-templates', query);
+    return this.api.getPage<InspectionTemplate, TemplateFilters>('/templates', query);
   }
   get(id: Uuid) {
-    return this.api.get<InspectionTemplate>(`/inspection-templates/${id}`);
+    return this.api.get<InspectionTemplate>(`/templates/${id}`);
+  }
+  update(id: Uuid, input: Partial<InspectionTemplate>) {
+    return this.api.put<InspectionTemplate>(`/inspection-templates/${id}`, input);
   }
   listVersions(templateId: Uuid) {
     return this.api.get<InspectionTemplateVersionDetail[]>(
@@ -248,6 +276,27 @@ export class HttpTemplatesService extends TemplatesService {
   }
   listDraftSections(templateId: Uuid) {
     return this.api.get<TemplateSectionDetail[]>(`/inspection-templates/${templateId}/sections`);
+  }
+  createSection(templateId: Uuid, input: Partial<TemplateSection>) {
+    return this.api.post<TemplateSectionDetail>(
+      `/inspection-templates/${templateId}/sections`,
+      input,
+    );
+  }
+  updateSection(templateId: Uuid, sectionId: Uuid, input: Partial<TemplateSection>) {
+    return this.api.put<TemplateSectionDetail>(
+      `/inspection-templates/${templateId}/sections/${sectionId}`,
+      input,
+    );
+  }
+  createItem(templateId: Uuid, sectionId: Uuid, input: Partial<TemplateItem>) {
+    return this.api.post<TemplateItem>(
+      `/inspection-templates/${templateId}/sections/${sectionId}/items`,
+      input,
+    );
+  }
+  updateItem(templateId: Uuid, itemId: Uuid, input: Partial<TemplateItem>) {
+    return this.api.put<TemplateItem>(`/inspection-templates/${templateId}/items/${itemId}`, input);
   }
 }
 

@@ -81,7 +81,7 @@ class ConflictDetectionTest {
 
         assertThat(result.status()).isEqualTo(SyncOperationStatus.CONFLICT);
         verify(inspectionExecutionService, never()).submit(any(), any(), anyBoolean(), any(), any());
-        verify(inspectionExecutionService, never()).start(any(), any(), any(), any());
+        verify(inspectionExecutionService, never()).start(any(), any(), anyBoolean(), any(), any());
     }
 
     @Test

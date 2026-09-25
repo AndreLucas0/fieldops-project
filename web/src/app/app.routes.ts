@@ -1,6 +1,7 @@
 import type { Routes } from '@angular/router';
 
 import { authGuard } from './core/auth/auth.guard';
+import { guestGuard } from './core/auth/auth.guard';
 
 /**
  * Rotas da interface administrativa.
@@ -12,11 +13,34 @@ import { authGuard } from './core/auth/auth.guard';
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   {
+    path: 'login',
+    canActivate: [guestGuard],
+    title: 'Entrar — FieldOps',
+    loadComponent: () =>
+      import('./features/login/login.component').then((m) => m.LoginComponent),
+  },
+  {
     path: 'dashboard',
     canActivate: [authGuard],
     title: 'Painel — FieldOps',
     loadComponent: () =>
       import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
+  },
+  {
+    path: 'inspection-templates',
+    canActivate: [authGuard],
+    title: 'Modelos de inspeção — FieldOps',
+    loadComponent: () =>
+      import('./features/templates/templates-list.component').then((m) => m.TemplatesListComponent),
+  },
+  {
+    path: 'inspection-templates/:templateId/edit',
+    canActivate: [authGuard],
+    title: 'Construtor de modelo — FieldOps',
+    loadComponent: () =>
+      import('./features/templates/template-builder.component').then(
+        (m) => m.TemplateBuilderComponent,
+      ),
   },
   // As demais telas entram aqui conforme forem implementadas. Enquanto isso,
   // um destino desconhecido volta para o painel em vez de deixar a tela vazia.

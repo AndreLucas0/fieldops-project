@@ -46,7 +46,7 @@ services:
   # compatível com S3"). Em produção, um provedor de objetos gerenciado
   # substitui este serviço; a API só precisa apontar para outro endpoint.
   evidence-storage:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:

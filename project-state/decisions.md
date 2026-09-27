@@ -27,6 +27,52 @@ ACTIVE / SUPERSEDED
 
 ---
 
+### [2026-09-27] — Substituição de MinIO por adobe/s3mock no docker-compose
+
+Context:
+`docker compose up -d` falhava com `401 UNAUTHORIZED` ao tentar baixar
+`quay.io/minio/minio:latest`. A imagem oficial do MinIO no Docker Hub
+(`minio/minio:latest`) também retorna `pull access denied — repository
+does not exist`. Ambos os registries requerem autenticação que não está
+configurada no ambiente de desenvolvimento.
+
+Decision:
+Substituir o serviço `evidence-storage` por `adobe/s3mock:latest`, que é
+acessível publicamente e compatível com S3 (aceita `forcePathStyle=true`).
+
+Configuração relevante:
+- Porta interna: 9090 (HTTP), mapeada para a porta externa `9000` via `EVIDENCE_STORAGE_PORT`.
+- Nenhuma mudança necessária na `application.yml` do backend — `EVIDENCE_STORAGE_ENDPOINT`
+  continua apontando para `http://localhost:9000`.
+- Env var para criação automática do bucket:
+  `COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS` (prefixo `com.adobe.testing.s3mock.store.*`
+  confirmado inspecionando `application.properties` dentro da imagem).
+- Healthcheck: `wget -q --spider http://localhost:9090/` (GET / = ListBuckets, 200 OK).
+- s3mock NÃO autentica credenciais — aceita qualquer `accessKey`/`secretKey`.
+  Variáveis `EVIDENCE_STORAGE_ACCESS_KEY` e `EVIDENCE_STORAGE_SECRET_KEY` continuam no
+  `.env.example` para uso futuro com um serviço real em produção.
+
+Reason:
+Imagens MinIO requerem autenticação em registry. adobe/s3mock é leve,
+S3-compatível e de acesso público.
+
+Alternatives considered:
+- `localstack/localstack:latest` — também acessível publicamente, mas requer configuração
+  mais complexa e não tem bucket auto-criação simples.
+- `bitnami/minio:latest` — não encontrado no Docker Hub.
+
+Impact:
+**Dados de evidência são efêmeros** — o `evidence-storage` usa diretório temp
+interno; dados são perdidos ao reiniciar o container. Aceitável em dev. Para
+persistir dados entre restarts em dev, fazer `docker commit` ou adicionar um
+volume com permissão de escrita para o usuário `cnb` (UID 1000).
+Removed: `fieldops_evidence_data` named volume (era o volume do MinIO).
+
+Status:
+ACTIVE
+
+---
+
 ### [2026-09-22] — Persistent cross-session project memory (`CLAUDE.md` + `project-state/`)
 
 Context:

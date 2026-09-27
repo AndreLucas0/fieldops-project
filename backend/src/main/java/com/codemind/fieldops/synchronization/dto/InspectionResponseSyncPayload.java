@@ -17,5 +17,6 @@ public record InspectionResponseSyncPayload(
     Boolean valueBoolean,
     LocalDate valueDate,
     String valueChoice,
-    String observation) {
+    String observation,
+    String conformity) {
 }

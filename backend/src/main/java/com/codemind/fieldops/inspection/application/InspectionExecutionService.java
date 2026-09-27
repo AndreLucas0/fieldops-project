@@ -1,5 +1,6 @@
 package com.codemind.fieldops.inspection.application;
 
+import com.codemind.fieldops.inspection.domain.Conformity;
 import com.codemind.fieldops.inspection.domain.Inspection;
 import com.codemind.fieldops.inspection.domain.InspectionResponse;
 import com.codemind.fieldops.inspection.domain.InspectionStatus;
@@ -192,6 +193,7 @@ public class InspectionExecutionService {
         response.setValueDate(request.valueDate());
         response.setValueChoice(request.valueChoice());
         response.setObservation(request.observation());
+        response.setConformity(request.conformity() != null ? Conformity.valueOf(request.conformity()) : null);
 
         return responseRepository.save(response);
     }

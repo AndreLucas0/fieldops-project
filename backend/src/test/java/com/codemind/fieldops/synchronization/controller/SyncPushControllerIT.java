@@ -436,4 +436,50 @@ class SyncPushControllerIT {
             .extractingPath("$.results[0].status").asString().isEqualTo("REJECTED");
     }
 
+    // ---- Persist conformity via sync (BF-003, modelo-de-dados.md §10.8.4) ----
+
+    @Test
+    void syncResponseWithConformityIsAppliedAndFieldPersisted() {
+        Inspection inProgressInspection = inspectionRepository.save(Inspection.builder()
+            .templateVersion(activeTemplateVersion)
+            .client(testClient)
+            .site(testSite)
+            .technician(technicianUser)
+            .createdBy(technicianUser)
+            .priority(InspectionPriority.MEDIUM)
+            .status(InspectionStatus.IN_PROGRESS)
+            .scheduledFor(Instant.now().plusSeconds(3600))
+            .startedAtServer(Instant.now())
+            .build());
+
+        ItemSnapshot snapshot = itemSnapshotRepository.save(ItemSnapshot.builder()
+            .inspection(inProgressInspection)
+            .sectionTitle("Section 1")
+            .sectionOrder(1)
+            .itemTitle("Item 1")
+            .responseType("BOOLEAN")
+            .required(false)
+            .itemOrder(1)
+            .build());
+
+        String operationId = UUID.randomUUID().toString();
+        String payload = pushPayload(operationId, "INSPECTION_RESPONSE", snapshot.getId().toString(), "UPSERT", "null",
+            """
+            {"inspectionId": "%s", "valueBoolean": true, "conformity": "CONFORMING"}"""
+                .formatted(inProgressInspection.getId()));
+
+        assertThat(mvc.post().uri("/mobile/sync/push")
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.results[0].status").asString().isEqualTo("APPLIED");
+
+        var saved = inspectionResponseRepository
+            .findByInspectionIdAndSnapshotId(inProgressInspection.getId(), snapshot.getId())
+            .orElseThrow();
+        assertThat(saved.getConformity()).hasToString("CONFORMING");
+    }
+
 }

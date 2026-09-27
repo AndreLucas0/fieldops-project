@@ -430,4 +430,46 @@ class InspectionResponseControllerIT {
             .content(payload))
             .hasStatus(HttpStatus.CONFLICT);
     }
+
+    // ---- Persist conformity field (BF-003, RN-035, modelo-de-dados.md §10.8.4) ----
+
+    @Test
+    void upsertResponseWithConformityPersistsField() {
+        String payload = """
+            {"valueBoolean": true, "conformity": "CONFORMING"}""";
+
+        assertThat(mvc.put().uri("/inspections/" + inProgressInspection.getId() + "/responses/" + testSnapshot.getId())
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.conformity").asString().isEqualTo("CONFORMING");
+    }
+
+    @Test
+    void upsertResponseWithNullConformityStoresNull() {
+        String payload = """
+            {"valueBoolean": true}""";
+
+        assertThat(mvc.put().uri("/inspections/" + inProgressInspection.getId() + "/responses/" + testSnapshot.getId())
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.conformity").isNull();
+    }
+
+    @Test
+    void upsertResponseWithInvalidConformityReturns400() {
+        String payload = """
+            {"valueBoolean": true, "conformity": "GARBAGE"}""";
+
+        assertThat(mvc.put().uri("/inspections/" + inProgressInspection.getId() + "/responses/" + testSnapshot.getId())
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatus(HttpStatus.BAD_REQUEST);
+    }
 }

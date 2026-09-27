@@ -6,6 +6,7 @@ import com.codemind.fieldops.inspection.dto.InspectionResponseCreateRequest;
 import com.codemind.fieldops.inspection.dto.InspectionResponseDto;
 import com.codemind.fieldops.inspection.mapper.InspectionResponseMapper;
 import com.codemind.fieldops.shared.security.JwtClaims;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -51,7 +52,7 @@ public class InspectionResponseController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','TECHNICIAN')")
     public InspectionResponseDto upsertResponse(@PathVariable UUID inspectionId,
                                                   @PathVariable UUID snapshotId,
-                                                  @RequestBody InspectionResponseCreateRequest request,
+                                                  @Valid @RequestBody InspectionResponseCreateRequest request,
                                                   @AuthenticationPrincipal Jwt jwt) {
         String role = jwt.getClaimAsString(JwtClaims.ROLE);
         UUID userId = UUID.fromString(jwt.getSubject());

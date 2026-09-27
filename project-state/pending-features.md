@@ -110,24 +110,40 @@ Validation:
 
 ## BF-004 — Dashboard and Inspection History Endpoints
 
-Status: PENDING
+Status: DONE
 
 Description:
-Implement the documented/consumed endpoints:
-- `GET /dashboard/summary`, `/dashboard/inspections-by-status`, `/dashboard/non-conformities-by-severity`
-- `GET /inspections/{id}/history`
+Implemented the documented/consumed endpoints:
+- `GET /dashboard/summary` → `DashboardSummaryDto` (7 aggregate fields)
+- `GET /dashboard/inspections-by-status` → `List<StatusCountDto>` (GROUP BY)
+- `GET /dashboard/non-conformities-by-severity` → `List<SeverityCountDto>` (GROUP BY)
+- `GET /inspections/{id}/history` → `PageResponse<AuditEventDto>` (paginated, ordered by occurredAt ASC)
 
 Source:
 Backend audit — 2026-09-22 (`project-state/backend-audit.md`, 🔴 #4 and #7).
 Requirements: RN-086, UC-18, `api-rest.md` §12.10 (history); `api-rest.md`
 §12.16, `plano-implementacao-backend.md` Sprint 8, UC-19 (dashboard).
 
-Dependencies:
-- History: none — `AuditEventRepository` already exists and is already populated by `AuditEventPublisher`; only the read side (controller/service) is missing.
-- Dashboard: none technically blocking — aggregate queries over existing tables (`inspections`, `non_conformities`). Consider implementing alongside the advanced `/inspections` filters (see `backend-audit.md` 🟡 #3) to avoid duplicating "overdue" logic.
+Validation (2026-09-27):
+- 13/13 targeted IT tests GREEN (`DashboardControllerIT` 8/8, `InspectionHistoryControllerIT` 5/5)
+- 46/46 unit tests GREEN (no regressions)
+- ECC java-reviewer: 0 CRITICAL, 2 HIGH (both fixed before merge):
+  - Overdue exclusion set expanded to include `SUBMITTED` + `UNDER_REVIEW` (matches `shared/mocks/store.ts` `CLOSED_STATUSES`)
+  - History existence guard moved into `InspectionService.getHistory()` — single `@Transactional(readOnly = true)` boundary
 
-Impact: high for the admin UX — the web `/dashboard` screen (FE-W02) is
-already built and calls these three endpoints; they currently 404.
+New files:
+- `shared/audit/AuditEventDto.java`, `shared/audit/AuditService.java`
+- `dashboard/dto/DashboardSummaryDto.java`, `StatusCountDto.java`, `SeverityCountDto.java`
+- `dashboard/DashboardService.java`
+- `dashboard/controller/DashboardController.java`
+
+Modified files:
+- `inspection/application/InspectionService.java` — added `getHistory()`, injected `AuditService`
+- `inspection/controller/InspectionController.java` — added `GET /{id}/history`, delegates to `inspectionService.getHistory()`
+- `inspection/repository/InspectionRepository.java` — added `countByStatus`, `countOverdue`, `countGroupByStatus` + `StatusCountView` projection
+- `nonconformity/repository/NonConformityRepository.java` — added `countByStatus`, `countGroupBySeverity` + `SeverityCountView` projection
+
+Commit pending.
 
 ---
 

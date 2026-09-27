@@ -14,8 +14,11 @@ import com.codemind.fieldops.inspection.dto.InspectionCreateRequest;
 import com.codemind.fieldops.inspection.dto.InspectionUpdateRequest;
 import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
+import com.codemind.fieldops.shared.audit.AuditEventDto;
+import com.codemind.fieldops.shared.audit.AuditService;
 import com.codemind.fieldops.shared.error.BusinessRuleViolationException;
 import com.codemind.fieldops.shared.error.ResourceNotFoundException;
+import com.codemind.fieldops.shared.pagination.PageResponse;
 import com.codemind.fieldops.site.application.SiteService;
 import com.codemind.fieldops.site.domain.InspectionSite;
 import com.codemind.fieldops.template.domain.TemplateItem;
@@ -54,6 +57,7 @@ public class InspectionService {
     private final SiteService siteService;
     private final EquipmentService equipmentService;
     private final UserRepository userRepository;
+    private final AuditService auditService;
 
     public InspectionService(InspectionRepository inspectionRepository,
                               ItemSnapshotRepository itemSnapshotRepository,
@@ -61,7 +65,8 @@ public class InspectionService {
                               ClientService clientService,
                               SiteService siteService,
                               EquipmentService equipmentService,
-                              UserRepository userRepository) {
+                              UserRepository userRepository,
+                              AuditService auditService) {
         this.inspectionRepository = inspectionRepository;
         this.itemSnapshotRepository = itemSnapshotRepository;
         this.templateVersionRepository = templateVersionRepository;
@@ -69,6 +74,13 @@ public class InspectionService {
         this.siteService = siteService;
         this.equipmentService = equipmentService;
         this.userRepository = userRepository;
+        this.auditService = auditService;
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<AuditEventDto> getHistory(UUID id, Pageable pageable) {
+        getById(id);
+        return auditService.getInspectionHistory(id, pageable);
     }
 
     @Transactional(readOnly = true)

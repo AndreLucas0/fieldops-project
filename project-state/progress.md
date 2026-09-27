@@ -25,6 +25,15 @@ InspectionTemplateControllerIT (null→boolean in publish DTO) — both unrelate
 BF-002 and causing ~108 cascade errors in full suite. All other IT classes pass in
 isolation. Commit pending.
 
+BF-004 (dashboard + inspection history endpoints) implemented on 2026-09-27 —
+see pending-features.md. `DashboardController` (`/summary`, `/inspections-by-status`,
+`/non-conformities-by-severity`) and `GET /inspections/{id}/history` all GREEN.
+`DashboardService.NON_OVERDUE_STATUSES` aligned with `shared/mocks/store.ts`
+`CLOSED_STATUSES` (includes `SUBMITTED` + `UNDER_REVIEW`). Existence guard for
+history moved into `InspectionService.getHistory()` (single transaction boundary).
+ECC review: 0 CRITICAL, 2 HIGH found and fixed. 13/13 IT + 46/46 unit GREEN.
+Commit pending.
+
 BF-003 (persist `conformity` field on inspection responses) implemented on
 2026-09-27 — see pending-features.md. Added `String conformity` to
 `InspectionResponseCreateRequest`, `InspectionResponseSyncPayload`, and

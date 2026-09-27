@@ -10,6 +10,7 @@ import com.codemind.fieldops.inspection.dto.InspectionCreateRequest;
 import com.codemind.fieldops.inspection.dto.InspectionResponse;
 import com.codemind.fieldops.inspection.dto.InspectionUpdateRequest;
 import com.codemind.fieldops.inspection.mapper.InspectionMapper;
+import com.codemind.fieldops.shared.audit.AuditEventDto;
 import com.codemind.fieldops.shared.pagination.PageResponse;
 import com.codemind.fieldops.shared.pagination.SortFieldValidator;
 import jakarta.validation.Valid;
@@ -94,6 +95,13 @@ public class InspectionController {
                                       @AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
         return inspectionMapper.toResponse(inspectionService.cancel(id, userId, request));
+    }
+
+    @GetMapping("/{id}/history")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public PageResponse<AuditEventDto> history(@PathVariable UUID id,
+                                                @PageableDefault(size = 20) Pageable pageable) {
+        return inspectionService.getHistory(id, pageable);
     }
 
 }

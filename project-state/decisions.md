@@ -263,3 +263,113 @@ change.
 
 Status:
 ACTIVE
+
+---
+
+### [2026-09-26] — Integração ECC × FieldOps: papel, perfil e governança
+
+Context:
+O plugin Everything Claude Code (ECC) foi instalado em 2026-09-26. Antes de
+qualquer configuração, foram realizadas duas etapas analíticas (Auditoria de
+Reconciliação e Desenho da Configuração) para garantir compatibilidade com o
+workflow existente do FieldOps.
+
+Decision:
+Manter o ECC no perfil `standard` com a configuração padrão instalada.
+Nenhum hook adicional foi ativado. Nenhum hook existente foi desativado.
+O perfil `standard` é a configuração-alvo definitiva para o FieldOps.
+
+Modelo de responsabilidades e precedência entre as camadas do projeto
+(cada camada tem função distinta; não formam uma hierarquia linear única):
+
+- `docs/` — fonte normativa de requisitos, regras de negócio, fluxos e
+  comportamento esperado. Define o que o sistema DEVE fazer. Alterações
+  exigem evidência e justificativa formal.
+- `CLAUDE.md` — fonte operacional de metodologia, workflow, TDD, Git e
+  protocolos de sessão. Define como o agente deve trabalhar.
+- `project-state/` — fonte de contexto persistente. Registra estado atual,
+  decisões técnicas, progresso e pendências.
+- Código / Testes / `openapi.yaml` — evidência técnica da implementação
+  atual e dos contratos vigentes. Representam o que foi implementado, não
+  o que deve ser. Divergências entre código e requisitos documentados devem
+  ser registradas (ver CLAUDE.md §3), não resolvidas automaticamente em
+  favor do código.
+- ECC (hooks, agents, skills) — camada auxiliar de guardrails, validações e
+  automações. Reforça as regras do FieldOps; nunca as redefine.
+- ECC Learning / Instincts — camada auxiliar de aprendizado. Padrões
+  aprendidos não são normativos: não substituem requisito, regra de negócio,
+  regra operacional, decisão arquitetural nem regra de workflow sem aprovação
+  humana explícita.
+
+Reason:
+O perfil `standard` ativa guardrails alinhados com as regras do FieldOps
+(`block-no-verify`, `doc-file-warning`, `config-protection`, `gateguard-fact-
+force`) sem introduzir comportamentos incompatíveis com o workflow manual de
+Git ou com o protocolo TDD exigido pelo CLAUDE.md. Perfil `strict` rejeitado:
+adiciona hooks desnecessários no Windows e redundantes no workflow manual.
+Perfil `minimal` rejeitado: não ativa proteção de `docs/` nem `gateguard`.
+
+Alternatives considered:
+Perfil `strict`, perfil `minimal`, configuração customizada hook-by-hook.
+
+Impact:
+Quando houver conflito entre ECC Learning / Instincts e as regras oficiais
+do FieldOps (docs/, CLAUDE.md, project-state/, contratos técnicos), o
+aprendizado deve ser tratado como não normativo e não deve ser aplicado
+automaticamente. CL v1: `auto_approve=false` (aprovação manual
+obrigatória antes de qualquer padrão se tornar ativo). CL v2: observer
+desativado (`enabled: false`). Nenhum instinct existe para FieldOps (project
+ID homunculus: 957db2ab6df0). ECC_HOOK_PROFILE não precisa ser definida
+explicitamente: `hook-flags.js` resolve para `standard` por código quando a
+variável não está no ambiente.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-26] — Comportamento do stop-format-typecheck no FieldOps (Windows)
+
+Context:
+O hook `stop-format-typecheck` (ativo no perfil `standard`) é o único mecanismo
+ECC identificado que pode escrever em arquivos do projeto. Comportamento
+auditado em detalhe no código-fonte do hook.
+
+Decision:
+Manter o hook ativo. Registrar as condições exatas de operação para que
+sessões futuras não interpretem o comportamento atual como garantia permanente.
+
+Condições verificadas no código:
+- Extensões processadas: `.ts`, `.tsx`, `.js`, `.jsx` apenas.
+- Extensões nunca afetadas: `.java`, `.yaml`, `.sql`, `.xml`, `.md`, `.json`,
+  `.properties` e todos os arquivos do backend Java.
+- `web/`: Prettier configurado (`.prettierrc` — printWidth: 100, singleQuote:
+  true). Formatter ATIVO se condições de caminho permitirem.
+- `mobile/`: nenhum formatter detectado → hook não executa em mobile.
+- `backend/`: extensão `.java` excluída pelo filtro → hook nunca alcança Java.
+- Condição de skip no Windows (comportamento do hook, não política de
+  segurança permanente): `UNSAFE_PATH_CHARS = /[&|<>^%!\s()]/` (linha 33 de
+  stop-format-typecheck.js). Se o caminho absoluto do arquivo contém espaços
+  E o formatter usa binário `.cmd`, o batch inteiro é ignorado. No ambiente
+  atual (`C:\Users\aluca\OneDrive\Área de Trabalho\fieldops-project`), os
+  espaços em "Área de Trabalho" ativam este skip. Este é um efeito do caminho
+  atual do projeto, não uma configuração de segurança projetada para o FieldOps.
+
+Reason:
+Documentar para continuidade de sessão e para que o comportamento não seja
+interpretado erroneamente como política de segurança definitiva.
+
+Alternatives considered:
+Desativar via `ECC_DISABLED_HOOKS=stop:format-typecheck`: rejeitado — o hook
+é inócuo no ambiente atual e a configuração Prettier de `web/` é consistente.
+
+Impact:
+LIMITAÇÃO: se o projeto for movido para um caminho sem espaços (ex.:
+`C:\projects\fieldops`), o hook passará a formatar arquivos `.ts`/`.js` de
+`web/` editados na sessão. A configuração Prettier está correta, mas o
+comportamento deve ser compreendido. Se formatação automática não for desejada
+nesse cenário futuro, usar `ECC_DISABLED_HOOKS=stop:format-typecheck` como
+variável de ambiente local (sem versionar).
+
+Status:
+ACTIVE

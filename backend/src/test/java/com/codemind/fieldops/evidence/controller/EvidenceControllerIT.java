@@ -258,6 +258,18 @@ class EvidenceControllerIT {
             .hasStatus(HttpStatus.UNAUTHORIZED);
     }
 
+    @Test
+    void uploadToApprovedInspectionReturns409() {
+        assertThat(mvc.perform(MockMvcRequestBuilders
+                .multipart("/inspections/" + approvedInspection.getId() + "/evidence")
+                .file(jpegFile())
+                .param("idempotencyKey", UUID.randomUUID().toString())
+                .param("type", "PHOTO")
+                .param("capturedAtDevice", Instant.now().toString())
+                .header("Authorization", bearer(technicianToken))))
+            .hasStatus(HttpStatus.CONFLICT);
+    }
+
     // ---- GET evidence ----
 
     @Test

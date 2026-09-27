@@ -1,12 +1,16 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-09-22
+Last updated: 2026-09-26
 
 ## Current State
 
 Backend audit completed (2026-09-22, see `project-state/backend-audit.md`).
 
 The backend is not yet functionally complete relative to `./docs/**`.
+
+BF-006 (evidence upload block on APPROVED inspections) implemented on
+2026-09-26 — see pending-features.md for updated status. Backend now
+enforces RN-049 for both upload and delete paths. Not yet committed.
 
 Persistent project memory (`CLAUDE.md` + `project-state/`) was set up on
 2026-09-22 in a dedicated, non-implementation task — see `decisions.md` for

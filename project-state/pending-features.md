@@ -140,12 +140,12 @@ model builder/versions screens don't work against the real backend without it.
 
 ## BF-006 — Evidence Read-Only After Approval
 
-Status: PENDING
+Status: DONE
 
 Description:
-Prevent new evidence uploads once an inspection reaches `APPROVED`
-(currently only deletion is blocked; `EvidenceService.upload()` doesn't check
-`inspection.getStatus()`).
+Prevent new evidence uploads once an inspection reaches `APPROVED`.
+Implemented 2026-09-26 via guard clause in `EvidenceService.upload()` (mirrors
+existing `delete()` pattern). Both upload and delete now enforce RN-049.
 
 Source:
 Backend audit — 2026-09-22 (`project-state/backend-audit.md`, 🔴 #6).
@@ -154,6 +154,11 @@ Requirement: RN-049.
 Relates to: BF-002 (same "approved = immutable" rule category).
 
 Dependencies: none.
+
+Validation:
+- `EvidenceControllerIT.uploadToApprovedInspectionReturns409` — new test, passes.
+- All 11 `EvidenceControllerIT` tests pass; 46 unit tests pass.
+- Not yet committed; commit pending manual review by project owner.
 
 ---
 

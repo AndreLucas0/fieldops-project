@@ -67,6 +67,10 @@ public class EvidenceService {
     @Transactional
     public Evidence upload(UUID inspectionId, UUID userId, EvidenceUploadCommand command, MultipartFile file) {
         Inspection inspection = getInspection(inspectionId);
+        if (inspection.getStatus() == InspectionStatus.APPROVED) {
+            throw new ResourceConflictException(EVIDENCE_READ_ONLY_CODE,
+                "Evidence of an approved inspection is read-only");
+        }
         User createdBy = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND_CODE, "User not found"));
 

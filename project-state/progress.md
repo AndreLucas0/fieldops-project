@@ -6,130 +6,142 @@ Last updated: 2026-09-27
 
 Backend audit completed (2026-09-22, see `project-state/backend-audit.md`).
 
-BF-001 (template versioning) implemented on 2026-09-27 — see pending-features.md.
-`POST /inspection-templates/{id}/publish` now allows re-publishing an ACTIVE template,
-creating a new version and deactivating the previous one. Concurrent publish guarded
-by existing `@Version` column → 409 instead of 500. 3/3 new IT tests GREEN, 17/17
-total `InspectionTemplateControllerIT` GREEN, 46/46 unit tests GREEN. Commit pending.
+Todos os itens críticos do audit (BF-001 a BF-006) estão implementados e commitados.
+A branch `feat/BF-001` está 6 commits à frente de `main` (BF-002 a BF-005 + BF-001 —
+BF-006 já está em `main` desde `132b2c4`). Nenhum commit pendente na working tree.
 
-The backend is not yet functionally complete relative to `./docs/**`.
+### BF-001 — Template Versioning — commitado `7553bc7`
 
-BF-006 (evidence upload block on APPROVED inspections) implemented on
-2026-09-26 and committed on 2026-09-27 (commit `132b2c4 feat: evidence read
-only`) — see pending-features.md for updated status. Backend now enforces
-RN-049 for both upload and delete paths.
+`POST /inspection-templates/{id}/publish` agora funciona para templates em qualquer
+status (não apenas `DRAFT`). Chamar em template `ACTIVE` cria nova versão com
+`versionNumber` auto-incrementado, desativa versões ativas anteriores
+(`activeForNewInspections = false`) e mantém o template `ACTIVE`. Publishes
+concorrentes protegidos por `@Version` em `InspectionTemplate` → 409.
+3/3 novos IT tests + 17/17 `InspectionTemplateControllerIT` + 46/46 unit tests GREEN.
+`InspectionTemplateControllerIT.setUp()` atualizado com TRUNCATE CASCADE via
+`JdbcTemplate` para evitar violações de FK entre IT classes.
 
-BF-002 (lock checklist responses after SUBMITTED/UNDER_REVIEW/APPROVED)
-implemented on 2026-09-27 — see pending-features.md. Guard clause added to
-`InspectionExecutionService.upsertResponse()` enforcing RN-043 + RN-082 on
-both HTTP and sync paths. `SynchronizationService.apply()` updated to handle
-`ResourceConflictException` gracefully. 3 IT tests added (SUBMITTED, UNDER_REVIEW,
-APPROVED for HTTP; APPROVED for sync). Unit tests: 46/46. IT tests: 4/4 targeted
-BF-002 tests GREEN (Docker available 2026-09-27). Full `./mvnw verify` has 4
-pre-existing failures in FlywayMigrationIT (stale version assertion) and
-InspectionTemplateControllerIT (null→boolean in publish DTO) — both unrelated to
-BF-002 and causing ~108 cascade errors in full suite. All other IT classes pass in
-isolation. Commit pending.
+### BF-002 — Lock Inspection Responses — commitado `42d86fd`
 
-BF-005 (template version read endpoints, partial) implemented on 2026-09-27 —
-see pending-features.md for updated status. `GET /inspection-templates/{id}/versions`
-and `GET /inspection-template-versions/{versionId}` implemented. `TemplateController`
-now dual-mapped at `/templates/*` and `/inspection-templates/*`. Pre-req fixes:
-`FlywayMigrationIT` version assertion, `TemplateItemRequest` boolean → Boolean.
-7/7 IT + 46/46 unit GREEN. ECC: 0 CRITICAL, 0 unfixed HIGH, 2 MEDIUM fixed.
-Section/item builder BLOCKED (data model decision pending — see decisions.md).
-Commit pending.
+Guard clause em `InspectionExecutionService.upsertResponse()` bloqueia alterações de
+respostas quando a inspeção está em `SUBMITTED`, `UNDER_REVIEW` ou `APPROVED` (RN-043,
+RN-082). `SynchronizationService.apply()` captura `ResourceConflictException` e retorna
+`Outcome.rejected()`. 4 novos IT tests GREEN (3 HTTP + 1 sync path).
 
-BF-004 (dashboard + inspection history endpoints) implemented on 2026-09-27 —
-see pending-features.md. `DashboardController` (`/summary`, `/inspections-by-status`,
-`/non-conformities-by-severity`) and `GET /inspections/{id}/history` all GREEN.
-`DashboardService.NON_OVERDUE_STATUSES` aligned with `shared/mocks/store.ts`
-`CLOSED_STATUSES` (includes `SUBMITTED` + `UNDER_REVIEW`). Existence guard for
-history moved into `InspectionService.getHistory()` (single transaction boundary).
-ECC review: 0 CRITICAL, 2 HIGH found and fixed. 13/13 IT + 46/46 unit GREEN.
-Commit pending.
+### BF-003 — Persist `conformity` — commitado `2c4893f`
 
-BF-003 (persist `conformity` field on inspection responses) implemented on
-2026-09-27 — see pending-features.md. Added `String conformity` to
-`InspectionResponseCreateRequest`, `InspectionResponseSyncPayload`, and
-`InspectionResponseDto`. Wired `Conformity.valueOf()` in
-`InspectionExecutionService.upsertResponse()`. Updated
-`SynchronizationService.applyInspectionResponse()` and `toChange()` (pull path).
-Input validation: `@Pattern` on DTO + `@Valid` on controller `@RequestBody` → 400
-for invalid enum strings (ECC HIGH finding resolved). Explicit `@Mapping` added to
-`InspectionResponseMapper.toDto()` for consistency (ECC MEDIUM finding resolved).
-4 new IT tests: 3 in `InspectionResponseControllerIT` (conformity persists, null
-conformity, invalid conformity→400), 1 in `SyncPushControllerIT` (conformity
-applied via sync). Results: 46/46 unit tests, 16/16 `InspectionResponseControllerIT`
-in isolation, 10/10 `SyncPushControllerIT` in isolation. Commit pending.
+Campo `conformity` adicionado a `InspectionResponseCreateRequest`,
+`InspectionResponseSyncPayload` e `InspectionResponseDto`. Validação `@Pattern` → 400
+para strings de enum inválidas. 4 novos IT tests GREEN.
 
-Persistent project memory (`CLAUDE.md` + `project-state/`) was set up on
-2026-09-22 in a dedicated, non-implementation task — see `decisions.md` for
-the rationale.
+### BF-004 — Dashboard + Inspection History — commitado `1545467`
 
-## Completed Work Referenced by Recent Git History
+`GET /dashboard/summary`, `GET /dashboard/inspections-by-status`,
+`GET /dashboard/non-conformities-by-severity` e `GET /inspections/{id}/history`
+implementados. 13/13 IT tests GREEN. 2 HIGHs do ECC corrigidos antes do commit.
 
-Verified against `git log --oneline --decorate` on `main` (HEAD `c929ea3`) on
-2026-09-22:
+### BF-005 — Template Version Read Endpoints — commitado `228825c` (PARTIAL)
 
-| Ref (task id inferred from branch name) | Commit | Summary |
+`GET /inspection-templates/{id}/versions` e `GET /inspection-template-versions/{versionId}`
+implementados. `TemplateController` com dual mapping `/templates/*` + `/inspection-templates/*`.
+Pre-req fixes: `FlywayMigrationIT` version assertion + `TemplateItemRequest` boolean → Boolean.
+7/7 IT tests GREEN. Section/item builder ainda **BLOQUEADO** — decisão de produto pendente
+sobre armazenamento de seções draft (ver `decisions.md` 2026-09-27).
+
+### BF-006 — Evidence Read-Only After Approval — commitado `132b2c4` (em `main`)
+
+Guard clause em `EvidenceService.upload()` bloqueia uploads em inspeções `APPROVED`
+(RN-049). 11/11 `EvidenceControllerIT` + 46/46 unit tests GREEN.
+
+---
+
+## Completed Work — Git History Atualizado
+
+Verificado contra `git log --oneline` em `feat/BF-001` em 2026-09-27:
+
+| Commit | Branch/contexto | Resumo |
 |---|---|---|
-| INT-001 | `a25f337` (branch `task/int-001-align-templates-api`) | fix: align templates API integration |
-| INT-005 | `358b1ec` (branch `task/int-005-technician-start-inspection`) | fix: allow technicians to start assigned inspections |
-| INT-010 | `4f31cda` (branch `task/int-010-web-login`) | feat: implement web authentication flow |
-| INT-006 | `b311fd5` (branch `task/int-006-align-inspection-detail-contract`) | fix: align mobile inspection detail contract |
-| — | `c929ea3` | Merge pull request #263 (merges INT-006 branch into `main`) |
+| `7553bc7` | `feat/BF-001` | feat: template versioning feature (BF-001) |
+| `228825c` | `feat/BF-001` | feat: template versions and sections endpoints (BF-005) |
+| `1545467` | `feat/BF-001` | feat: implement dashboard and inspection history endpoints (BF-004) |
+| `89b8d50` | `feat/BF-001` | doc: pending-features update |
+| `2c4893f` | `feat/BF-001` | feat: persist conformity field (BF-003) |
+| `42d86fd` | `feat/BF-001` | feat: lock inspection responses after submission/approval (BF-002) |
+| `b885ae0` | `feat/BF-001` (base) | docs: correlação de stale data |
+| `132b2c4` | `main` (HEAD) | feat: evidence read only (BF-006) |
+| `c929ea3` | `main` | Merge pull request #263 (INT-006) |
+| `9a33c5c` | `main` | Merge pull request #267 (INT-005) |
 
-These entries are read directly from `git log`/`git branch -a` and are
-current as of this update. Re-verify with `git log` in future sessions rather
-than trusting this table indefinitely — it will go stale as work continues.
+Re-verificar com `git log` em sessões futuras — esta tabela envelhecerá com novos merges.
 
-## Latest Backend Audit
+---
 
-44 features analyzed (see `project-state/backend-audit.md` for full detail
-and evidence):
+## Status Atualizado do Audit
 
-- 28 implemented (🟢)
-- 6 partial (🟡)
-- 7 not implemented (🔴)
-- 2 without test evidence (⚪)
-- 0 mock/placeholder (🔵)
-- 1 not integrated (🟣)
+Audit base: 2026-09-22, HEAD `c929ea3`, 44 features (ver `backend-audit.md`).
+
+Desde o audit, os seguintes itens 🔴 foram resolvidos:
+
+| BF | Item audit | Status anterior | Status atual |
+|---|---|---|---|
+| BF-006 | 🔴 #6 evidence upload bloqueado em APPROVED | 🔴 | 🟢 |
+| BF-002 | 🔴 #5 lock responses após submit/approval | 🔴 | 🟢 |
+| BF-003 | 🟡 #4 persist `conformity` | 🟡 | 🟢 |
+| BF-004 | 🔴 #4/#7 dashboard + history | 🔴 | 🟢 |
+| BF-005 | 🔴 #2/#3 template version read endpoints | 🔴 | 🟡 (partial — builder bloqueado) |
+| BF-001 | 🔴 #1 template re-versioning | 🔴 | 🟢 |
+
+---
 
 ## Current Pending Work
 
-See `project-state/pending-features.md` (BF-001 through BF-007).
+Ver `project-state/pending-features.md` para detalhe de cada item.
+
+Itens ainda pendentes:
+- **BF-005** (PARTIAL/BLOCKED) — section/item builder endpoints aguardam decisão de produto
+- **BF-007** (PENDING) — integração mobile sync; tarefa do lado mobile, não backend
+- **Divergências menores** (não BF) — PEND-04 (QR scope), PEND-05 (evidence ownership), PEND-15 (admin filters)
+
+---
 
 ## Recommended Next Task
 
-BF-001 — Template Versioning
+Com os BFs críticos concluídos, as opções são:
 
-This is a planning/state recommendation carried over from the audit report,
-not an instruction to implement it automatically. The actual next task
-should be chosen with the project owner, considering product priorities not
-captured by this audit (the audit deliberately avoided ranking pendencies by
-complexity/priority — see `backend-audit.md` methodology).
+1. **Abrir PR de `feat/BF-001` → `main`** para integrar todos os commits acumulados
+   na branch. Recomendado antes de iniciar novo trabalho para evitar divergência de base.
+
+2. **PEND-15** — Adicionar filtros admin faltantes em `InspectionSpecifications`
+   (`supervisorId`, `equipmentId`, `scheduledFrom/To`, `overdue`, text `q`). Sem bloqueio
+   de dados, implementação simples de Specification.
+
+3. **Decisão de produto sobre BF-005** — Definir mecanismo de armazenamento de seções
+   draft (tabela `draft_sections` vs. `TemplateVersion` em status `DRAFT`) para
+   desbloquear o section/item builder. Esta é uma decisão de produto/arquitetura, não
+   de código (ver `decisions.md` 2026-09-27).
+
+4. **BF-007** — Integração mobile sync: grande escopo, envolve persistência local,
+   outbox e tela FE-M04 no mobile. Bloqueante para a entrega per AC-RELEASE
+   (`criterios-de-aceitacao.md` §17.19).
+
+---
 
 ## Environment Limitations Observed
 
-- The 2026-09-22 backend audit was read-only and evidence-based on static
-  analysis: it read test files as evidence of coverage but did **not**
-  execute the test suites (`./mvnw test`/`verify`, `npm test` in web/mobile).
-  Treat "🟢 implemented + tested" findings as "a corresponding test file
-  exists and appears to cover the case," not as "the suite was run and
-  passed in this session."
-- Backend integration tests (`*IT.java`) use Testcontainers and require a
-  running Docker daemon — availability not verified in this session.
-- This session ran on Windows (win32); path/shell specifics in `CLAUDE.md`
-  §10 apply.
+- Docker esteve **disponível** em 2026-09-27 — IT tests via Testcontainers executados
+  com sucesso (todos os ITs verificados passaram em isolamento nesta sessão).
+- iOS: Expo Go no App Store travado em SDK 54 enquanto o projeto usa SDK 57; requer
+  macOS para o simulador (`ESTADO-DO-PROJETO.md` §8).
+- Android via Expo Go funciona no Windows com o APK linkado (`ESTADO-DO-PROJETO.md` §8).
+- Mobile web preview (`npx expo start --web`) não exercita camera/QR/GPS/SecureStore
+  de forma confiável (`ESTADO-DO-PROJETO.md` §9).
+- Windows (win32) / PowerShell como shell primário; Bash disponível via Git Bash.
+
+---
 
 ## Historical Note
 
-`ESTADO-DO-PROJETO.md` (dated 2026-08-18) states "A API (Java/Spring) não
-existe neste repositório." This is now stale — `backend/` contains 184 Java
-files, 12 Flyway migrations, and 27 test files as of 2026-09-22. The document
-was written from the `web` branch before the backend was merged into `main`.
-Do not use `ESTADO-DO-PROJETO.md` as the source of truth for backend state;
-use `project-state/backend-audit.md` instead. (Recorded as a documentation
-divergence in `project-state/backend-audit.md` rather than corrected in
-place, per the read-only audit rules that produced it.)
+`ESTADO-DO-PROJETO.md` (2026-08-18) afirma "A API (Java/Spring) não existe neste
+repositório" — informação stale. O `backend/` tem 184+ Java files, 12 Flyway
+migrations e vários test files. Usar `project-state/backend-audit.md` como fonte de
+verdade do estado do backend, não `ESTADO-DO-PROJETO.md`.

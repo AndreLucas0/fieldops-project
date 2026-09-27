@@ -51,7 +51,7 @@ Validation (2026-09-27):
 - All 46/46 unit tests GREEN
 - All 7/7 `TemplateVersionControllerIT` tests GREEN
 
-Commit pending.
+Commitado: `7553bc7 feat: template versioning feature` (branch `feat/BF-001`, não mergeado em `main`).
 
 ---
 
@@ -76,8 +76,9 @@ Validation:
 - `SyncPushControllerIT.syncResponseOnApprovedInspectionIsRejected` — new test, GREEN.
 - All 46 unit tests pass.
 - IT tests run on 2026-09-27 (Docker available): 4/4 targeted BF-002 tests GREEN.
-- Full `./mvnw verify`: 4 pre-existing failures unrelated to BF-002 (see "Pre-existing IT failures"
-  below). All other IT classes pass in isolation. Commit pending.
+- Pre-existing failures em `FlywayMigrationIT` e `InspectionTemplateControllerIT` foram corrigidas no BF-005.
+
+Commitado: `42d86fd feat: lock inspection responses after submission/approval` (branch `feat/BF-001`).
 
 Relates to: BF-006 (same "approved = immutable" rule category).
 
@@ -113,7 +114,8 @@ Validation:
 - `InspectionResponseControllerIT.upsertResponseWithInvalidConformityReturns400` — new test, GREEN (HIGH finding fix).
 - `SyncPushControllerIT.syncResponseWithConformityIsAppliedAndFieldPersisted` — new test, GREEN.
 - All 46 unit tests pass. `InspectionResponseControllerIT` 16/16 in isolation. `SyncPushControllerIT` 10/10 in isolation.
-- Commit pending (user must trigger).
+
+Commitado: `2c4893f feat: persist conformity field` (branch `feat/BF-001`).
 
 ---
 
@@ -152,7 +154,7 @@ Modified files:
 - `inspection/repository/InspectionRepository.java` — added `countByStatus`, `countOverdue`, `countGroupByStatus` + `StatusCountView` projection
 - `nonconformity/repository/NonConformityRepository.java` — added `countByStatus`, `countGroupBySeverity` + `SeverityCountView` projection
 
-Commit pending.
+Commitado: `1545467 feat: implement dashboard and inspection history endpoints (BF-004)` (branch `feat/BF-001`).
 
 ---
 
@@ -190,7 +192,7 @@ Modified files:
 - `shared/FlywayMigrationIT.java` — version assertion "9" → "12"
 - `template/dto/TemplateItemRequest.java` — `boolean` → `Boolean` (3 fields)
 
-Commit pending.
+Commitado: `228825c feat: template versions and sections endpoints` (branch `feat/BF-001`).
 
 ---
 
@@ -252,7 +254,7 @@ These came out of the same audit but are **not** "feature not built" — see
 `backend-audit.md` "Contract divergences" section for full detail. Listed
 here only so they aren't lost:
 
-- `TemplateController` base path is `/templates`, not `/inspection-templates` as documented — affects every template-related contract-divergence item above.
+- ~~`TemplateController` base path is `/templates`~~ — **RESOLVIDA** em BF-005 (`228825c`): `TemplateController` agora responde em ambos `/templates/*` e `/inspection-templates/*` (dual mapping).
 - `PUT /inspections/{id}/responses/{snapshotId}` uses the snapshot id, not a device-generated response id as `api-rest.md` §12.11 describes.
 - `POST /inspections/{id}/responses:batch` doesn't exist (mitigated by sync).
 - QR lookup (`GET /equipment/by-qr/{qrCode}`) doesn't scope results to the technician's assigned inspection (RN-063, PEND-04) — a security-hardening item, tracked here rather than as its own BF because it's a scope/authorization refinement, not a missing feature.
@@ -260,22 +262,20 @@ here only so they aren't lost:
 - `InspectionSpecifications` is missing several documented admin filters (`supervisorId, equipmentId, scheduledFrom/To, overdue`, text search `q`) — PEND-15.
 - `InspectionResponseController.upsertResponse()` double-loads the inspection: once in `getInspectionForTechnician()` (controller) and again in `upsertResponse()` (service). Pre-existing; identified during BF-002 review. Low priority — optimization refactor only.
 
-## Pre-existing IT failures (identified 2026-09-27, unrelated to BF-002)
+## Pre-existing IT failures — RESOLVIDAS (BF-005, 2026-09-27)
 
-Two IT classes fail consistently and pre-date BF-002 work:
+As duas falhas pré-existentes identificadas durante BF-002 foram corrigidas como
+pre-requisito do BF-005:
 
-1. **`FlywayMigrationIT.migrationsApplyCleanlyOnAnEmptyDatabase`** — asserts
-   `flyway.info().current().getVersion() == "9"` but the schema is now at v12
-   (migrations 10–12 were added after the test was written). Fix: update the
-   assertion to `"12"`. Trivial one-line change.
+1. **`FlywayMigrationIT`** — asserção `"9"` → `"12"` (schema atual). **RESOLVIDA** em
+   `228825c`.
 
-2. **`InspectionTemplateControllerIT`** — 3 tests fail with HTTP 500 when calling
-   `POST /templates/{id}/publish`. Root cause: `JSON parse error: Cannot map null
-   into type boolean` — the publish request DTO has a primitive `boolean` field
-   that receives `null` from the test payload. Fix: change the DTO field to
-   `Boolean` (boxed) or ensure the test sends all required fields. Related to
-   BF-001/BF-005 (template publish flow).
+2. **`InspectionTemplateControllerIT`** — `TemplateItemRequest` com campos `boolean`
+   primitivos → `Boolean` (boxed), eliminando o erro 500 em `POST .../publish`.
+   **RESOLVIDA** em `228825c`. A classe agora tem 17/17 tests GREEN (incluindo 3 novos
+   testes de BF-001 adicionados em `7553bc7`).
 
-Both failures cause the full `./mvnw verify` suite to cascade-fail with ~108 errors
-because the failing contexts are shared by other IT classes. Each IT class passes
-in isolation. These should be fixed in a dedicated task before the next full IT run.
+Além disso, o setUp de `InspectionTemplateControllerIT` foi atualizado (em `7553bc7`)
+para usar `TRUNCATE TABLE inspection_template_versions CASCADE` via `JdbcTemplate`,
+eliminando o risco de violação de FK quando ITs que criam inspeções executam antes
+desta classe em `./mvnw verify`.

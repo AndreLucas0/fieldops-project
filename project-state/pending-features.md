@@ -158,7 +158,7 @@ Dependencies: none.
 Validation:
 - `EvidenceControllerIT.uploadToApprovedInspectionReturns409` — new test, passes.
 - All 11 `EvidenceControllerIT` tests pass; 46 unit tests pass.
-- Not yet committed; commit pending manual review by project owner.
+- Committed 2026-09-27: `132b2c4 feat: evidence read only`.
 
 ---
 

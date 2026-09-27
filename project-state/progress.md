@@ -9,8 +9,9 @@ Backend audit completed (2026-09-22, see `project-state/backend-audit.md`).
 The backend is not yet functionally complete relative to `./docs/**`.
 
 BF-006 (evidence upload block on APPROVED inspections) implemented on
-2026-09-26 — see pending-features.md for updated status. Backend now
-enforces RN-049 for both upload and delete paths. Not yet committed.
+2026-09-26 and committed on 2026-09-27 (commit `132b2c4 feat: evidence read
+only`) — see pending-features.md for updated status. Backend now enforces
+RN-049 for both upload and delete paths.
 
 Persistent project memory (`CLAUDE.md` + `project-state/`) was set up on
 2026-09-22 in a dedicated, non-implementation task — see `decisions.md` for

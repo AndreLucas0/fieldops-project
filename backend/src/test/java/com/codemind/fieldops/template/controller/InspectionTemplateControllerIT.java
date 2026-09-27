@@ -8,6 +8,8 @@ import com.codemind.fieldops.shared.security.JwtClaims;
 import com.codemind.fieldops.template.domain.InspectionTemplate;
 import com.codemind.fieldops.template.domain.TemplateStatus;
 import com.codemind.fieldops.template.repository.InspectionTemplateRepository;
+import com.codemind.fieldops.template.repository.TemplateVersionRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
 import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.domain.UserRole;
 import com.codemind.fieldops.user.domain.UserStatus;
@@ -44,7 +46,13 @@ class InspectionTemplateControllerIT {
     private InspectionTemplateRepository templateRepository;
 
     @Autowired
+    private TemplateVersionRepository versionRepository;
+
+    @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -61,6 +69,10 @@ class InspectionTemplateControllerIT {
 
     @BeforeEach
     void setUp() {
+        // CASCADE truncates template_sections, template_items, inspections, and all
+        // inspection child tables (responses, snapshots, evidence, etc.) in one shot,
+        // preventing FK violations when other IT classes leave inspection data behind.
+        jdbcTemplate.execute("TRUNCATE TABLE inspection_template_versions CASCADE");
         templateRepository.deleteAll();
         userRepository.deleteAll();
         adminUser = userRepository.save(newUser("Admin", "admin.tmpl@fieldops.local", UserRole.ADMIN));
@@ -306,6 +318,108 @@ class InspectionTemplateControllerIT {
         assertThat(mvc.post().uri("/templates").header("Authorization", bearer(adminToken))
             .contentType(MediaType.APPLICATION_JSON).content(payload))
             .hasStatus(HttpStatus.BAD_REQUEST);
+    }
+
+    // ── BF-001: re-publish ACTIVE template ──────────────────────────────────
+
+    @Test
+    void publishNewVersionOnActiveTemplateCreatesVersionTwo() {
+        String templateId = createAndPublishTemplate("Versioning Template");
+
+        String publishPayload = """
+            {"sections": [{"title": "S2","displayOrder": 1,"items": [{"title": "I2","responseType": "TEXT_SHORT","displayOrder": 1}]}]}""";
+
+        assertThat(mvc.post().uri("/templates/" + templateId + "/publish")
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(publishPayload))
+            .hasStatus(HttpStatus.CREATED)
+            .bodyJson()
+            .extractingPath("$.versionNumber").asNumber().isEqualTo(2);
+    }
+
+    @Test
+    void getActiveVersionAfterRepublishReturnsVersionTwo() {
+        String templateId = createAndPublishTemplate("Versioning Template 2");
+
+        String publishPayload = """
+            {"sections": [{"title": "S2","displayOrder": 1,"items": [{"title": "I2","responseType": "TEXT_SHORT","displayOrder": 1}]}]}""";
+        mvc.post().uri("/templates/" + templateId + "/publish")
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(publishPayload).exchange();
+
+        assertThat(mvc.get().uri("/templates/" + templateId + "/active-version")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.versionNumber").asNumber().isEqualTo(2);
+    }
+
+    @Test
+    void previousVersionIsDeactivatedAfterRepublish() {
+        String[] templateIdHolder = {null};
+        String[] v1IdHolder = {null};
+
+        assertThat(mvc.post().uri("/templates")
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Deactivation Test\",\"category\":\"Test\"}")
+            .exchange())
+            .hasStatus(HttpStatus.CREATED)
+            .bodyJson()
+            .extractingPath("$.id").asString().satisfies(s -> templateIdHolder[0] = s);
+
+        String publishPayload1 = """
+            {"sections": [{"title": "S1","displayOrder": 1,"items": [{"title": "I1","responseType": "BOOLEAN","displayOrder": 1}]}]}""";
+        assertThat(mvc.post().uri("/templates/" + templateIdHolder[0] + "/publish")
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(publishPayload1)
+            .exchange())
+            .hasStatus(HttpStatus.CREATED)
+            .bodyJson()
+            .extractingPath("$.id").asString().satisfies(s -> v1IdHolder[0] = s);
+
+        String publishPayload2 = """
+            {"sections": [{"title": "S2","displayOrder": 1,"items": [{"title": "I2","responseType": "TEXT_SHORT","displayOrder": 1}]}]}""";
+        assertThat(mvc.post().uri("/templates/" + templateIdHolder[0] + "/publish")
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(publishPayload2)
+            .exchange())
+            .hasStatus(HttpStatus.CREATED);
+
+        assertThat(mvc.get().uri("/inspection-template-versions/" + v1IdHolder[0])
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.activeForNewInspections").asBoolean().isFalse();
+    }
+
+    // ── helpers ─────────────────────────────────────────────────────────────
+
+    private String createAndPublishTemplate(String title) {
+        String[] idHolder = {null};
+        assertThat(mvc.post().uri("/templates")
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"" + title + "\",\"category\":\"Test\"}")
+            .exchange())
+            .hasStatus(HttpStatus.CREATED)
+            .bodyJson()
+            .extractingPath("$.id").asString().satisfies(s -> idHolder[0] = s);
+
+        String publishPayload = """
+            {"sections": [{"title": "S1","displayOrder": 1,"items": [{"title": "I1","responseType": "BOOLEAN","displayOrder": 1}]}]}""";
+        assertThat(mvc.post().uri("/templates/" + idHolder[0] + "/publish")
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(publishPayload)
+            .exchange())
+            .hasStatus(HttpStatus.CREATED);
+
+        return idHolder[0];
     }
 
     private void createTemplateViaApi(String title, String category) {

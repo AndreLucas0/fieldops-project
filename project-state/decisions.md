@@ -332,6 +332,66 @@ ACTIVE
 
 ---
 
+### [2026-09-27] — BF-001: INACTIVE template re-publish behavior is undocumented
+
+Context:
+BF-001 removed the `status != DRAFT` guard from `TemplateService.publish()`. The
+`TemplateStatus` enum has three values: `DRAFT`, `ACTIVE`, `INACTIVE`. The previous
+guard blocked ACTIVE and INACTIVE equally. After BF-001, INACTIVE templates can also
+be re-published (they will become ACTIVE with a new version).
+
+Decision:
+Accept this behavior implicitly for now. No guard for INACTIVE has been added.
+`criterios-de-aceitacao.md` §17.5, RN-018–RN-022, and UC-04 are all silent on whether
+re-publishing an INACTIVE template is permitted. The behavior is by omission, not by
+explicit design.
+
+Reason:
+The acceptance criterion ("alterar modelo já utilizado → nova versão criada") is silent
+on INACTIVE. Adding a guard without a documented requirement would be speculative.
+
+Alternatives considered:
+Add `if (template.getStatus() == INACTIVE) { throw ... }` — rejected because no
+requirement mandates it; deferred until product explicitly prohibits it.
+
+Impact:
+If in the future it is decided that INACTIVE templates must not be re-published, add
+the guard in `TemplateService.publish()` and a test for the 422 response.
+
+Status:
+ACTIVE (pending product clarification if INACTIVE re-publish should be blocked)
+
+---
+
+### [2026-09-27] — BF-001: TemplateVersionControllerIT has same FK ordering risk as InspectionTemplateControllerIT
+
+Context:
+`InspectionTemplateControllerIT.setUp()` was updated (BF-001) to use
+`jdbcTemplate.execute("TRUNCATE TABLE inspection_template_versions CASCADE")` to avoid
+FK violations when inspection-creating IT classes leave data behind. The same risk exists
+in `TemplateVersionControllerIT.setUp()` (which uses `versionRepository.deleteAll()` first
+without the cascade truncation). The fix was not applied to `TemplateVersionControllerIT`
+because it is outside BF-001 scope and the class has been passing in isolation.
+
+Decision:
+Defer the fix to `TemplateVersionControllerIT` to a dedicated test-hygiene task.
+
+Reason:
+BF-001 scope discipline — only the file modified by this BF should be corrected here.
+`TemplateVersionControllerIT` has been passing in practice (7/7 GREEN); the FK violation
+would only manifest in full `./mvnw verify` if an inspection-creating IT class runs just
+before it.
+
+Impact:
+If `./mvnw verify` non-deterministically fails with FK violations in
+`TemplateVersionControllerIT.setUp()`, apply the same TRUNCATE CASCADE pattern used in
+`InspectionTemplateControllerIT`.
+
+Status:
+ACTIVE (known risk, deferred)
+
+---
+
 ### [2026-09-26] — Integração ECC × FieldOps: papel, perfil e governança
 
 Context:

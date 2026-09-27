@@ -19,30 +19,39 @@ tracked task waiting to be picked up deliberately.
 
 ## BF-001 — Template Versioning
 
-Status: PENDING
+Status: DONE
 
 Description:
-Allow publishing a new version of a template that already has an `ACTIVE`
-version. Currently `TemplateService.update()`/`publish()` require
-`status == DRAFT` and there is no path back to `DRAFT` or forward to a new
-version from `ACTIVE`.
+`POST /inspection-templates/{id}/publish` now works for templates in any status
+(not only `DRAFT`). Calling it on an `ACTIVE` template creates a new version
+with an auto-incremented `versionNumber`, deactivates all previous active
+versions (`activeForNewInspections = false`), and keeps the template `ACTIVE`.
+Concurrent publish attempts are guarded by the existing `@Version` column on
+`InspectionTemplate` — a concurrent call receives 409 instead of 500.
 
 Source:
 Backend audit — 2026-09-22 (`project-state/backend-audit.md`, 🔴 #1).
-Requirements: RN-018, RN-019, RN-020, RN-022; `casos-de-uso.md` UC-04/UC-05;
-`criterios-de-aceitacao.md` §17.5.
+Requirements: RN-019, RN-020; `casos-de-uso.md` UC-04; `criterios-de-aceitacao.md` §17.5.
 
-Dependencies:
-Product decision on the mechanism (reopen the same `InspectionTemplate` for a
-new draft cycle? new endpoint `POST /inspection-templates/{id}/versions/draft`?).
-To be determined from documentation and code analysis before implementation.
+Implementation (2026-09-27):
+- `TemplateService.publish()`: removed `status != DRAFT` guard; added deactivation
+  of previous active versions; added `ObjectOptimisticLockingFailureException` catch → 409.
+- `InspectionTemplateControllerIT`: added `JdbcTemplate` TRUNCATE CASCADE setUp (HIGH #2 fix),
+  added `TemplateVersionRepository` injection, 3 new IT tests.
 
-Relates to: BF-005 (same "reopen template for edit" redesign should likely be
-decided together).
+Open: `TemplateService.update()` still requires `DRAFT` status — metadata changes on
+ACTIVE templates are not yet unlocked (out of scope for BF-001; tracked here if needed).
+INACTIVE template re-publish behavior is undocumented — recorded in decisions.md.
 
-Validation:
-To be defined during implementation — needs a test that publishes a second
-version of an already-`ACTIVE` template (no such test exists today).
+Validation (2026-09-27):
+- `InspectionTemplateControllerIT.publishNewVersionOnActiveTemplateCreatesVersionTwo` — GREEN
+- `InspectionTemplateControllerIT.getActiveVersionAfterRepublishReturnsVersionTwo` — GREEN
+- `InspectionTemplateControllerIT.previousVersionIsDeactivatedAfterRepublish` — GREEN
+- All 17/17 `InspectionTemplateControllerIT` tests GREEN (0 regressions)
+- All 46/46 unit tests GREEN
+- All 7/7 `TemplateVersionControllerIT` tests GREEN
+
+Commit pending.
 
 ---
 

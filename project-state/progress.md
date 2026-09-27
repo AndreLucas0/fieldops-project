@@ -6,6 +6,12 @@ Last updated: 2026-09-27
 
 Backend audit completed (2026-09-22, see `project-state/backend-audit.md`).
 
+BF-001 (template versioning) implemented on 2026-09-27 — see pending-features.md.
+`POST /inspection-templates/{id}/publish` now allows re-publishing an ACTIVE template,
+creating a new version and deactivating the previous one. Concurrent publish guarded
+by existing `@Version` column → 409 instead of 500. 3/3 new IT tests GREEN, 17/17
+total `InspectionTemplateControllerIT` GREEN, 46/46 unit tests GREEN. Commit pending.
+
 The backend is not yet functionally complete relative to `./docs/**`.
 
 BF-006 (evidence upload block on APPROVED inspections) implemented on

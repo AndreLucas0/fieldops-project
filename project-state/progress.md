@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-09-26
+Last updated: 2026-09-27
 
 ## Current State
 
@@ -12,6 +12,32 @@ BF-006 (evidence upload block on APPROVED inspections) implemented on
 2026-09-26 and committed on 2026-09-27 (commit `132b2c4 feat: evidence read
 only`) — see pending-features.md for updated status. Backend now enforces
 RN-049 for both upload and delete paths.
+
+BF-002 (lock checklist responses after SUBMITTED/UNDER_REVIEW/APPROVED)
+implemented on 2026-09-27 — see pending-features.md. Guard clause added to
+`InspectionExecutionService.upsertResponse()` enforcing RN-043 + RN-082 on
+both HTTP and sync paths. `SynchronizationService.apply()` updated to handle
+`ResourceConflictException` gracefully. 3 IT tests added (SUBMITTED, UNDER_REVIEW,
+APPROVED for HTTP; APPROVED for sync). Unit tests: 46/46. IT tests: 4/4 targeted
+BF-002 tests GREEN (Docker available 2026-09-27). Full `./mvnw verify` has 4
+pre-existing failures in FlywayMigrationIT (stale version assertion) and
+InspectionTemplateControllerIT (null→boolean in publish DTO) — both unrelated to
+BF-002 and causing ~108 cascade errors in full suite. All other IT classes pass in
+isolation. Commit pending.
+
+BF-003 (persist `conformity` field on inspection responses) implemented on
+2026-09-27 — see pending-features.md. Added `String conformity` to
+`InspectionResponseCreateRequest`, `InspectionResponseSyncPayload`, and
+`InspectionResponseDto`. Wired `Conformity.valueOf()` in
+`InspectionExecutionService.upsertResponse()`. Updated
+`SynchronizationService.applyInspectionResponse()` and `toChange()` (pull path).
+Input validation: `@Pattern` on DTO + `@Valid` on controller `@RequestBody` → 400
+for invalid enum strings (ECC HIGH finding resolved). Explicit `@Mapping` added to
+`InspectionResponseMapper.toDto()` for consistency (ECC MEDIUM finding resolved).
+4 new IT tests: 3 in `InspectionResponseControllerIT` (conformity persists, null
+conformity, invalid conformity→400), 1 in `SyncPushControllerIT` (conformity
+applied via sync). Results: 46/46 unit tests, 16/16 `InspectionResponseControllerIT`
+in isolation, 10/10 `SyncPushControllerIT` in isolation. Commit pending.
 
 Persistent project memory (`CLAUDE.md` + `project-state/`) was set up on
 2026-09-22 in a dedicated, non-implementation task — see `decisions.md` for

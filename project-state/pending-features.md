@@ -48,41 +48,48 @@ version of an already-`ACTIVE` template (no such test exists today).
 
 ## BF-002 — Lock Inspection Responses After Submission/Approval
 
-Status: PENDING
+Status: DONE
 
 Description:
 Prevent changes to checklist responses once an inspection reaches
-`SUBMITTED`, `UNDER_REVIEW`, or `APPROVED`. Today `InspectionExecutionService.
-upsertResponse` never reads `inspection.getStatus()`.
+`SUBMITTED`, `UNDER_REVIEW`, or `APPROVED`. Guard clause added to
+`InspectionExecutionService.upsertResponse()`. `SynchronizationService.apply()`
+updated to catch `ResourceConflictException` and return `Outcome.rejected()`.
 
 Source:
 Backend audit — 2026-09-22 (`project-state/backend-audit.md`, 🔴 #5).
 Requirements: RN-043, RN-082.
 
-Scope:
-- direct response endpoint (`PUT /inspections/{id}/responses/{snapshotId}`, `InspectionResponseController`)
-- mobile sync flow (`SynchronizationService.applyInspectionResponse`, which reuses the same service method)
+Validation:
+- `InspectionResponseControllerIT.upsertResponseOnSubmittedInspectionReturns409` — new test, GREEN.
+- `InspectionResponseControllerIT.upsertResponseOnUnderReviewInspectionReturns409` — new test, GREEN.
+- `InspectionResponseControllerIT.upsertResponseOnApprovedInspectionReturns409` — new test, GREEN.
+- `SyncPushControllerIT.syncResponseOnApprovedInspectionIsRejected` — new test, GREEN.
+- All 46 unit tests pass.
+- IT tests run on 2026-09-27 (Docker available): 4/4 targeted BF-002 tests GREEN.
+- Full `./mvnw verify`: 4 pre-existing failures unrelated to BF-002 (see "Pre-existing IT failures"
+  below). All other IT classes pass in isolation. Commit pending.
 
-Important: a fix in `InspectionExecutionService.upsertResponse` covers both
-paths at once, but tests for **both** call sites need to be written —
-`InspectionResponseControllerIT` and `SyncPushControllerIT` currently have no
-"respond after approved/submitted" case.
-
-Impact: high — core data-integrity rule (an approved inspection's record
-should not be rewritable).
+Relates to: BF-006 (same "approved = immutable" rule category).
 
 ---
 
 ## BF-003 — Persist `conformity`
 
-Status: PENDING
+Status: DONE
 
 Description:
 The `conformity` field (used by the `CONFORMITY` response type, required in
-the MVP per `funcionalidades.md` §8.5) is never set by any client-facing
-write route (`InspectionResponseCreateRequest`, `InspectionResponseSyncPayload`
-don't include it). This also blocks validating RN-036 and RN-038, since there
-is no conformity value to validate against.
+the MVP per `funcionalidades.md` §8.5) was never set by any client-facing
+write route. Fixed 2026-09-27: added `String conformity` to
+`InspectionResponseCreateRequest`, `InspectionResponseSyncPayload`, and
+`InspectionResponseDto`; wired `Conformity.valueOf()` in
+`InspectionExecutionService.upsertResponse()`; updated
+`SynchronizationService.applyInspectionResponse()` and `toChange()` (pull
+path). Input validation added: `@Pattern` on `InspectionResponseCreateRequest.conformity`
++ `@Valid` on controller `@RequestBody` so invalid enum strings return 400
+instead of 500. Explicit `@Mapping` added to `InspectionResponseMapper.toDto()`
+for consistency with `toMobileResponseDto()`.
 
 Source:
 Backend audit — 2026-09-22 (`project-state/backend-audit.md`, 🟡 #4).
@@ -90,6 +97,14 @@ Requirements: RN-035, RN-036, RN-038; `modelo-de-dados.md` §10.8.4;
 `funcionalidades.md` §8.5.
 
 Dependencies: none technically blocking.
+
+Validation:
+- `InspectionResponseControllerIT.upsertResponseWithConformityPersistsField` — new test, GREEN.
+- `InspectionResponseControllerIT.upsertResponseWithNullConformityStoresNull` — new test, GREEN.
+- `InspectionResponseControllerIT.upsertResponseWithInvalidConformityReturns400` — new test, GREEN (HIGH finding fix).
+- `SyncPushControllerIT.syncResponseWithConformityIsAppliedAndFieldPersisted` — new test, GREEN.
+- All 46 unit tests pass. `InspectionResponseControllerIT` 16/16 in isolation. `SyncPushControllerIT` 10/10 in isolation.
+- Commit pending (user must trigger).
 
 ---
 
@@ -202,3 +217,24 @@ here only so they aren't lost:
 - QR lookup (`GET /equipment/by-qr/{qrCode}`) doesn't scope results to the technician's assigned inspection (RN-063, PEND-04) — a security-hardening item, tracked here rather than as its own BF because it's a scope/authorization refinement, not a missing feature.
 - Evidence deletion has no ownership check (any `TECHNICIAN`, not just the inspection's owner, can delete) — PEND-05, same nature as the QR item above.
 - `InspectionSpecifications` is missing several documented admin filters (`supervisorId, equipmentId, scheduledFrom/To, overdue`, text search `q`) — PEND-15.
+- `InspectionResponseController.upsertResponse()` double-loads the inspection: once in `getInspectionForTechnician()` (controller) and again in `upsertResponse()` (service). Pre-existing; identified during BF-002 review. Low priority — optimization refactor only.
+
+## Pre-existing IT failures (identified 2026-09-27, unrelated to BF-002)
+
+Two IT classes fail consistently and pre-date BF-002 work:
+
+1. **`FlywayMigrationIT.migrationsApplyCleanlyOnAnEmptyDatabase`** — asserts
+   `flyway.info().current().getVersion() == "9"` but the schema is now at v12
+   (migrations 10–12 were added after the test was written). Fix: update the
+   assertion to `"12"`. Trivial one-line change.
+
+2. **`InspectionTemplateControllerIT`** — 3 tests fail with HTTP 500 when calling
+   `POST /templates/{id}/publish`. Root cause: `JSON parse error: Cannot map null
+   into type boolean` — the publish request DTO has a primitive `boolean` field
+   that receives `null` from the test payload. Fix: change the DTO field to
+   `Boolean` (boxed) or ensure the test sends all required fields. Related to
+   BF-001/BF-005 (template publish flow).
+
+Both failures cause the full `./mvnw verify` suite to cascade-fail with ~108 errors
+because the failing contexts are shared by other IT classes. Each IT class passes
+in isolation. These should be fixed in a dedicated task before the next full IT run.

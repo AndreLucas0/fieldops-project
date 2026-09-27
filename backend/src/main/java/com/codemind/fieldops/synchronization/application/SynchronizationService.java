@@ -12,6 +12,7 @@ import com.codemind.fieldops.nonconformity.dto.NonConformityCreateRequest;
 import com.codemind.fieldops.nonconformity.dto.NonConformityUpdateRequest;
 import com.codemind.fieldops.nonconformity.repository.NonConformityRepository;
 import com.codemind.fieldops.shared.error.BusinessRuleViolationException;
+import com.codemind.fieldops.shared.error.ResourceConflictException;
 import com.codemind.fieldops.shared.error.ResourceNotFoundException;
 import com.codemind.fieldops.nonconformity.application.NonConformityService;
 import com.codemind.fieldops.synchronization.domain.SyncEntityType;
@@ -187,6 +188,8 @@ public class SynchronizationService {
                     "Evidence must be sent through the multipart upload endpoint");
             };
         } catch (ResourceNotFoundException e) {
+            return Outcome.rejected(e.getCode(), e.getMessage());
+        } catch (ResourceConflictException e) {
             return Outcome.rejected(e.getCode(), e.getMessage());
         } catch (BusinessRuleViolationException e) {
             return Outcome.rejected(e.getCode(), e.getMessage());

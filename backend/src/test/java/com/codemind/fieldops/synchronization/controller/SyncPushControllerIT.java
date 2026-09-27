@@ -396,4 +396,44 @@ class SyncPushControllerIT {
             .hasStatus(HttpStatus.UNAUTHORIZED);
     }
 
+    // ---- Lock responses via sync on APPROVED inspection (RN-082) ----
+
+    @Test
+    void syncResponseOnApprovedInspectionIsRejected() {
+        Inspection approvedInspection = inspectionRepository.save(Inspection.builder()
+            .templateVersion(activeTemplateVersion)
+            .client(testClient)
+            .site(testSite)
+            .technician(technicianUser)
+            .createdBy(technicianUser)
+            .priority(InspectionPriority.MEDIUM)
+            .status(InspectionStatus.APPROVED)
+            .scheduledFor(Instant.now().plusSeconds(3600))
+            .startedAtServer(Instant.now())
+            .build());
+
+        ItemSnapshot snapshot = itemSnapshotRepository.save(ItemSnapshot.builder()
+            .inspection(approvedInspection)
+            .sectionTitle("Section 1")
+            .sectionOrder(1)
+            .itemTitle("Item 1")
+            .responseType("BOOLEAN")
+            .required(false)
+            .itemOrder(1)
+            .build());
+
+        String operationId = UUID.randomUUID().toString();
+        String payload = pushPayload(operationId, "INSPECTION_RESPONSE", snapshot.getId().toString(), "UPSERT", "null",
+            """
+            {"inspectionId": "%s", "valueBoolean": true}""".formatted(approvedInspection.getId()));
+
+        assertThat(mvc.post().uri("/mobile/sync/push")
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.results[0].status").asString().isEqualTo("REJECTED");
+    }
+
 }

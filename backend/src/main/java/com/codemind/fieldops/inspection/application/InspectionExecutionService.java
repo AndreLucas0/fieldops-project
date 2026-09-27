@@ -11,6 +11,7 @@ import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
 import com.codemind.fieldops.shared.audit.AuditEventPublisher;
 import com.codemind.fieldops.shared.error.BusinessRuleViolationException;
+import com.codemind.fieldops.shared.error.ResourceConflictException;
 import com.codemind.fieldops.shared.error.ResourceNotFoundException;
 import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.repository.UserRepository;
@@ -34,6 +35,7 @@ public class InspectionExecutionService {
     private static final String INSPECTION_CANNOT_BE_STARTED_CODE = "INSPECTION_CANNOT_BE_STARTED";
     private static final String INSPECTION_CANNOT_BE_SUBMITTED_CODE = "INSPECTION_CANNOT_BE_SUBMITTED";
     private static final String MISSING_REQUIRED_RESPONSES_CODE = "MISSING_REQUIRED_RESPONSES";
+    private static final String INSPECTION_RESPONSE_LOCKED_CODE = "INSPECTION_RESPONSE_LOCKED";
 
     private final InspectionRepository inspectionRepository;
     private final ItemSnapshotRepository itemSnapshotRepository;
@@ -142,10 +144,21 @@ public class InspectionExecutionService {
         return metadata;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = ResourceConflictException.class)
     public InspectionResponse upsertResponse(UUID inspectionId, UUID snapshotId, UUID respondedByUserId,
                                               InspectionResponseCreateRequest request) {
         Inspection inspection = getInspection(inspectionId);
+
+        // RN-043: responses locked after SUBMITTED; RN-082: locked after APPROVED.
+        // UNDER_REVIEW is the intermediate state between SUBMITTED and APPROVED/REJECTED.
+        // noRollbackFor prevents marking the caller's transaction rollback-only when sync
+        // catches this exception (processOne uses REQUIRES_NEW and calls this via join).
+        if (inspection.getStatus() == InspectionStatus.SUBMITTED
+                || inspection.getStatus() == InspectionStatus.UNDER_REVIEW
+                || inspection.getStatus() == InspectionStatus.APPROVED) {
+            throw new ResourceConflictException(INSPECTION_RESPONSE_LOCKED_CODE,
+                "Inspection responses are locked once the inspection has been submitted for review or approved");
+        }
 
         ItemSnapshot snapshot = itemSnapshotRepository.findById(snapshotId)
             .orElseThrow(() -> new ResourceNotFoundException(SNAPSHOT_NOT_FOUND_CODE, "Snapshot not found"));

@@ -149,23 +149,39 @@ Commit pending.
 
 ## BF-005 — Template Versions and Sections Endpoints
 
-Status: PENDING
+Status: PARTIAL
 
 Description:
-Implement the endpoints for:
-- listing/reading published template versions: `GET /inspection-templates/{id}/versions`, `GET /inspection-template-versions/{versionId}`
-- incremental section/item builder: `POST/PUT .../sections`, `POST/PUT .../sections/{id}/items`
+Read endpoints implemented on 2026-09-27 (partial):
+- `GET /inspection-templates/{id}/versions` → `PageResponse<TemplateVersionResponse>` — paginated, ordered by version_number DESC
+- `GET /inspection-template-versions/{versionId}` → `TemplateVersionResponse` (with sections/items)
+- `TemplateController` now responds at BOTH `/templates/*` AND `/inspection-templates/*` (dual mapping) to match the web client's API calls (`resources.ts`)
+- Pre-req fixes: `FlywayMigrationIT` version assertion "9" → "12"; `TemplateItemRequest` 3 `boolean` fields → `Boolean` (boxed)
+
+Still pending:
+- Section/item builder endpoints (`POST/PUT .../sections`, `POST/PUT .../sections/{id}/items`) — blocked by data model decision: draft sections have no storage location (`TemplateSection` belongs to `TemplateVersion`, not `InspectionTemplate`; see `decisions.md` 2026-09-27)
 
 Source:
 Backend audit — 2026-09-22 (`project-state/backend-audit.md`, 🔴 #2 and #3).
-Requirements: RN-020, RN-022, `api-rest.md` §12.9.
+Requirements: RN-019, RN-020, RN-022, `api-rest.md` §12.9.
 
-Dependencies:
-- Version listing depends on BF-001 to have more than one version to actually list (the read endpoint itself can technically be built today against `TemplateVersionRepository`, which already supports multiple versions in the data model).
-- Section/item endpoints have no technical dependency — additive to the current `TemplateController`.
+Validation (2026-09-27):
+- 7/7 IT tests GREEN (`TemplateVersionControllerIT`): adminCanListVersions(200), supervisorCanListVersions(200), technicianCannotListVersions(403), listVersionsForNonExistentTemplate(404), adminCanGetVersionDetail(200), technicianCannotGetVersionDetail(403), versionDetailNotFound(404)
+- 46/46 unit tests GREEN (no regressions)
+- ECC java-reviewer: 0 CRITICAL, 3 HIGH — 2 were not real issues (annotation present, open-in-view is pre-existing codebase pattern); 1 N+1 recorded in `decisions.md` for future sprint; 2 MEDIUM findings fixed (sort validation + technician-403 test for detail endpoint)
 
-Impact: the web already assumes this contract (`resources.ts:239-250`) — the
-model builder/versions screens don't work against the real backend without it.
+New files:
+- `template/controller/InspectionTemplateVersionController.java` — `GET /inspection-template-versions/{versionId}`
+- `template/controller/TemplateVersionControllerIT.java` (test)
+
+Modified files:
+- `template/controller/TemplateController.java` — dual mapping `{"/templates", "/inspection-templates"}`, added `GET /{id}/versions` with sort validation
+- `template/application/TemplateService.java` — added `listVersions()`, `getVersion()`
+- `template/repository/TemplateVersionRepository.java` — added `findByTemplateIdOrderByVersionNumberDesc(UUID, Pageable)`
+- `shared/FlywayMigrationIT.java` — version assertion "9" → "12"
+- `template/dto/TemplateItemRequest.java` — `boolean` → `Boolean` (3 fields)
+
+Commit pending.
 
 ---
 

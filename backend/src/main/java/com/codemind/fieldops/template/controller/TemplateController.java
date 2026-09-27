@@ -33,10 +33,11 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/templates")
+@RequestMapping({"/templates", "/inspection-templates"})
 public class TemplateController {
 
     private static final Set<String> SORTABLE_FIELDS = Set.of("title", "category", "status", "createdAt");
+    private static final Set<String> VERSION_SORTABLE_FIELDS = Set.of("versionNumber", "publishedAt", "createdAt");
 
     private final TemplateService templateService;
     private final TemplateMapper templateMapper;
@@ -95,6 +96,15 @@ public class TemplateController {
     public TemplateVersionResponse getActiveVersion(@PathVariable UUID id) {
         TemplateVersion version = templateService.getActiveVersion(id);
         return templateMapper.toVersionResponse(version);
+    }
+
+    @GetMapping("/{id}/versions")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public PageResponse<TemplateVersionResponse> listVersions(@PathVariable UUID id,
+                                                              @PageableDefault(size = 20) Pageable pageable) {
+        SortFieldValidator.validate(pageable.getSort(), VERSION_SORTABLE_FIELDS);
+        Page<TemplateVersion> versions = templateService.listVersions(id, pageable);
+        return PageResponse.from(versions.map(templateMapper::toVersionResponse));
     }
 
 }

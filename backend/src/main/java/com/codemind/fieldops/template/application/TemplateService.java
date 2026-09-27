@@ -71,6 +71,22 @@ public class TemplateService {
         return version;
     }
 
+    @Transactional(readOnly = true)
+    public Page<TemplateVersion> listVersions(UUID templateId, Pageable pageable) {
+        getById(templateId);
+        Page<TemplateVersion> versions = versionRepository.findByTemplateIdOrderByVersionNumberDesc(templateId, pageable);
+        versions.forEach(v -> v.getSections().forEach(s -> s.getItems().size()));
+        return versions;
+    }
+
+    @Transactional(readOnly = true)
+    public TemplateVersion getVersion(UUID versionId) {
+        TemplateVersion version = versionRepository.findById(versionId)
+            .orElseThrow(() -> new ResourceNotFoundException("TEMPLATE_VERSION_NOT_FOUND", "Template version not found"));
+        version.getSections().forEach(s -> s.getItems().size());
+        return version;
+    }
+
     @Transactional
     public InspectionTemplate create(UUID createdByUserId, TemplateCreateRequest request) {
         User createdBy = userRepository.findById(createdByUserId)

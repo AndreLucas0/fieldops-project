@@ -25,6 +25,15 @@ InspectionTemplateControllerIT (null→boolean in publish DTO) — both unrelate
 BF-002 and causing ~108 cascade errors in full suite. All other IT classes pass in
 isolation. Commit pending.
 
+BF-005 (template version read endpoints, partial) implemented on 2026-09-27 —
+see pending-features.md for updated status. `GET /inspection-templates/{id}/versions`
+and `GET /inspection-template-versions/{versionId}` implemented. `TemplateController`
+now dual-mapped at `/templates/*` and `/inspection-templates/*`. Pre-req fixes:
+`FlywayMigrationIT` version assertion, `TemplateItemRequest` boolean → Boolean.
+7/7 IT + 46/46 unit GREEN. ECC: 0 CRITICAL, 0 unfixed HIGH, 2 MEDIUM fixed.
+Section/item builder BLOCKED (data model decision pending — see decisions.md).
+Commit pending.
+
 BF-004 (dashboard + inspection history endpoints) implemented on 2026-09-27 —
 see pending-features.md. `DashboardController` (`/summary`, `/inspections-by-status`,
 `/non-conformities-by-severity`) and `GET /inspections/{id}/history` all GREEN.

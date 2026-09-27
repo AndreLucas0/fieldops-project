@@ -61,6 +61,72 @@ ACTIVE
 
 ---
 
+### [2026-09-27] — BF-005: Section/item builder blocked by data model gap
+
+Context:
+`TemplateSection` belongs to `TemplateVersion` (FK `template_version_id`), not
+to `InspectionTemplate`. A section/item builder needs somewhere to store draft
+sections before publish. There is no "draft sections" table — any section
+written must be attached to a version, but a version is only created at publish
+time. The current publish flow (`POST /templates/{id}/publish`) receives all
+sections in one batch inside the publish request body.
+
+Decision:
+Defer section/item builder endpoints (`POST/PUT .../sections`, etc.) until a
+product decision is made on the mechanism. Two options:
+(a) Add a `draft_sections` table or shadow `template_sections` rows flagged
+    `draft = true` attached to the `InspectionTemplate` directly.
+(b) Introduce a `POST /inspection-templates/{id}/versions/draft` endpoint that
+    creates a `TemplateVersion` in `DRAFT` status, allowing sections to be
+    attached incrementally before a final `PUBLISH` action promotes it to
+    `ACTIVE`.
+
+Reason:
+Implementing the builder before the data model is resolved risks creating a
+DB migration that has to be reversed. This is a product architecture decision,
+not a coding decision.
+
+Alternatives considered:
+Reuse the publish payload approach (already in `PublishTemplateRequest`). This
+doesn't require new endpoints but changes the UX pattern from incremental-build
+to batch-submit.
+
+Impact:
+BF-005 status remains PARTIAL. The web's `listDraftSections`, `createSection`,
+`updateSection`, `createItem`, `updateItem` calls (`resources.ts`) will return
+404 until this is resolved.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-27] — N+1 lazy-init pattern in TemplateService (pre-existing, deferred)
+
+Context:
+`TemplateService.listVersions()` and `getActiveVersion()` initialize lazy
+section/item collections within the transaction by calling `.size()` in a loop:
+```java
+versions.forEach(v -> v.getSections().forEach(s -> s.getItems().size()));
+```
+For `listVersions` this is 1 + (page_size * N_sections) + (page_size * N_sections * N_items)
+queries per request — a two-level N+1. For `getActiveVersion` and `getVersion`
+(single version), the N+1 is bounded and low-risk in practice.
+The `findByIdWithSectionsAndItems` pre-existing query causes `MultipleBagFetchException`
+(JOIN FETCH two `@OneToMany` simultaneously), so `findById()` + lazy init was used.
+
+Decision:
+Accept the N+1 pattern for this sprint. Fixing requires `@EntityGraph` (sections
+only) + a second IN-batch query for items. Belongs in a dedicated performance sprint.
+
+Reason:
+Template versions are low-volume (typically 1–10 per template). Impact is minimal.
+
+Status:
+ACTIVE (pending performance sprint)
+
+---
+
 The entries below are decisions already recorded in `ESTADO-DO-PROJETO.md`
 §11 (dated 2026-08-18, web/mobile side) prior to this persistence mechanism
 being set up. They are reproduced here, not invented, so they survive even

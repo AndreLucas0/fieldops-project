@@ -4,6 +4,8 @@ import com.codemind.fieldops.template.domain.TemplateVersion;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +14,8 @@ public interface TemplateVersionRepository extends JpaRepository<TemplateVersion
 
     @Query("SELECT MAX(tv.versionNumber) FROM TemplateVersion tv WHERE tv.template.id = :templateId")
     Optional<Integer> findMaxVersionNumberByTemplateId(@Param("templateId") UUID templateId);
+
+    Page<TemplateVersion> findByTemplateIdOrderByVersionNumberDesc(UUID templateId, Pageable pageable);
 
     @Query("SELECT tv FROM TemplateVersion tv WHERE tv.template.id = :templateId AND tv.activeForNewInspections = true ORDER BY tv.versionNumber DESC")
     List<TemplateVersion> findActiveVersionsByTemplateId(@Param("templateId") UUID templateId);

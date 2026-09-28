@@ -10,6 +10,11 @@ import com.codemind.fieldops.client.dto.ClientUpdateRequest;
 import com.codemind.fieldops.client.mapper.ClientMapper;
 import com.codemind.fieldops.shared.pagination.PageResponse;
 import com.codemind.fieldops.shared.pagination.SortFieldValidator;
+import com.codemind.fieldops.site.application.SiteService;
+import com.codemind.fieldops.site.domain.InspectionSite;
+import com.codemind.fieldops.site.domain.SiteStatus;
+import com.codemind.fieldops.site.dto.SiteResponse;
+import com.codemind.fieldops.site.mapper.SiteMapper;
 import jakarta.validation.Valid;
 import java.util.Set;
 import java.util.UUID;
@@ -37,10 +42,15 @@ public class ClientController {
 
     private final ClientService clientService;
     private final ClientMapper clientMapper;
+    private final SiteService siteService;
+    private final SiteMapper siteMapper;
 
-    public ClientController(ClientService clientService, ClientMapper clientMapper) {
+    public ClientController(ClientService clientService, ClientMapper clientMapper,
+            SiteService siteService, SiteMapper siteMapper) {
         this.clientService = clientService;
         this.clientMapper = clientMapper;
+        this.siteService = siteService;
+        this.siteMapper = siteMapper;
     }
 
     @GetMapping
@@ -77,6 +87,17 @@ public class ClientController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public ClientResponse updateStatus(@PathVariable UUID id, @Valid @RequestBody ClientStatusUpdateRequest request) {
         return clientMapper.toResponse(clientService.updateStatus(id, request.status()));
+    }
+
+    @GetMapping("/{clientId}/sites")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public PageResponse<SiteResponse> listClientSites(
+            @PathVariable UUID clientId,
+            @RequestParam(required = false) SiteStatus status,
+            @PageableDefault(size = 20) Pageable pageable) {
+        clientService.getById(clientId);
+        Page<InspectionSite> sites = siteService.list(clientId, null, status, pageable);
+        return PageResponse.from(sites.map(siteMapper::toResponse));
     }
 
 }

@@ -20,7 +20,7 @@ public interface TemplateVersionRepository extends JpaRepository<TemplateVersion
     @Query("SELECT tv FROM TemplateVersion tv WHERE tv.template.id = :templateId AND tv.activeForNewInspections = true ORDER BY tv.versionNumber DESC")
     List<TemplateVersion> findActiveVersionsByTemplateId(@Param("templateId") UUID templateId);
 
-    @Query("SELECT tv FROM TemplateVersion tv LEFT JOIN FETCH tv.sections s LEFT JOIN FETCH s.items WHERE tv.id = :id")
+    @Query("SELECT tv FROM TemplateVersion tv LEFT JOIN FETCH tv.sections WHERE tv.id = :id")
     Optional<TemplateVersion> findByIdWithSectionsAndItems(@Param("id") UUID id);
 
 }

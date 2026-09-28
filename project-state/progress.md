@@ -48,6 +48,43 @@ Pre-req fixes: `FlywayMigrationIT` version assertion + `TemplateItemRequest` boo
 7/7 IT tests GREEN. Section/item builder ainda **BLOQUEADO** — decisão de produto pendente
 sobre armazenamento de seções draft (ver `decisions.md` 2026-09-27).
 
+### NESTED-NAV — Nested Navigation Endpoints — não commitado ainda
+
+`GET /clients/{clientId}/sites` e `GET /sites/{siteId}/equipment` implementados
+(openapi.yaml §12.7, §12.8; web client `resources.ts` linhas 214/235 chamavam
+esses endpoints e recebiam 404).
+
+Abordagem: endpoints adicionados diretamente em `ClientController` e
+`SiteController` respectivamente. Cada endpoint valida existência do pai
+(`clientService.getById` / `siteService.getById`) retornando 404 se não
+encontrado, depois delega ao `SiteService.list` / `EquipmentService.list`
+já existentes. Sem nova migration ou novo service.
+
+16/16 `ClientControllerIT` GREEN (incluindo 4 novos testes da rota nested).
+17/17 `SiteControllerIT` GREEN (incluindo 4 novos testes da rota nested).
+13/13 `EquipmentControllerIT` GREEN. 46/46 unit tests GREEN.
+
+Pre-existing full-suite ordering failures (não relacionadas a esta BF):
+`EquipmentControllerIT` + `SiteControllerIT` falham no `./mvnw verify` completo
+por FK ordering entre IT classes (ver `decisions.md` 2026-09-27 — ITORDER-001).
+Todos passam em isolamento e em grupos de classes relacionadas.
+
+### PEND-15 — Admin Filters on `GET /inspections` — não commitado ainda
+
+5 filtros documentados no `openapi.yaml` adicionados a `GET /inspections`:
+`supervisorId` (UUID), `equipmentId` (UUID), `scheduledFrom` (Instant),
+`scheduledTo` (Instant), `overdue` (Boolean). Sem migration necessária — todos
+os campos já existiam na entidade `Inspection`.
+
+Side-fix: `MultipleBagFetchException` pré-existente em `POST /inspections`
+corrigida como bloqueador de teste: removido `LEFT JOIN FETCH s.items` da query
+`TemplateVersionRepository.findByIdWithSectionsAndItems`; adicionado
+`@BatchSize(size=50)` em `TemplateSection.items`.
+
+19/19 `InspectionSchedulingControllerIT` GREEN (incluindo 6 novos testes dos filtros
++ 2 novos testes de overdue). 52/52 nos 4 inspection IT classes. 24/24 nos template IT
+classes. 0 regressões.
+
 ### BF-006 — Evidence Read-Only After Approval — commitado `132b2c4` (em `main`)
 
 Guard clause em `EvidenceService.upload()` bloqueia uploads em inspeções `APPROVED`

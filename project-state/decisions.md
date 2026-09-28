@@ -107,6 +107,41 @@ ACTIVE
 
 ---
 
+### [2026-09-27] — ITORDER-001: Pre-existing full-suite IT ordering failures
+
+Context:
+Running `./mvnw verify` (all IT classes in sequence) produces FK violations in
+three test classes when a previous class leaves records referencing shared tables.
+Observed failures:
+- `EquipmentControllerIT.setUp()`: `inspection_templates_created_by_fkey` FK
+  violation when `userRepository.deleteAll()` runs after `InspectionTemplateControllerIT`
+  left templates with `created_by` pointing to users.
+- `SiteControllerIT.setUp()`: same `inspection_templates_created_by_fkey` FK
+  violation caused by `InspectionSchedulingControllerIT` leaving templates in DB.
+- `MobileInspectionControllerIT`: 2 assertion failures even in isolation (pre-existing
+  test logic issue unrelated to ordering).
+
+Decision:
+Accept as known limitations. All affected classes pass in isolation and in
+sub-group runs. Do not use `./mvnw verify` alone as the pass/fail gate —
+use targeted isolation runs for classes under development.
+
+Reason:
+Fixing requires adding `JdbcTemplate` TRUNCATE CASCADE to each affected setUp().
+This is orthogonal to current BF work; tracked here for a dedicated cleanup task.
+
+Alternatives considered:
+Shared `@BeforeAll` with full-schema TRUNCATE CASCADE — rejected as too broad.
+
+Impact:
+Full `./mvnw verify` shows false negatives for `EquipmentControllerIT` and
+`SiteControllerIT`. CI should use targeted per-package IT runs.
+
+Status:
+ACTIVE (pending cleanup task)
+
+---
+
 ### [2026-09-27] — BF-005: Section/item builder blocked by data model gap
 
 Context:
@@ -494,6 +529,44 @@ desativado (`enabled: false`). Nenhum instinct existe para FieldOps (project
 ID homunculus: 957db2ab6df0). ECC_HOOK_PROFILE não precisa ser definida
 explicitamente: `hook-flags.js` resolve para `standard` por código quando a
 variável não está no ambiente.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-27] — MultipleBagFetchException em TemplateVersionRepository
+
+Context:
+`InspectionService.create()` chamava `findByIdWithSectionsAndItems` com JPQL
+`LEFT JOIN FETCH tv.sections s LEFT JOIN FETCH s.items`. Hibernate 7.4.1
+rejeita o fetch simultâneo de dois `List` (bags) → `MultipleBagFetchException`
+→ 500 em todos os testes que criam inspeções. Bug pré-existente; não havia sido
+detectado pois os IT tests também falhavam antes dessa sessão por outras razões.
+
+Decision:
+Remover `LEFT JOIN FETCH s.items` da query. Carregar `sections` via JOIN FETCH
+(única bag). Adicionar `@BatchSize(size=50)` em `TemplateSection.items` para
+que Hibernate carregue os itens em batch query separado quando acessados
+(evita N+1 sem cartesian product).
+
+Reason:
+Mudança mínima que não altera tipos de coleção (`List` permanece), não requer
+migração de dados, e resolve a exceção completamente. Para templates típicos
+(≤ 20 sections × ≤ 30 items), o batch loading é inexpressivo em termos de
+latência.
+
+Alternatives considered:
+- Mudar `List<TemplateSection>` para `Set<TemplateSection>` no `TemplateVersion`
+  (fix canônico Hibernate): rejeitado por ser mais invasivo — requer atualização
+  de todos os callers de `setSections()` em tests.
+- `@Fetch(FetchMode.SUBSELECT)`: equivalente ao BatchSize mas menos explícito
+  sobre o tamanho do lote.
+
+Impact:
+`TemplateSection.items` agora usa batch loading em vez de JOIN FETCH. Para
+templates com muitas seções, Hibernate emite `CEIL(sections / 50)` queries
+adicionais. Aceitável para o volume esperado no projeto.
 
 Status:
 ACTIVE

@@ -8,6 +8,9 @@ import com.codemind.fieldops.client.domain.Client;
 import com.codemind.fieldops.client.domain.ClientStatus;
 import com.codemind.fieldops.client.repository.ClientRepository;
 import com.codemind.fieldops.shared.security.JwtClaims;
+import com.codemind.fieldops.site.domain.InspectionSite;
+import com.codemind.fieldops.site.domain.SiteStatus;
+import com.codemind.fieldops.site.repository.InspectionSiteRepository;
 import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.domain.UserRole;
 import com.codemind.fieldops.user.domain.UserStatus;
@@ -52,6 +55,9 @@ class ClientControllerIT {
     @Autowired
     private JwtEncoder jwtEncoder;
 
+    @Autowired
+    private InspectionSiteRepository siteRepository;
+
     private User adminUser;
     private User supervisorUser;
     private User technicianUser;
@@ -61,6 +67,7 @@ class ClientControllerIT {
 
     @BeforeEach
     void setUp() {
+        siteRepository.deleteAll();
         clientRepository.deleteAll();
         userRepository.deleteAll();
         adminUser = userRepository.save(newUser("Admin User", "admin.client@fieldops.local", UserRole.ADMIN));
@@ -103,6 +110,14 @@ class ClientControllerIT {
         return clientRepository.save(Client.builder()
             .name(name)
             .status(ClientStatus.ACTIVE)
+            .build());
+    }
+
+    private InspectionSite saveSite(String name, Client client) {
+        return siteRepository.save(InspectionSite.builder()
+            .client(client)
+            .name(name)
+            .status(SiteStatus.ACTIVE)
             .build());
     }
 
@@ -232,6 +247,50 @@ class ClientControllerIT {
         assertThat(result).bodyJson().hasPath("$.id");
         assertThat(result).bodyJson().hasPath("$.name");
         assertThat(result).bodyJson().hasPath("$.status");
+    }
+
+    @Test
+    void adminCanListSitesByClient() {
+        Client client = saveClient("Site List Client");
+        saveSite("Site Alpha", client);
+        saveSite("Site Beta", client);
+
+        assertThat(mvc.get().uri("/clients/" + client.getId() + "/sites")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content").asList().hasSize(2);
+    }
+
+    @Test
+    void technicianCannotListClientSites() {
+        Client client = saveClient("Forbidden Client");
+
+        assertThat(mvc.get().uri("/clients/" + client.getId() + "/sites")
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatus(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void listSitesForNonExistentClientReturnsNotFound() {
+        assertThat(mvc.get().uri("/clients/" + UUID.randomUUID() + "/sites")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatus(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void listClientSitesOnlyReturnsSitesForThatClient() {
+        Client clientA = saveClient("Client Alpha");
+        Client clientB = saveClient("Client Beta");
+        saveSite("Site for Alpha", clientA);
+        saveSite("Site for Beta", clientB);
+
+        assertThat(mvc.get().uri("/clients/" + clientA.getId() + "/sites")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content[*].clientId").asList()
+            .containsOnly(clientA.getId().toString());
     }
 
 }

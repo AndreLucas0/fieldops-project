@@ -86,13 +86,21 @@ public class InspectionService {
     @Transactional(readOnly = true)
     public Page<Inspection> list(UUID clientId, UUID siteId, UUID technicianId,
                                   InspectionStatus status, InspectionPriority priority,
+                                  UUID supervisorId, UUID equipmentId,
+                                  Instant scheduledFrom, Instant scheduledTo,
+                                  Boolean overdue,
                                   Pageable pageable) {
         Specification<Inspection> specification = Specification
             .where(InspectionSpecifications.hasClientId(clientId))
             .and(InspectionSpecifications.hasSiteId(siteId))
             .and(InspectionSpecifications.hasTechnicianId(technicianId))
             .and(InspectionSpecifications.hasStatus(status))
-            .and(InspectionSpecifications.hasPriority(priority));
+            .and(InspectionSpecifications.hasPriority(priority))
+            .and(InspectionSpecifications.hasSupervisorId(supervisorId))
+            .and(InspectionSpecifications.hasEquipmentId(equipmentId))
+            .and(InspectionSpecifications.scheduledFrom(scheduledFrom))
+            .and(InspectionSpecifications.scheduledTo(scheduledTo))
+            .and(InspectionSpecifications.isOverdue(overdue));
         return inspectionRepository.findAll(specification, pageable);
     }
 

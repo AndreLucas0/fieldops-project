@@ -208,6 +208,75 @@ ACTIVE (pending performance sprint)
 
 ---
 
+### [2026-09-28] — PEND-04: QR scope non-terminal statuses (RN-063)
+
+Context:
+`EquipmentService.getByQrCode()` (PEND-04) blocks TECHNICIAN access to equipment
+unless they have a non-terminal inspection for the equipment's site.
+`TERMINAL_STATUSES = {APPROVED, REJECTED, CANCELED}`. The ECC reviewer (H-02)
+raised whether `SUBMITTED` and `UNDER_REVIEW` should also be terminal.
+
+Decision:
+Treat `SUBMITTED` and `UNDER_REVIEW` as **non-terminal** for the QR scope check.
+Technicians retain access during the review phase.
+
+Reason:
+The technician may need to return to the site during supervisor review (e.g.,
+to provide clarifying evidence). Revoking mobile access at submit would block
+legitimate re-visits. `contrato-backend-frontend.md` PEND-04 marks the scope
+boundary as `[A DEFINIR]`; this decision fills the gap.
+
+Impact:
+Scope revoked only when inspection reaches `APPROVED`, `REJECTED`, or `CANCELED`.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-28] — PEND-04: AccessDeniedException from service layer (H-01 ECC)
+
+Context:
+`EquipmentService.getByQrCode()` throws `AccessDeniedException` from inside a
+`@Transactional(readOnly = true)` service method. ECC reviewer raised that this
+creates implicit coupling between `GlobalExceptionHandler.handleAccessDenied`
+(MVC dispatch path) and `JsonAccessDeniedHandler` (filter-chain path).
+
+Decision:
+Accept the pattern. Identical to `EvidenceService.delete()` (PEND-05).
+Both handlers produce the same JSON shape (403/FORBIDDEN).
+
+Reason:
+Changing requires a new exception class + `GlobalExceptionHandler` handler —
+out of scope for PEND-04. Integration test confirms the correct 403 response.
+
+Impact:
+Consistent with existing codebase patterns. Low risk while both handlers remain
+aligned.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-28] — PEND-04: Missing @Size on @PathVariable qrCode (H-03 ECC)
+
+Context:
+`GET /equipment/by-qr/{qrCode}` accepts an unconstrained String path variable.
+DB column is `VARCHAR(100)`. No SQL injection risk (parameterized). Adding
+`@Size(max=100)` with `@Validated` requires a `ConstraintViolationException`
+handler in `GlobalExceptionHandler` (absent). Codebase-wide gap — all
+`@PathVariable String` parameters lack constraints.
+
+Decision:
+Defer to a dedicated input-hardening sprint. Add `ConstraintViolationException`
+handler + `@Size` annotations across all String @PathVariable endpoints together.
+
+Status:
+ACTIVE (deferred)
+
+---
+
 The entries below are decisions already recorded in `ESTADO-DO-PROJETO.md`
 §11 (dated 2026-08-18, web/mobile side) prior to this persistence mechanism
 being set up. They are reproduced here, not invented, so they survive even

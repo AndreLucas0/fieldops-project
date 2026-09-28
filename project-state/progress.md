@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-09-28
+Last updated: 2026-09-28 (PEND-04)
 
 ## Current State
 
@@ -85,6 +85,42 @@ corrigida como bloqueador de teste: removido `LEFT JOIN FETCH s.items` da query
 + 2 novos testes de overdue). 52/52 nos 4 inspection IT classes. 24/24 nos template IT
 classes. 0 regressões.
 
+### PEND-04 — QR Lookup Scope (RN-063) — não commitado ainda
+
+`GET /equipment/by-qr/{qrCode}` now enforces RN-063: a TECHNICIAN can only read
+equipment data if they have a non-terminal inspection assigned to that equipment's
+site. ADMIN and SUPERVISOR are unrestricted.
+
+Scope definition: non-terminal = any status except APPROVED, REJECTED, CANCELED
+(see `decisions.md` 2026-09-28 for the SUBMITTED/UNDER_REVIEW rationale).
+
+Implementation:
+- `InspectionRepository` — `existsByTechnicianIdAndSiteIdAndStatusNotIn()`
+- `EquipmentService.getByQrCode()` — new params `(UUID userId, boolean isTechnician)`,
+  scope check via repository query, `AccessDeniedException` → 403 if out of scope
+- `EquipmentController.getByQrCode()` — extracts JWT claims, passes to service
+- `EquipmentControllerIT` — added `@AfterEach` tearDown (cross-class FK fix),
+  renamed `technicianCanGetEquipmentByQrCode` → `technicianCannotGetEquipmentByQrCodeOutOfScope`
+  (now expects 403), added `technicianCanGetEquipmentByQrCodeWithActiveInspection` (200),
+  added `technicianCannotGetEquipmentByQrCodeFromDifferentSite` (403)
+- `EquipmentServiceTest` — new unit test class (4 tests for scope logic)
+
+ECC java-reviewer results: 0 CRITICAL, 3 HIGH — all resolved:
+  - H-01 (AccessDeniedException from service): accepted, matches PEND-05 pattern (decisions.md)
+  - H-02 (SUBMITTED/UNDER_REVIEW scope): explicit decision recorded (decisions.md)
+  - H-03 (@Size on @PathVariable): deferred, codebase-wide gap (decisions.md)
+4 MEDIUM findings: M-02 fixed (EquipmentServiceTest), M-03 fixed (different-site test),
+M-01 and M-04 documented/deferred.
+
+Test results:
+- EquipmentControllerIT: 15/15 GREEN (3 new PEND-04 tests)
+- EquipmentControllerIT + SiteControllerIT: 31/31 GREEN (@AfterEach fixed cross-class FK)
+- Unit tests: 50/50 GREEN (4 new in EquipmentServiceTest)
+- InspectionSchedulingControllerIT + SiteControllerIT: pre-existing ITORDER-001 failure,
+  not caused by PEND-04
+
+---
+
 ### PEND-05 — Evidence Deletion Ownership — não commitado ainda
 
 Guard de ownership adicionado a `EvidenceService.delete()`: TECHNICIAN só pode deletar
@@ -158,9 +194,10 @@ Ver `project-state/pending-features.md` para detalhe de cada item.
 Itens ainda pendentes:
 - **BF-005** (PARTIAL/BLOCKED) — section/item builder endpoints aguardam decisão de produto
 - **BF-007** (PENDING) — integração mobile sync; tarefa do lado mobile, não backend
-- **Divergências menores** (não BF) — PEND-04 (QR scope)
+- ~~PEND-04 (QR scope)~~ — **RESOLVIDA** em 2026-09-28 (ver PEND-04 acima)
 - ~~PEND-05 (evidence ownership)~~ — **RESOLVIDA** em 2026-09-28 (ver PEND-05 acima)
 - ~~PEND-15 (admin filters)~~ — **RESOLVIDA** em 2026-09-28 (commitado em `22b7d31`)
+- **Hardening** — `@Size` em `@PathVariable String` + handler `ConstraintViolationException` (codebase-wide, deferred)
 
 ---
 
@@ -171,18 +208,18 @@ Com os BFs críticos concluídos, as opções são:
 1. **Abrir PR de `feat/BF-001` → `main`** para integrar todos os commits acumulados
    na branch. Recomendado antes de iniciar novo trabalho para evitar divergência de base.
 
-2. **PEND-04** — QR lookup scope: verificar que o TECHNICIAN tem inspeção atribuída
-   com o equipamento antes de retornar os dados (RN-063). Pequena mudança de
-   segurança em `EquipmentController.findByQr()`.
-
-3. **Decisão de produto sobre BF-005** — Definir mecanismo de armazenamento de seções
+2. **Decisão de produto sobre BF-005** — Definir mecanismo de armazenamento de seções
    draft (tabela `draft_sections` vs. `TemplateVersion` em status `DRAFT`) para
    desbloquear o section/item builder. Esta é uma decisão de produto/arquitetura, não
    de código (ver `decisions.md` 2026-09-27).
 
-4. **BF-007** — Integração mobile sync: grande escopo, envolve persistência local,
+3. **BF-007** — Integração mobile sync: grande escopo, envolve persistência local,
    outbox e tela FE-M04 no mobile. Bloqueante para a entrega per AC-RELEASE
    (`criterios-de-aceitacao.md` §17.19).
+
+4. **Input hardening** — `@Size` constraints em `@PathVariable String` + handler
+   `ConstraintViolationException` em `GlobalExceptionHandler` (codebase-wide).
+   Ver `decisions.md` 2026-09-28 PEND-04 H-03.
 
 ---
 

@@ -262,6 +262,8 @@ here only so they aren't lost:
 - ~~Evidence deletion has no ownership check~~ — **RESOLVIDA** em PEND-05 (2026-09-28): `EvidenceService.delete()` agora verifica ownership para TECHNICIAN; guard reordenado (ownership 403 antes do APPROVED 409). 12/12 `EvidenceControllerIT` GREEN.
 - ~~`InspectionSpecifications` is missing several documented admin filters~~ — **RESOLVIDA** em PEND-15 (2026-09-27): `supervisorId`, `equipmentId`, `scheduledFrom`, `scheduledTo`, `overdue` implementados. Texto livre `q` ainda não implementado (não coberto pelo openapi.yaml, baixa prioridade).
 - `InspectionResponseController.upsertResponse()` double-loads the inspection: once in `getInspectionForTechnician()` (controller) and again in `upsertResponse()` (service). Pre-existing; identified during BF-002 review. Low priority — optimization refactor only.
+- ~~`QR lookup não restringe ao escopo do técnico`~~ — **RESOLVIDA** em PEND-04 (2026-09-28): `GET /equipment/by-qr/{qrCode}` agora bloqueia TECHNICIAN sem inspeção não-terminal no mesmo site (RN-063). Scope boundary SUBMITTED/UNDER_REVIEW documentado em `decisions.md`.
+- `Missing @Size validation on @PathVariable String` — todas as rotas com `@PathVariable String` carecem de constraint de tamanho. Requer `ConstraintViolationException` handler no `GlobalExceptionHandler`. Deferred — ver `decisions.md` 2026-09-28 (PEND-04 H-03).
 
 ## Pre-existing IT failures — RESOLVIDAS (BF-005, 2026-09-27)
 

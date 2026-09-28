@@ -10,16 +10,26 @@ import com.codemind.fieldops.client.repository.ClientRepository;
 import com.codemind.fieldops.equipment.domain.Equipment;
 import com.codemind.fieldops.equipment.domain.EquipmentStatus;
 import com.codemind.fieldops.equipment.repository.EquipmentRepository;
+import com.codemind.fieldops.inspection.domain.Inspection;
+import com.codemind.fieldops.inspection.domain.InspectionPriority;
+import com.codemind.fieldops.inspection.domain.InspectionStatus;
+import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.shared.security.JwtClaims;
 import com.codemind.fieldops.site.domain.InspectionSite;
 import com.codemind.fieldops.site.domain.SiteStatus;
 import com.codemind.fieldops.site.repository.InspectionSiteRepository;
+import com.codemind.fieldops.template.domain.InspectionTemplate;
+import com.codemind.fieldops.template.domain.TemplateStatus;
+import com.codemind.fieldops.template.domain.TemplateVersion;
+import com.codemind.fieldops.template.repository.InspectionTemplateRepository;
+import com.codemind.fieldops.template.repository.TemplateVersionRepository;
 import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.domain.UserRole;
 import com.codemind.fieldops.user.domain.UserStatus;
 import com.codemind.fieldops.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +60,15 @@ class EquipmentControllerIT {
     private EquipmentRepository equipmentRepository;
 
     @Autowired
+    private InspectionRepository inspectionRepository;
+
+    @Autowired
+    private InspectionTemplateRepository templateRepository;
+
+    @Autowired
+    private TemplateVersionRepository templateVersionRepository;
+
+    @Autowired
     private InspectionSiteRepository siteRepository;
 
     @Autowired
@@ -68,11 +87,15 @@ class EquipmentControllerIT {
     private User technicianUser;
     private String adminToken;
     private String technicianToken;
+    private Client testClient;
     private InspectionSite testSite;
 
     @BeforeEach
     void setUp() {
+        inspectionRepository.deleteAll();
         equipmentRepository.deleteAll();
+        templateVersionRepository.deleteAll();
+        templateRepository.deleteAll();
         siteRepository.deleteAll();
         clientRepository.deleteAll();
         userRepository.deleteAll();
@@ -80,8 +103,19 @@ class EquipmentControllerIT {
         technicianUser = userRepository.save(newUser("Tech", "tech.equip@fieldops.local", UserRole.TECHNICIAN));
         adminToken = mintAccessToken(adminUser);
         technicianToken = mintAccessToken(technicianUser);
-        Client testClient = clientRepository.save(Client.builder().name("Equip Client").status(ClientStatus.ACTIVE).build());
+        testClient = clientRepository.save(Client.builder().name("Equip Client").status(ClientStatus.ACTIVE).build());
         testSite = siteRepository.save(InspectionSite.builder().client(testClient).name("Equip Site").status(SiteStatus.ACTIVE).build());
+    }
+
+    @AfterEach
+    void tearDown() {
+        inspectionRepository.deleteAll();
+        equipmentRepository.deleteAll();
+        templateVersionRepository.deleteAll();
+        templateRepository.deleteAll();
+        siteRepository.deleteAll();
+        clientRepository.deleteAll();
+        userRepository.deleteAll();
     }
 
     private User newUser(String name, String email, UserRole role) {
@@ -196,13 +230,54 @@ class EquipmentControllerIT {
     }
 
     @Test
-    void technicianCanGetEquipmentByQrCode() {
+    void technicianCannotGetEquipmentByQrCodeOutOfScope() {
         saveEquipment("QR Equipment Tech", "QR-TECH-001");
 
         assertThat(mvc.get().uri("/equipment/by-qr/QR-TECH-001").header("Authorization", bearer(technicianToken)))
+            .hasStatus(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void technicianCanGetEquipmentByQrCodeWithActiveInspection() {
+        saveEquipment("QR Equipment In Scope", "QR-TECH-INSCOPE");
+
+        InspectionTemplate template = templateRepository.save(InspectionTemplate.builder()
+            .title("T").description("D").category("C")
+            .status(TemplateStatus.ACTIVE).currentVersion(1).createdBy(adminUser).build());
+        TemplateVersion version = templateVersionRepository.save(TemplateVersion.builder()
+            .template(template).versionNumber(1).titleSnapshot("T").descriptionSnapshot("D")
+            .publishedBy(adminUser).publishedAt(Instant.now()).activeForNewInspections(true).build());
+        inspectionRepository.save(Inspection.builder()
+            .templateVersion(version).client(testClient).site(testSite).technician(technicianUser)
+            .createdBy(adminUser).priority(InspectionPriority.MEDIUM).status(InspectionStatus.IN_PROGRESS)
+            .scheduledFor(Instant.now().plusSeconds(3600)).startedAtServer(Instant.now()).build());
+
+        assertThat(mvc.get().uri("/equipment/by-qr/QR-TECH-INSCOPE").header("Authorization", bearer(technicianToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$.qrCode").asString().isEqualTo("QR-TECH-001");
+            .extractingPath("$.qrCode").asString().isEqualTo("QR-TECH-INSCOPE");
+    }
+
+    @Test
+    void technicianCannotGetEquipmentByQrCodeFromDifferentSite() {
+        InspectionSite otherSite = siteRepository.save(
+            InspectionSite.builder().client(testClient).name("Other Site").status(SiteStatus.ACTIVE).build());
+        equipmentRepository.save(Equipment.builder()
+            .site(otherSite).name("Other Equipment").qrCode("QR-OTHER-SITE").status(EquipmentStatus.ACTIVE).build());
+
+        InspectionTemplate template = templateRepository.save(InspectionTemplate.builder()
+            .title("T").description("D").category("C")
+            .status(TemplateStatus.ACTIVE).currentVersion(1).createdBy(adminUser).build());
+        TemplateVersion version = templateVersionRepository.save(TemplateVersion.builder()
+            .template(template).versionNumber(1).titleSnapshot("T").descriptionSnapshot("D")
+            .publishedBy(adminUser).publishedAt(Instant.now()).activeForNewInspections(true).build());
+        inspectionRepository.save(Inspection.builder()
+            .templateVersion(version).client(testClient).site(testSite).technician(technicianUser)
+            .createdBy(adminUser).priority(InspectionPriority.MEDIUM).status(InspectionStatus.IN_PROGRESS)
+            .scheduledFor(Instant.now().plusSeconds(3600)).startedAtServer(Instant.now()).build());
+
+        assertThat(mvc.get().uri("/equipment/by-qr/QR-OTHER-SITE").header("Authorization", bearer(technicianToken)))
+            .hasStatus(HttpStatus.FORBIDDEN);
     }
 
     @Test

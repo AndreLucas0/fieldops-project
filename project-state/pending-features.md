@@ -259,7 +259,7 @@ here only so they aren't lost:
 - `PUT /inspections/{id}/responses/{snapshotId}` uses the snapshot id, not a device-generated response id as `api-rest.md` §12.11 describes.
 - `POST /inspections/{id}/responses:batch` doesn't exist (mitigated by sync).
 - QR lookup (`GET /equipment/by-qr/{qrCode}`) doesn't scope results to the technician's assigned inspection (RN-063, PEND-04) — a security-hardening item, tracked here rather than as its own BF because it's a scope/authorization refinement, not a missing feature.
-- Evidence deletion has no ownership check (any `TECHNICIAN`, not just the inspection's owner, can delete) — PEND-05, same nature as the QR item above.
+- ~~Evidence deletion has no ownership check~~ — **RESOLVIDA** em PEND-05 (2026-09-28): `EvidenceService.delete()` agora verifica ownership para TECHNICIAN; guard reordenado (ownership 403 antes do APPROVED 409). 12/12 `EvidenceControllerIT` GREEN.
 - ~~`InspectionSpecifications` is missing several documented admin filters~~ — **RESOLVIDA** em PEND-15 (2026-09-27): `supervisorId`, `equipmentId`, `scheduledFrom`, `scheduledTo`, `overdue` implementados. Texto livre `q` ainda não implementado (não coberto pelo openapi.yaml, baixa prioridade).
 - `InspectionResponseController.upsertResponse()` double-loads the inspection: once in `getInspectionForTechnician()` (controller) and again in `upsertResponse()` (service). Pre-existing; identified during BF-002 review. Low priority — optimization refactor only.
 

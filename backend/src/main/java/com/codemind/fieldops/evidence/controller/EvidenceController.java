@@ -7,6 +7,7 @@ import com.codemind.fieldops.evidence.domain.EvidenceType;
 import com.codemind.fieldops.evidence.dto.EvidenceResponse;
 import com.codemind.fieldops.evidence.mapper.EvidenceMapper;
 import com.codemind.fieldops.shared.error.BusinessRuleViolationException;
+import com.codemind.fieldops.shared.security.JwtClaims;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -80,7 +81,8 @@ public class EvidenceController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','TECHNICIAN')")
     public void delete(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
-        evidenceService.delete(id, userId);
+        boolean isTechnician = "TECHNICIAN".equals(jwt.getClaimAsString(JwtClaims.ROLE));
+        evidenceService.delete(id, userId, isTechnician);
     }
 
     private EvidenceResponse toResponse(Evidence evidence) {

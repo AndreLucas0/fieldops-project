@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-09-27
+Last updated: 2026-09-28
 
 ## Current State
 
@@ -85,6 +85,27 @@ corrigida como bloqueador de teste: removido `LEFT JOIN FETCH s.items` da query
 + 2 novos testes de overdue). 52/52 nos 4 inspection IT classes. 24/24 nos template IT
 classes. 0 regressões.
 
+### PEND-05 — Evidence Deletion Ownership — não commitado ainda
+
+Guard de ownership adicionado a `EvidenceService.delete()`: TECHNICIAN só pode deletar
+evidências de inspeções onde é o técnico atribuído. ADMIN e SUPERVISOR mantêm acesso
+irrestrito. Guard reordenado: ownership (403) antes do APPROVED check (409) para evitar
+vazamento de estado a usuários não autorizados.
+
+EvidenceController.delete(): extraído `isTechnician` de `jwt.getClaimAsString(JwtClaims.ROLE)`,
+repassado ao service junto com `userId`.
+
+12/12 `EvidenceControllerIT` GREEN (incluindo 1 novo teste `technicianCannotDeleteEvidenceFromOtherTechniciansInspection`).
+46/46 unit tests GREEN. Outros ITs em isolamento: 19/19 InspectionSchedulingControllerIT,
+12/12 InspectionExecutionControllerIT, 10/10 SyncPushControllerIT.
+
+Side-fix: 3 MEDIUMs do ECC java-reviewer corrigidos antes de finalizar:
+- Guard ordering invertido (ownership antes de APPROVED)
+- Asserção pós-rejeição adicionada ao novo teste (evidência ainda existe no DB)
+- Upload setup no teste agora tem asserção de sucesso
+
+---
+
 ### BF-006 — Evidence Read-Only After Approval — commitado `132b2c4` (em `main`)
 
 Guard clause em `EvidenceService.upload()` bloqueia uploads em inspeções `APPROVED`
@@ -137,7 +158,9 @@ Ver `project-state/pending-features.md` para detalhe de cada item.
 Itens ainda pendentes:
 - **BF-005** (PARTIAL/BLOCKED) — section/item builder endpoints aguardam decisão de produto
 - **BF-007** (PENDING) — integração mobile sync; tarefa do lado mobile, não backend
-- **Divergências menores** (não BF) — PEND-04 (QR scope), PEND-05 (evidence ownership), PEND-15 (admin filters)
+- **Divergências menores** (não BF) — PEND-04 (QR scope)
+- ~~PEND-05 (evidence ownership)~~ — **RESOLVIDA** em 2026-09-28 (ver PEND-05 acima)
+- ~~PEND-15 (admin filters)~~ — **RESOLVIDA** em 2026-09-28 (commitado em `22b7d31`)
 
 ---
 
@@ -148,9 +171,9 @@ Com os BFs críticos concluídos, as opções são:
 1. **Abrir PR de `feat/BF-001` → `main`** para integrar todos os commits acumulados
    na branch. Recomendado antes de iniciar novo trabalho para evitar divergência de base.
 
-2. **PEND-15** — Adicionar filtros admin faltantes em `InspectionSpecifications`
-   (`supervisorId`, `equipmentId`, `scheduledFrom/To`, `overdue`, text `q`). Sem bloqueio
-   de dados, implementação simples de Specification.
+2. **PEND-04** — QR lookup scope: verificar que o TECHNICIAN tem inspeção atribuída
+   com o equipamento antes de retornar os dados (RN-063). Pequena mudança de
+   segurança em `EquipmentController.findByQr()`.
 
 3. **Decisão de produto sobre BF-005** — Definir mecanismo de armazenamento de seções
    draft (tabela `draft_sections` vs. `TemplateVersion` em status `DRAFT`) para

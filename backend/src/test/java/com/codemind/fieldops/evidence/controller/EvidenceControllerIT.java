@@ -352,6 +352,30 @@ class EvidenceControllerIT {
             .hasStatus(HttpStatus.CONFLICT);
     }
 
+    @Test
+    void technicianCannotDeleteEvidenceFromOtherTechniciansInspection() {
+        assertThat(mvc.perform(MockMvcRequestBuilders
+                .multipart("/inspections/" + inProgressInspection.getId() + "/evidence")
+                .file(jpegFile())
+                .param("idempotencyKey", UUID.randomUUID().toString())
+                .param("type", "PHOTO")
+                .param("capturedAtDevice", Instant.now().toString())
+                .header("Authorization", bearer(technicianToken))))
+            .hasStatus(HttpStatus.CREATED);
+        String evidenceId = evidenceRepository.findByInspectionId(inProgressInspection.getId()).get(0).getId()
+            .toString();
+
+        User otherTechnician = userRepository
+            .save(newUser("Other Tech", "other.tech@fieldops.local", UserRole.TECHNICIAN));
+        String otherToken = mintAccessToken(otherTechnician);
+
+        assertThat(mvc.delete().uri("/evidence/" + evidenceId)
+            .header("Authorization", bearer(otherToken)))
+            .hasStatus(HttpStatus.FORBIDDEN);
+
+        assertThat(evidenceRepository.findByInspectionId(inProgressInspection.getId())).hasSize(1);
+    }
+
     @TestConfiguration
     static class FakeStorageConfig {
 

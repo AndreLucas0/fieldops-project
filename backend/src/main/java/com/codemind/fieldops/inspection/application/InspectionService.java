@@ -236,6 +236,8 @@ public class InspectionService {
                     .itemDescription(item.getDescription())
                     .responseType(item.getResponseType().name())
                     .required(item.getRequired())
+                    .observationRequiredOnFailure(item.getObservationRequiredOnFailure())
+                    .evidenceRequiredOnFailure(item.getEvidenceRequiredOnFailure())
                     .optionsJson(item.getOptionsJson())
                     .itemOrder(item.getDisplayOrder())
                     .build();

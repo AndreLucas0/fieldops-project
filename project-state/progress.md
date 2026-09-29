@@ -121,6 +121,49 @@ Test results:
 
 ---
 
+### RN-038/039 — Submit Validation (Observation + Evidence on Non-Conforming) — não commitado ainda
+
+Validação de submit ampliada para cobrir RN-038/039:
+- **RN-038**: se `ItemSnapshot.observationRequiredOnFailure = true` e a resposta tem
+  `conformity = NON_CONFORMING`, o campo `observation` é obrigatório; ausência → 422.
+- **RN-039**: se `ItemSnapshot.evidenceRequiredOnFailure = true` e a resposta tem
+  `conformity = NON_CONFORMING`, pelo menos uma evidência vinculada ao response é
+  obrigatória; ausência → 422.
+
+Prerequisito corrigido: `createSnapshots()` não copiava `observationRequiredOnFailure`
+nem `evidenceRequiredOnFailure` do `TemplateItem` para o `ItemSnapshot`. Path A escolhido:
+migração V13 adicionou as colunas à `inspection_item_snapshots`.
+
+Implementation:
+- `V13__add_snapshot_failure_rules.sql` — `ALTER TABLE inspection_item_snapshots ADD COLUMN
+  observation_required_on_failure BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN
+  evidence_required_on_failure BOOLEAN NOT NULL DEFAULT FALSE`
+- `ItemSnapshot.java` — dois novos campos booleanos + `@PrePersist` defaults
+- `InspectionService.createSnapshots()` — copia os dois campos de `TemplateItem`
+- `InspectionResponseRepository` — `findByInspectionIdAndConformityFetchSnapshot`
+  (JPQL com `JOIN FETCH r.snapshot` para evitar N+1)
+- `EvidenceRepository` — `existsByInspectionIdAndResponseId`
+- `InspectionExecutionService` — `EvidenceRepository` injetado; bloco de validação
+  RN-038/039 após o bloco RN-037 existente
+- `InspectionExecutionControllerIT` — `@AfterEach tearDown()` adicionado (fix cross-class
+  FK — mesmo padrão de PEND-04 `EquipmentControllerIT`); 6 novos testes (5 RN-038/039 + 1
+  CONFORMING coexistence)
+
+ECC java-reviewer: 0 CRITICAL, 3 HIGH — todos resolvidos:
+- H-1 (N+1): corrigido com JOIN FETCH query
+- H-2 (readOnly): `@Transactional(readOnly = true)` adicionado ao método
+- H-3 (InspectionSchedulingControllerIT teardown): aceito — testes passam GREEN,
+  `@AfterEach` em `InspectionExecutionControllerIT` cobre o cleanup; registrado em decisions.md
+MEDIUM/LOW findings: cross-module coupling aceito (mesmo padrão), conforming coexistence
+test adicionado, error code renomeado de `CRITICAL_NON_CONFORMING` para `NON_CONFORMING`.
+
+Test results:
+- InspectionExecutionControllerIT: 18/18 GREEN (6 novos testes)
+- Regression: 115/115 GREEN (InspectionExecution + InspectionResponse + InspectionScheduling
+  + SyncPush + FlywayMigrationIT + todos *Test unitários)
+
+---
+
 ### PEND-05 — Evidence Deletion Ownership — não commitado ainda
 
 Guard de ownership adicionado a `EvidenceService.delete()`: TECHNICIAN só pode deletar
@@ -197,29 +240,26 @@ Itens ainda pendentes:
 - ~~PEND-04 (QR scope)~~ — **RESOLVIDA** em 2026-09-28 (ver PEND-04 acima)
 - ~~PEND-05 (evidence ownership)~~ — **RESOLVIDA** em 2026-09-28 (ver PEND-05 acima)
 - ~~PEND-15 (admin filters)~~ — **RESOLVIDA** em 2026-09-28 (commitado em `22b7d31`)
+- ~~RN-038/039 (submit validation)~~ — **RESOLVIDA** em 2026-09-28 (ver acima)
 - **Hardening** — `@Size` em `@PathVariable String` + handler `ConstraintViolationException` (codebase-wide, deferred)
 
 ---
 
 ## Recommended Next Task
 
-Com os BFs críticos concluídos, as opções são:
+Todos os backend BFs do audit estão concluídos ou formalmente bloqueados. Opções:
 
-1. **Abrir PR de `feat/BF-001` → `main`** para integrar todos os commits acumulados
-   na branch. Recomendado antes de iniciar novo trabalho para evitar divergência de base.
+1. **Abrir PR de `feat/PEND-004` → `main`** — integrar tudo: BF-002..005, NESTED-NAV,
+   PEND-04/05/15, RN-038/039. **Fortemente recomendado** — a branch está 10+ commits à
+   frente de `main`, acumulando risco de divergência.
 
-2. **Decisão de produto sobre BF-005** — Definir mecanismo de armazenamento de seções
-   draft (tabela `draft_sections` vs. `TemplateVersion` em status `DRAFT`) para
-   desbloquear o section/item builder. Esta é uma decisão de produto/arquitetura, não
-   de código (ver `decisions.md` 2026-09-27).
+2. **Decisão de produto sobre BF-005** — seções draft (tabela separada vs. `TemplateVersion`
+   em `DRAFT`). Decisão de produto/arquitetura, não de código (ver `decisions.md` 2026-09-27).
 
-3. **BF-007** — Integração mobile sync: grande escopo, envolve persistência local,
-   outbox e tela FE-M04 no mobile. Bloqueante para a entrega per AC-RELEASE
-   (`criterios-de-aceitacao.md` §17.19).
+3. **BF-007** — integração mobile sync (tarefa do lado mobile).
 
-4. **Input hardening** — `@Size` constraints em `@PathVariable String` + handler
-   `ConstraintViolationException` em `GlobalExceptionHandler` (codebase-wide).
-   Ver `decisions.md` 2026-09-28 PEND-04 H-03.
+4. **Input hardening** — `@Size` em `@PathVariable String` + `ConstraintViolationException`
+   handler (codebase-wide, deferred).
 
 ---
 

@@ -687,3 +687,66 @@ variável de ambiente local (sem versionar).
 
 Status:
 ACTIVE
+
+---
+
+### [2026-09-28] — RN-038/039: Path A — colunas booleanas em inspection_item_snapshots
+
+Context:
+`ItemSnapshot.rulesJson` existia como campo JSONB mas nunca era populado.
+`TemplateItem` tem `observationRequiredOnFailure` e `evidenceRequiredOnFailure`
+como colunas booleanas dedicadas. `createSnapshots()` não copiava esses campos.
+Duas abordagens para implementar RN-038/039: Path A (migration V13 + colunas
+booleanas) vs Path B (popular `rulesJson` com JSON e parsear em runtime).
+
+Decision:
+Path A — migração V13 + colunas booleanas explícitas em `inspection_item_snapshots`.
+
+Reason:
+Espelha o design de `template_items`. Evita parsing de JSON em `submit()`.
+Indexável, tipado, simples de testar.
+
+Impact:
+V13 migration aplicada. `createSnapshots()` copia os valores de `TemplateItem`.
+`submit()` valida respostas NON_CONFORMING via
+`findByInspectionIdAndConformityFetchSnapshot` (JOIN FETCH para evitar N+1).
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-28] — RN-038/039: cross-module coupling inspection → evidence
+
+Context:
+ECC java-reviewer identificou que `InspectionExecutionService` importa
+`EvidenceRepository` diretamente do módulo `evidence`.
+
+Decision:
+Aceitar o acoplamento direto — mesmo padrão de `NonConformityEvidenceValidator`.
+
+Reason:
+Projeto acadêmico. Anti-corruption layer adicionaria boilerplate sem benefício
+prático. Coerência com padrão existente é preferível.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-28] — rulesJson em ItemSnapshot intencionalmente não populado
+
+Context:
+`ItemSnapshot.rulesJson` existe na entidade e na tabela mas nunca é populado.
+`TemplateItem` não tem campo `rulesJson` equivalente. As regras binárias foram
+implementadas via colunas dedicadas (Path A, V13).
+
+Decision:
+`rulesJson` permanece null/unused — campo reservado para regras futuras mais complexas.
+
+Reason:
+Não há fonte correspondente em `TemplateItem` para copiar. Se necessário no
+futuro, o campo está disponível sem nova migration.
+
+Status:
+ACTIVE

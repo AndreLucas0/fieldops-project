@@ -220,6 +220,53 @@ Validation:
 
 ---
 
+## RN-038/039 — Submit Validation: Observation and Evidence on Non-Conforming Answers
+
+Status: DONE
+
+Description:
+`InspectionExecutionService.submit()` now enforces RN-038 and RN-039 in addition
+to the existing RN-037 (required responses) check:
+- **RN-038**: if `ItemSnapshot.observationRequiredOnFailure = true` and the response
+  has `conformity = NON_CONFORMING`, the `observation` field must be non-blank → 422
+  (`MISSING_OBSERVATION_ON_NON_CONFORMING`).
+- **RN-039**: if `ItemSnapshot.evidenceRequiredOnFailure = true` and the response
+  has `conformity = NON_CONFORMING`, at least one evidence record linked to that
+  response must exist → 422 (`MISSING_EVIDENCE_ON_NON_CONFORMING`).
+
+Prerequisite gap fixed: `createSnapshots()` in `InspectionService` was not copying
+`observationRequiredOnFailure`/`evidenceRequiredOnFailure` from `TemplateItem` to
+`ItemSnapshot`. Fixed via Path A (Flyway V13 migration + boolean columns on snapshot
+table). Path B (populate `rulesJson`) was considered and rejected (see `decisions.md`
+2026-09-28).
+
+Source:
+Backend audit 2026-09-22 (`project-state/backend-audit.md`, 🟡 #5).
+Requirements: RN-038, RN-039; `regras-de-negocio.md` §9.5.
+
+Validation (2026-09-28):
+- `submitWithNonConformingAnswerMissingObservationReturns422` — GREEN
+- `submitWithNonConformingAnswerWithObservationSucceeds` — GREEN
+- `submitWithNonConformingAnswerObservationRuleNotSetSucceeds` — GREEN
+- `submitWithCriticalNonConformingAnswerMissingEvidenceReturns422` — GREEN
+- `submitWithCriticalNonConformingAnswerWithEvidenceSucceeds` — GREEN
+- `submitWithOnlyConformingAnswersWhenObservationRuleSetSucceeds` — GREEN
+- InspectionExecutionControllerIT: 18/18 GREEN; regression 115/115 GREEN
+
+ECC java-reviewer: 0 CRITICAL, 3 HIGH (all resolved — N+1 fixed via JOIN FETCH,
+`@Transactional(readOnly = true)` added, cross-class FK fixed via `@AfterEach`).
+
+Files modified:
+- `V13__add_snapshot_failure_rules.sql` (new migration)
+- `ItemSnapshot.java` (2 new boolean fields + `@PrePersist` defaults)
+- `InspectionService.createSnapshots()` (copies the 2 fields from `TemplateItem`)
+- `InspectionResponseRepository` (new `findByInspectionIdAndConformityFetchSnapshot` with JOIN FETCH)
+- `EvidenceRepository` (new `existsByInspectionIdAndResponseId`)
+- `InspectionExecutionService` (`EvidenceRepository` injected; RN-038/039 validation block)
+- `InspectionExecutionControllerIT` (`@AfterEach` teardown; 6 new tests)
+
+---
+
 ## BF-007 — Mobile Sync Integration
 
 Status: PENDING

@@ -159,6 +159,7 @@ GET    /api/v1/inspection-templates
 GET    /api/v1/inspection-templates/{id}
 POST   /api/v1/inspection-templates
 PUT    /api/v1/inspection-templates/{id}
+GET    /api/v1/inspection-templates/{id}/sections
 POST   /api/v1/inspection-templates/{id}/sections
 PUT    /api/v1/inspection-templates/{id}/sections/{sectionId}
 POST   /api/v1/inspection-templates/{id}/sections/{sectionId}/items

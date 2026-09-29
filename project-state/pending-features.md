@@ -160,7 +160,43 @@ Commitado: `1545467 feat: implement dashboard and inspection history endpoints (
 
 ## BF-005 — Template Versions and Sections Endpoints
 
-Status: PARTIAL
+Status: DONE (2026-09-29 — builder completed; was PARTIAL since 2026-09-27)
+
+Builder implementation (2026-09-29, product decision: DRAFT TemplateVersion —
+see `decisions.md` 2026-09-29 "BF-005: builder over a DRAFT TemplateVersion"):
+- V14: `inspection_template_versions.status` (`DRAFT`/`PUBLISHED`), nullable
+  `published_by/published_at` for drafts only, one draft per template (partial
+  unique index), draft never active (CHECK).
+- `GET/POST /inspection-templates/{id}/sections`, `PUT .../sections/{sectionId}`,
+  `POST .../sections/{sectionId}/items`, `PUT .../items/{itemId}` (ADMIN/SUPERVISOR).
+- `POST .../publish` without body promotes the draft (RN-015/016 → 422 without
+  section/item); legacy body publish kept, 409 while a draft is open.
+- ACTIVE template: first builder write clones the active structure (RN-020);
+  published sections/items → 409 (RN-019); INACTIVE template → 409.
+- Drafts hidden from `GET .../versions` and `GET /inspection-template-versions/{id}`;
+  `POST /inspections` with a draft version → 422.
+- Responses now carry `templateVersionId` (section) and `sectionId` (item), as in openapi.
+
+Validation (2026-09-29):
+- RED: 21/21 new tests failing (routes absent) before implementation; +2 RED for review findings H1/H2.
+- GREEN: `TemplateBuilderControllerIT` 23/23; `InspectionSchedulingControllerIT` 20/20
+  (1 new); `FlywayMigrationIT` 2/2 (version 14); `InspectionTemplateControllerIT` 17/17;
+  `TemplateVersionControllerIT` 7/7; unit 50/50.
+- Full `./mvnw verify`: 256 ITs, only failures = `MobileInspectionControllerIT` (2,
+  identical on untouched `main` 7beb028 — pre-existing) and `SiteControllerIT` (17,
+  FK ordering ITORDER-001; 17/17 GREEN in isolation).
+- Real HTTP (throwaway Postgres + app on :8099, 16-step flow): all statuses and
+  persistence as expected.
+- ECC java-reviewer + database-reviewer: H1 (INACTIVE bypass), H2 (stale draft vs
+  legacy publish), concurrency 500s and version-number gaps fixed; rest recorded below.
+
+Follow-ups (not implemented — out of BF-005 scope):
+- Pessimistic lock on template row for publish/draft creation (races now → 409, not serialized).
+- `GlobalExceptionHandler` catch-all returns 500 for unknown routes
+  (`NoResourceFoundException`) and malformed JSON (`HttpMessageNotReadableException`) —
+  should be 404/400. Pre-existing, codebase-wide.
+- Delete section/item endpoints are not documented nor implemented.
+- `TemplateService.update()` still DRAFT-only (metadata of ACTIVE templates) — see BF-001 note.
 
 Description:
 Read endpoints implemented on 2026-09-27 (partial):
@@ -169,7 +205,7 @@ Read endpoints implemented on 2026-09-27 (partial):
 - `TemplateController` now responds at BOTH `/templates/*` AND `/inspection-templates/*` (dual mapping) to match the web client's API calls (`resources.ts`)
 - Pre-req fixes: `FlywayMigrationIT` version assertion "9" → "12"; `TemplateItemRequest` 3 `boolean` fields → `Boolean` (boxed)
 
-Still pending:
+Still pending (SUPERSEDED 2026-09-29 — builder implemented, see top of this BF):
 - Section/item builder endpoints (`POST/PUT .../sections`, `POST/PUT .../sections/{id}/items`) — blocked by data model decision: draft sections have no storage location (`TemplateSection` belongs to `TemplateVersion`, not `InspectionTemplate`; see `decisions.md` 2026-09-27)
 
 Source:
@@ -320,12 +356,34 @@ Source:
 Backend audit — 2026-09-22 (`project-state/backend-audit.md`, 🟣 #1);
 `ESTADO-DO-PROJETO.md` §5, §9-10.
 
-Validation (2026-09-28):
+Validation (2026-09-28) — SUPERSEDED by the 2026-09-29 validation below:
 - Cannot run `npm test` — `node_modules` absent, no `npm install` run.
   Environment limitation recorded. All logic changes are manually reviewed.
   Jest mock design verified against local-db.ts SQL strings and sync-service.ts
   outbox behavior.
 - TypeScript check not run — same environment limitation (no node_modules).
+
+Validation (2026-09-29) — reopened and fixed, now actually validated:
+- Finding: BF-007 declared `expo-sqlite ~15.0.0` / `expo-network ~7.0.0` (old-SDK
+  versions) and never updated `package-lock.json` → `npm ci` failed on a clean
+  machine (`EUSAGE — Missing: expo-network@7.0.5, expo-sqlite@15.0.6 from lock file`).
+  Expo SDK 57 (`expo@57.0.13` `bundledNativeModules.json`) expects `~57.0.1` for both.
+- Fix: `mobile/package.json` → `expo-sqlite ~57.0.1`, `expo-network ~57.0.1`;
+  `npm install` regenerated the lock (diff limited to expo-sqlite 57.0.3,
+  expo-network 57.0.2 and its dep await-lock). No source change needed (same API).
+- `npm ci --dry-run` → OK; `npx expo install --check` → both no longer flagged;
+  `npm run typecheck` → OK; `npm run lint` → OK.
+- `npm test`: 291/291 tests pass; BF-007 suites (`checklist-screen`,
+  `summary-nc-screens`) 26/26. 1 suite fails to load (`inspections-screen.test.tsx`,
+  lucide ESM) — pre-existing since `cdb7c5b` (2026-09-15), unrelated to BF-007.
+
+Follow-ups (not implemented — outside BF-007 validation scope):
+- `inspections-screen.test.tsx` cannot load: Jest does not transform
+  `lucide-react-native` ESM (needs `transformIgnorePatterns` or a mock). Broken since `cdb7c5b`.
+- `local-db.ts`, `sync-service.ts`, `use-sync.ts` have no direct unit tests — only
+  exercised through screen tests with mocks (batching, REJECTED/CONFLICT handling untested).
+- `npx expo install --check` still flags patch updates unrelated to BF-007:
+  `expo-splash-screen ~57.0.9`, `react-native 0.86.3`, `eslint-config-expo ~57.0.2`, `jest-expo ~57.0.5`.
 
 ---
 

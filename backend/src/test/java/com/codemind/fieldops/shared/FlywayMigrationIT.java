@@ -31,7 +31,7 @@ class FlywayMigrationIT {
 		assertThat(flyway.info().all()).isNotEmpty();
 		assertThat(flyway.info().all())
 			.allSatisfy(migration -> assertThat(migration.getState()).isEqualTo(MigrationState.SUCCESS));
-		assertThat(flyway.info().current().getVersion().toString()).isEqualTo("13");
+		assertThat(flyway.info().current().getVersion().toString()).isEqualTo("14");
 	}
 
 	@Test

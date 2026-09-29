@@ -178,6 +178,58 @@ BF-005 status remains PARTIAL. The web's `listDraftSections`, `createSection`,
 404 until this is resolved.
 
 Status:
+SUPERSEDED (2026-09-29) — product decision taken: option (b). See
+"BF-005: builder over a DRAFT TemplateVersion" below.
+
+---
+
+### [2026-09-29] — BF-005: builder over a DRAFT TemplateVersion
+
+Context:
+The block recorded above (2026-09-27) needed a product decision on where draft
+sections live. The user chose option (b) on 2026-09-29.
+
+Decision:
+- `inspection_template_versions.status` (`DRAFT`/`PUBLISHED`, V14). The builder
+  routes (`POST/PUT .../sections`, `POST .../sections/{id}/items`,
+  `PUT .../items/{id}`) write into the template's single DRAFT version, created
+  lazily on the first builder write (partial unique index: one draft per template).
+- RN-020: when the template already has an active version, the new draft starts
+  as a copy of the active structure (sections + items).
+- `POST .../publish` **without body** (openapi contract) promotes the draft:
+  number = max+1, becomes active, previous active is deactivated (BF-001 rule).
+  Requires ≥1 section and ≥1 item (RN-015/016 → 422).
+- Draft `version_number` is the fixed placeholder `0` (never used by a
+  published version), so draft and legacy publish never collide or leave gaps.
+- The legacy `POST .../publish` **with** `{"sections":[...]}` body is kept
+  (existing tests/clients), but returns 409 `TEMPLATE_DRAFT_IN_PROGRESS` while a
+  draft is open — otherwise the open draft would silently overwrite the legacy
+  structure on the next publish (ECC java-reviewer H2).
+- Drafts are not exposed as versions: excluded from `GET .../versions`,
+  404 on `GET /inspection-template-versions/{id}`, and `POST /inspections`
+  with a draft `templateVersionId` → 422 `TEMPLATE_VERSION_NOT_PUBLISHED`.
+- INACTIVE templates: every builder write and draft publish → 409
+  `TEMPLATE_NOT_EDITABLE` (ECC java-reviewer H1).
+- `GET /inspection-templates/{id}/sections` (already consumed by web
+  `listDraftSections`) returns the draft structure, empty list without draft;
+  added to `openapi.yaml` and `docs/api-rest.md` §12.9.
+
+Reason:
+Reuses the existing `TemplateSection → TemplateVersion` FK (no parallel
+draft tables) and matches the openapi wording "seção na versão em rascunho".
+
+Alternatives considered:
+(a) separate draft tables attached to `InspectionTemplate` — rejected by the
+user (duplicated structure, copy step on publish).
+Delete the open draft on legacy publish — rejected: silent data loss.
+
+Impact:
+Web builder calls stop returning 404. Concurrency: races on draft creation,
+display_order and publish map to 409 (`DataIntegrityViolationException` /
+optimistic lock), not 500; no pessimistic lock was added (follow-up in
+`pending-features.md`).
+
+Status:
 ACTIVE
 
 ---

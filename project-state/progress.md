@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-09-28 (BF-007)
+Last updated: 2026-09-29 (BF-005 builder)
 
 ## Current State
 
@@ -47,6 +47,50 @@ implementados. `TemplateController` com dual mapping `/templates/*` + `/inspecti
 Pre-req fixes: `FlywayMigrationIT` version assertion + `TemplateItemRequest` boolean → Boolean.
 7/7 IT tests GREEN. Section/item builder ainda **BLOQUEADO** — decisão de produto pendente
 sobre armazenamento de seções draft (ver `decisions.md` 2026-09-27).
+
+### BF-007 — validação e correção de dependências — 2026-09-29, não commitado ainda
+
+Candidato 1 da lista de próximos ciclos. A validação revelou que a BF-007 não
+instalava em máquina limpa: `expo-sqlite ~15.0.0`/`expo-network ~7.0.0` (versões de
+SDK antigo) sem entrada no `package-lock.json` → `npm ci` falhava. Corrigido para
+`~57.0.1` (o que o SDK 57 exige) e lock regenerado — só `mobile/package.json` e
+`mobile/package-lock.json` alterados; nenhum código-fonte.
+
+Resultados: `npm ci --dry-run` OK; typecheck OK; lint OK; `npm test` 291/291
+(suítes da BF-007 26/26). Uma suíte pré-existente não carrega
+(`inspections-screen.test.tsx`, lucide ESM, quebrada desde `cdb7c5b` 2026-09-15) —
+follow-up, junto com a falta de testes unitários diretos de `local-db`/`sync-service`.
+Contagem histórica "302 testes" (ESTADO-DO-PROJETO 2026-08-18) não é comparável: a
+suíte que não carrega não entra no total.
+
+---
+
+### BF-005 (builder) — Section/Item Builder via DRAFT version — 2026-09-29, não commitado ainda
+
+Completa a BF-005 (antes PARTIAL). Decisão de produto do usuário: opção (b),
+rascunho como `TemplateVersion` em status `DRAFT` (`decisions.md` 2026-09-29).
+Branch `main`, working tree com as alterações desta BF (sem commit/push — manual).
+
+- V14 (`status` DRAFT/PUBLISHED; 1 draft por template; draft nunca ativo).
+- Rotas `GET/POST .../sections`, `PUT .../sections/{id}`, `POST .../sections/{id}/items`,
+  `PUT .../items/{id}`; publish sem corpo promove o draft; publish legado com corpo
+  mantido (409 se houver draft aberto).
+- Draft de template ACTIVE nasce como cópia da versão ativa (RN-020); estrutura publicada
+  → 409 (RN-019); template INACTIVE → 409; draft invisível como versão e não agendável (422).
+- `openapi.yaml` + `docs/api-rest.md` §12.9: adicionado `GET .../sections` (já consumido pelo web).
+
+Testes: `TemplateBuilderControllerIT` 23/23 (novo), `InspectionSchedulingControllerIT` 20/20
+(+1), `FlywayMigrationIT` 2/2 (v14), template ITs 17/17 + 7/7, unit 50/50. `./mvnw verify`
+completo: falhas só em `MobileInspectionControllerIT` (2 — idênticas no `main` intocado,
+confirmado via worktree do HEAD `7beb028`) e `SiteControllerIT` (ITORDER-001; 17/17 isolado).
+HTTP real: backend em Postgres descartável (:5499/:8099), fluxo de 16 passos OK.
+ECC java-reviewer + database-reviewer executados; HIGHs corrigidos com testes RED→GREEN.
+
+Não implementado (follow-ups em `pending-features.md` BF-005): lock pessimista, handler
+404/400 para rota inexistente/JSON malformado, delete de seção/item, update de metadados
+de template ACTIVE. Web não alterado (já chamava as rotas).
+
+---
 
 ### NESTED-NAV — Nested Navigation Endpoints — não commitado ainda
 
@@ -235,7 +279,8 @@ Desde o audit, os seguintes itens 🔴 foram resolvidos:
 Ver `project-state/pending-features.md` para detalhe de cada item.
 
 Itens ainda pendentes:
-- **BF-005** (PARTIAL/BLOCKED) — section/item builder endpoints aguardam decisão de produto
+- ~~BF-005 (PARTIAL/BLOCKED)~~ — **CONCLUÍDA** em 2026-09-29 (builder via versão DRAFT, ver acima)
+- ~~BF-007 validação~~ — **VALIDADA** em 2026-09-29 (ver "BF-007 — validação" abaixo)
 - ~~BF-007 (mobile sync)~~ — **CONCLUÍDA** em 2026-09-28 (ver BF-007 abaixo)
 - ~~PEND-04 (QR scope)~~ — **RESOLVIDA** em 2026-09-28 (ver PEND-04 acima)
 - ~~PEND-05 (evidence ownership)~~ — **RESOLVIDA** em 2026-09-28 (ver PEND-05 acima)
@@ -272,6 +317,11 @@ manualmente. Mock design verificado contra strings SQL de `local-db.ts`.
 ---
 
 ## Recommended Next Task
+
+> Atualização 2026-09-29: a opção 2 abaixo (decisão BF-005) foi resolvida e a BF-005
+> concluída. Todas as BFs do audit (BF-001..007) estão DONE. Próximos candidatos:
+> validar BF-007 no mobile (`npm install` + `npm test` + typecheck) e o hardening do
+> `GlobalExceptionHandler` (404/400 em vez de 500). Lista original mantida como histórico:
 
 Todos os backend BFs do audit estão concluídos ou formalmente bloqueados. Opções:
 

@@ -1,6 +1,7 @@
 package com.codemind.fieldops.template.repository;
 
 import com.codemind.fieldops.template.domain.TemplateVersion;
+import com.codemind.fieldops.template.domain.TemplateVersionStatus;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,7 +16,11 @@ public interface TemplateVersionRepository extends JpaRepository<TemplateVersion
     @Query("SELECT MAX(tv.versionNumber) FROM TemplateVersion tv WHERE tv.template.id = :templateId")
     Optional<Integer> findMaxVersionNumberByTemplateId(@Param("templateId") UUID templateId);
 
-    Page<TemplateVersion> findByTemplateIdOrderByVersionNumberDesc(UUID templateId, Pageable pageable);
+    Page<TemplateVersion> findByTemplateIdAndStatusOrderByVersionNumberDesc(UUID templateId,
+                                                                           TemplateVersionStatus status,
+                                                                           Pageable pageable);
+
+    Optional<TemplateVersion> findByTemplateIdAndStatus(UUID templateId, TemplateVersionStatus status);
 
     @Query("SELECT tv FROM TemplateVersion tv WHERE tv.template.id = :templateId AND tv.activeForNewInspections = true ORDER BY tv.versionNumber DESC")
     List<TemplateVersion> findActiveVersionsByTemplateId(@Param("templateId") UUID templateId);

@@ -1,5 +1,10 @@
 package com.codemind.fieldops.site.controller;
 
+import com.codemind.fieldops.equipment.application.EquipmentService;
+import com.codemind.fieldops.equipment.domain.Equipment;
+import com.codemind.fieldops.equipment.domain.EquipmentStatus;
+import com.codemind.fieldops.equipment.dto.EquipmentResponse;
+import com.codemind.fieldops.equipment.mapper.EquipmentMapper;
 import com.codemind.fieldops.shared.pagination.PageResponse;
 import com.codemind.fieldops.shared.pagination.SortFieldValidator;
 import com.codemind.fieldops.site.application.SiteService;
@@ -37,10 +42,15 @@ public class SiteController {
 
     private final SiteService siteService;
     private final SiteMapper siteMapper;
+    private final EquipmentService equipmentService;
+    private final EquipmentMapper equipmentMapper;
 
-    public SiteController(SiteService siteService, SiteMapper siteMapper) {
+    public SiteController(SiteService siteService, SiteMapper siteMapper,
+            EquipmentService equipmentService, EquipmentMapper equipmentMapper) {
         this.siteService = siteService;
         this.siteMapper = siteMapper;
+        this.equipmentService = equipmentService;
+        this.equipmentMapper = equipmentMapper;
     }
 
     @GetMapping
@@ -78,6 +88,17 @@ public class SiteController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public SiteResponse updateStatus(@PathVariable UUID id, @Valid @RequestBody SiteStatusUpdateRequest request) {
         return siteMapper.toResponse(siteService.updateStatus(id, request.status()));
+    }
+
+    @GetMapping("/{siteId}/equipment")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public PageResponse<EquipmentResponse> listSiteEquipment(
+            @PathVariable UUID siteId,
+            @RequestParam(required = false) EquipmentStatus status,
+            @PageableDefault(size = 20) Pageable pageable) {
+        siteService.getById(siteId);
+        Page<Equipment> equipment = equipmentService.list(siteId, null, status, pageable);
+        return PageResponse.from(equipment.map(equipmentMapper::toResponse));
     }
 
 }

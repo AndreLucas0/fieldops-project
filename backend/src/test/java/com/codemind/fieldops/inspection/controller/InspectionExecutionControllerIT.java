@@ -7,8 +7,13 @@ import com.codemind.fieldops.TestcontainersConfiguration;
 import com.codemind.fieldops.client.domain.Client;
 import com.codemind.fieldops.client.domain.ClientStatus;
 import com.codemind.fieldops.client.repository.ClientRepository;
+import com.codemind.fieldops.evidence.domain.Evidence;
+import com.codemind.fieldops.evidence.domain.EvidenceType;
+import com.codemind.fieldops.evidence.repository.EvidenceRepository;
+import com.codemind.fieldops.inspection.domain.Conformity;
 import com.codemind.fieldops.inspection.domain.Inspection;
 import com.codemind.fieldops.inspection.domain.InspectionPriority;
+import com.codemind.fieldops.inspection.domain.InspectionResponse;
 import com.codemind.fieldops.inspection.domain.InspectionStatus;
 import com.codemind.fieldops.inspection.domain.ItemSnapshot;
 import com.codemind.fieldops.inspection.repository.InspectionRepository;
@@ -35,6 +40,7 @@ import com.codemind.fieldops.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,6 +68,7 @@ class InspectionExecutionControllerIT {
     @Autowired private InspectionRepository inspectionRepository;
     @Autowired private ItemSnapshotRepository itemSnapshotRepository;
     @Autowired private InspectionResponseRepository inspectionResponseRepository;
+    @Autowired private EvidenceRepository evidenceRepository;
     @Autowired private NonConformityRepository nonConformityRepository;
     @Autowired private AuditEventRepository auditEventRepository;
     @Autowired private InspectionTemplateRepository templateRepository;
@@ -88,6 +95,7 @@ class InspectionExecutionControllerIT {
     void setUp() {
         auditEventRepository.deleteAll();
         nonConformityRepository.deleteAll();
+        evidenceRepository.deleteAll();
         inspectionResponseRepository.deleteAll();
         itemSnapshotRepository.deleteAll();
         inspectionRepository.deleteAll();
@@ -147,6 +155,21 @@ class InspectionExecutionControllerIT {
         section.setItems(List.of(item));
         version.setSections(List.of(section));
         activeTemplateVersion = templateVersionRepository.save(version);
+    }
+
+    @AfterEach
+    void tearDown() {
+        auditEventRepository.deleteAll();
+        nonConformityRepository.deleteAll();
+        evidenceRepository.deleteAll();
+        inspectionResponseRepository.deleteAll();
+        itemSnapshotRepository.deleteAll();
+        inspectionRepository.deleteAll();
+        templateVersionRepository.deleteAll();
+        templateRepository.deleteAll();
+        siteRepository.deleteAll();
+        clientRepository.deleteAll();
+        userRepository.deleteAll();
     }
 
     private User newUser(String name, String email, UserRole role) {
@@ -379,6 +402,156 @@ class InspectionExecutionControllerIT {
             .hasStatusOk()
             .bodyJson()
             .extractingPath("$.status").asString().isEqualTo("SUBMITTED");
+    }
+
+    // ---- RN-038: observation required on non-conforming answer ----
+
+    @Test
+    void submitWithNonConformingAnswerMissingObservationReturns422() {
+        Inspection inspection = createInProgressInspection();
+        itemSnapshotRepository.deleteAll(
+            itemSnapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspection.getId()));
+        ItemSnapshot snapshot = itemSnapshotRepository.save(ItemSnapshot.builder()
+            .inspection(inspection).sectionTitle("S").sectionOrder(1)
+            .itemTitle("NC Item").responseType("BOOLEAN").required(false)
+            .observationRequiredOnFailure(true).evidenceRequiredOnFailure(false)
+            .itemOrder(1).build());
+
+        mvc.put().uri("/inspections/" + inspection.getId() + "/responses/" + snapshot.getId())
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"valueBoolean\":false,\"conformity\":\"NON_CONFORMING\"}")
+            .exchange();
+
+        assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/submit")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
+    void submitWithNonConformingAnswerWithObservationSucceeds() {
+        Inspection inspection = createInProgressInspection();
+        itemSnapshotRepository.deleteAll(
+            itemSnapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspection.getId()));
+        ItemSnapshot snapshot = itemSnapshotRepository.save(ItemSnapshot.builder()
+            .inspection(inspection).sectionTitle("S").sectionOrder(1)
+            .itemTitle("NC Item").responseType("BOOLEAN").required(false)
+            .observationRequiredOnFailure(true).evidenceRequiredOnFailure(false)
+            .itemOrder(1).build());
+
+        mvc.put().uri("/inspections/" + inspection.getId() + "/responses/" + snapshot.getId())
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"valueBoolean\":false,\"conformity\":\"NON_CONFORMING\",\"observation\":\"Equipamento com falha\"}")
+            .exchange();
+
+        assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/submit")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson().extractingPath("$.status").asString().isEqualTo("SUBMITTED");
+    }
+
+    @Test
+    void submitWithNonConformingAnswerObservationRuleNotSetSucceeds() {
+        Inspection inspection = createInProgressInspection();
+        itemSnapshotRepository.deleteAll(
+            itemSnapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspection.getId()));
+        ItemSnapshot snapshot = itemSnapshotRepository.save(ItemSnapshot.builder()
+            .inspection(inspection).sectionTitle("S").sectionOrder(1)
+            .itemTitle("NC Item no rule").responseType("BOOLEAN").required(false)
+            .observationRequiredOnFailure(false).evidenceRequiredOnFailure(false)
+            .itemOrder(1).build());
+
+        mvc.put().uri("/inspections/" + inspection.getId() + "/responses/" + snapshot.getId())
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"valueBoolean\":false,\"conformity\":\"NON_CONFORMING\"}")
+            .exchange();
+
+        assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/submit")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson().extractingPath("$.status").asString().isEqualTo("SUBMITTED");
+    }
+
+    // ---- RN-039: evidence required on critical non-conforming item ----
+
+    @Test
+    void submitWithCriticalNonConformingAnswerMissingEvidenceReturns422() {
+        Inspection inspection = createInProgressInspection();
+        itemSnapshotRepository.deleteAll(
+            itemSnapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspection.getId()));
+        ItemSnapshot snapshot = itemSnapshotRepository.save(ItemSnapshot.builder()
+            .inspection(inspection).sectionTitle("S").sectionOrder(1)
+            .itemTitle("Critical Item").responseType("BOOLEAN").required(false)
+            .observationRequiredOnFailure(false).evidenceRequiredOnFailure(true)
+            .itemOrder(1).build());
+
+        mvc.put().uri("/inspections/" + inspection.getId() + "/responses/" + snapshot.getId())
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"valueBoolean\":false,\"conformity\":\"NON_CONFORMING\"}")
+            .exchange();
+
+        assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/submit")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
+    void submitWithCriticalNonConformingAnswerWithEvidenceSucceeds() {
+        Inspection inspection = createInProgressInspection();
+        itemSnapshotRepository.deleteAll(
+            itemSnapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspection.getId()));
+        ItemSnapshot snapshot = itemSnapshotRepository.save(ItemSnapshot.builder()
+            .inspection(inspection).sectionTitle("S").sectionOrder(1)
+            .itemTitle("Critical Item").responseType("BOOLEAN").required(false)
+            .observationRequiredOnFailure(false).evidenceRequiredOnFailure(true)
+            .itemOrder(1).build());
+
+        mvc.put().uri("/inspections/" + inspection.getId() + "/responses/" + snapshot.getId())
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"valueBoolean\":false,\"conformity\":\"NON_CONFORMING\"}")
+            .exchange();
+
+        InspectionResponse response = inspectionResponseRepository
+            .findByInspectionIdAndSnapshotId(inspection.getId(), snapshot.getId()).orElseThrow();
+
+        evidenceRepository.save(Evidence.builder()
+            .inspection(inspection).response(response)
+            .idempotencyKey(UUID.randomUUID()).type(EvidenceType.PHOTO)
+            .storageKey("evidence/test/photo.jpg").originalFileName("photo.jpg")
+            .mimeType("image/jpeg").sizeBytes(1024L)
+            .capturedAtDevice(Instant.now()).createdBy(adminUser).build());
+
+        assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/submit")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson().extractingPath("$.status").asString().isEqualTo("SUBMITTED");
+    }
+
+    @Test
+    void submitWithOnlyConformingAnswersWhenObservationRuleSetSucceeds() {
+        Inspection inspection = createInProgressInspection();
+        itemSnapshotRepository.deleteAll(
+            itemSnapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(inspection.getId()));
+        ItemSnapshot snapshot = itemSnapshotRepository.save(ItemSnapshot.builder()
+            .inspection(inspection).sectionTitle("S").sectionOrder(1)
+            .itemTitle("Conforming Item").responseType("BOOLEAN").required(false)
+            .observationRequiredOnFailure(true).evidenceRequiredOnFailure(false)
+            .itemOrder(1).build());
+
+        mvc.put().uri("/inspections/" + inspection.getId() + "/responses/" + snapshot.getId())
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"valueBoolean\":true,\"conformity\":\"CONFORMING\"}")
+            .exchange();
+
+        assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/submit")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson().extractingPath("$.status").asString().isEqualTo("SUBMITTED");
     }
 
     @Test

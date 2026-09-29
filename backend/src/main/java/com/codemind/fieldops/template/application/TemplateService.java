@@ -1,6 +1,7 @@
 package com.codemind.fieldops.template.application;
 
 import com.codemind.fieldops.shared.error.BusinessRuleViolationException;
+import com.codemind.fieldops.shared.error.ResourceConflictException;
 import com.codemind.fieldops.shared.error.ResourceNotFoundException;
 import com.codemind.fieldops.template.domain.InspectionTemplate;
 import com.codemind.fieldops.template.domain.TemplateItem;
@@ -22,6 +23,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -71,6 +73,22 @@ public class TemplateService {
         return version;
     }
 
+    @Transactional(readOnly = true)
+    public Page<TemplateVersion> listVersions(UUID templateId, Pageable pageable) {
+        getById(templateId);
+        Page<TemplateVersion> versions = versionRepository.findByTemplateIdOrderByVersionNumberDesc(templateId, pageable);
+        versions.forEach(v -> v.getSections().forEach(s -> s.getItems().size()));
+        return versions;
+    }
+
+    @Transactional(readOnly = true)
+    public TemplateVersion getVersion(UUID versionId) {
+        TemplateVersion version = versionRepository.findById(versionId)
+            .orElseThrow(() -> new ResourceNotFoundException("TEMPLATE_VERSION_NOT_FOUND", "Template version not found"));
+        version.getSections().forEach(s -> s.getItems().size());
+        return version;
+    }
+
     @Transactional
     public InspectionTemplate create(UUID createdByUserId, TemplateCreateRequest request) {
         User createdBy = userRepository.findById(createdByUserId)
@@ -101,15 +119,16 @@ public class TemplateService {
     @Transactional
     public TemplateVersion publish(UUID templateId, UUID publishedByUserId, List<TemplateSectionRequest> sections) {
         InspectionTemplate template = getById(templateId);
-        if (template.getStatus() != TemplateStatus.DRAFT) {
-            throw new BusinessRuleViolationException(TEMPLATE_NOT_DRAFT_CODE, "Only DRAFT templates can be published");
-        }
         if (sections == null || sections.isEmpty()) {
             throw new BusinessRuleViolationException(TEMPLATE_HAS_NO_SECTIONS_CODE, "Template must have at least one section to be published");
         }
 
         User publishedBy = userRepository.findById(publishedByUserId)
             .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND_CODE, "User not found"));
+
+        // Deactivate any previously active versions so only the new one is active for new inspections
+        versionRepository.findActiveVersionsByTemplateId(templateId)
+            .forEach(v -> v.setActiveForNewInspections(false));
 
         int nextVersionNumber = versionRepository.findMaxVersionNumberByTemplateId(templateId)
             .map(v -> v + 1)
@@ -155,13 +174,16 @@ public class TemplateService {
             version.getSections().add(section);
         }
 
-        TemplateVersion savedVersion = versionRepository.save(version);
-
-        template.setStatus(TemplateStatus.ACTIVE);
-        template.setCurrentVersion(nextVersionNumber);
-        templateRepository.save(template);
-
-        return savedVersion;
+        try {
+            TemplateVersion savedVersion = versionRepository.save(version);
+            template.setStatus(TemplateStatus.ACTIVE);
+            template.setCurrentVersion(nextVersionNumber);
+            templateRepository.save(template);
+            return savedVersion;
+        } catch (ObjectOptimisticLockingFailureException ex) {
+            throw new ResourceConflictException("CONCURRENT_PUBLISH",
+                "Another publish for this template is in progress. Please retry.");
+        }
     }
 
 }

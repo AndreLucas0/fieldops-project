@@ -1,5 +1,7 @@
 package com.codemind.fieldops.inspection.application;
 
+import com.codemind.fieldops.evidence.repository.EvidenceRepository;
+import com.codemind.fieldops.inspection.domain.Conformity;
 import com.codemind.fieldops.inspection.domain.Inspection;
 import com.codemind.fieldops.inspection.domain.InspectionResponse;
 import com.codemind.fieldops.inspection.domain.InspectionStatus;
@@ -11,6 +13,7 @@ import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
 import com.codemind.fieldops.shared.audit.AuditEventPublisher;
 import com.codemind.fieldops.shared.error.BusinessRuleViolationException;
+import com.codemind.fieldops.shared.error.ResourceConflictException;
 import com.codemind.fieldops.shared.error.ResourceNotFoundException;
 import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.repository.UserRepository;
@@ -34,21 +37,27 @@ public class InspectionExecutionService {
     private static final String INSPECTION_CANNOT_BE_STARTED_CODE = "INSPECTION_CANNOT_BE_STARTED";
     private static final String INSPECTION_CANNOT_BE_SUBMITTED_CODE = "INSPECTION_CANNOT_BE_SUBMITTED";
     private static final String MISSING_REQUIRED_RESPONSES_CODE = "MISSING_REQUIRED_RESPONSES";
+    private static final String MISSING_OBSERVATION_ON_NON_CONFORMING_CODE = "MISSING_OBSERVATION_ON_NON_CONFORMING";
+    private static final String MISSING_EVIDENCE_ON_NON_CONFORMING_CODE = "MISSING_EVIDENCE_ON_NON_CONFORMING";
+    private static final String INSPECTION_RESPONSE_LOCKED_CODE = "INSPECTION_RESPONSE_LOCKED";
 
     private final InspectionRepository inspectionRepository;
     private final ItemSnapshotRepository itemSnapshotRepository;
     private final InspectionResponseRepository responseRepository;
+    private final EvidenceRepository evidenceRepository;
     private final UserRepository userRepository;
     private final AuditEventPublisher auditEventPublisher;
 
     public InspectionExecutionService(InspectionRepository inspectionRepository,
                                        ItemSnapshotRepository itemSnapshotRepository,
                                        InspectionResponseRepository responseRepository,
+                                       EvidenceRepository evidenceRepository,
                                        UserRepository userRepository,
                                        AuditEventPublisher auditEventPublisher) {
         this.inspectionRepository = inspectionRepository;
         this.itemSnapshotRepository = itemSnapshotRepository;
         this.responseRepository = responseRepository;
+        this.evidenceRepository = evidenceRepository;
         this.userRepository = userRepository;
         this.auditEventPublisher = auditEventPublisher;
     }
@@ -119,6 +128,23 @@ public class InspectionExecutionService {
             }
         }
 
+        // RN-038/039: validate non-conforming responses
+        List<InspectionResponse> nonConformingResponses = responseRepository
+            .findByInspectionIdAndConformityFetchSnapshot(inspectionId, Conformity.NON_CONFORMING);
+        for (InspectionResponse response : nonConformingResponses) {
+            ItemSnapshot snapshot = response.getSnapshot();
+            if (Boolean.TRUE.equals(snapshot.getObservationRequiredOnFailure())
+                    && (response.getObservation() == null || response.getObservation().isBlank())) {
+                throw new BusinessRuleViolationException(MISSING_OBSERVATION_ON_NON_CONFORMING_CODE,
+                    "Non-conforming answer requires an observation");
+            }
+            if (Boolean.TRUE.equals(snapshot.getEvidenceRequiredOnFailure())
+                    && !evidenceRepository.existsByInspectionIdAndResponseId(inspectionId, response.getId())) {
+                throw new BusinessRuleViolationException(MISSING_EVIDENCE_ON_NON_CONFORMING_CODE,
+                    "Non-conforming item requires at least one evidence file");
+            }
+        }
+
         inspection.setStatus(InspectionStatus.SUBMITTED);
         inspection.setCompletedAtDevice(completedAtDevice);
         inspection.setSubmittedAtServer(Instant.now());
@@ -142,10 +168,21 @@ public class InspectionExecutionService {
         return metadata;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = ResourceConflictException.class)
     public InspectionResponse upsertResponse(UUID inspectionId, UUID snapshotId, UUID respondedByUserId,
                                               InspectionResponseCreateRequest request) {
         Inspection inspection = getInspection(inspectionId);
+
+        // RN-043: responses locked after SUBMITTED; RN-082: locked after APPROVED.
+        // UNDER_REVIEW is the intermediate state between SUBMITTED and APPROVED/REJECTED.
+        // noRollbackFor prevents marking the caller's transaction rollback-only when sync
+        // catches this exception (processOne uses REQUIRES_NEW and calls this via join).
+        if (inspection.getStatus() == InspectionStatus.SUBMITTED
+                || inspection.getStatus() == InspectionStatus.UNDER_REVIEW
+                || inspection.getStatus() == InspectionStatus.APPROVED) {
+            throw new ResourceConflictException(INSPECTION_RESPONSE_LOCKED_CODE,
+                "Inspection responses are locked once the inspection has been submitted for review or approved");
+        }
 
         ItemSnapshot snapshot = itemSnapshotRepository.findById(snapshotId)
             .orElseThrow(() -> new ResourceNotFoundException(SNAPSHOT_NOT_FOUND_CODE, "Snapshot not found"));
@@ -179,6 +216,7 @@ public class InspectionExecutionService {
         response.setValueDate(request.valueDate());
         response.setValueChoice(request.valueChoice());
         response.setObservation(request.observation());
+        response.setConformity(request.conformity() != null ? Conformity.valueOf(request.conformity()) : null);
 
         return responseRepository.save(response);
     }

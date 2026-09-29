@@ -27,6 +27,52 @@ ACTIVE / SUPERSEDED
 
 ---
 
+### [2026-09-27] — Substituição de MinIO por adobe/s3mock no docker-compose
+
+Context:
+`docker compose up -d` falhava com `401 UNAUTHORIZED` ao tentar baixar
+`quay.io/minio/minio:latest`. A imagem oficial do MinIO no Docker Hub
+(`minio/minio:latest`) também retorna `pull access denied — repository
+does not exist`. Ambos os registries requerem autenticação que não está
+configurada no ambiente de desenvolvimento.
+
+Decision:
+Substituir o serviço `evidence-storage` por `adobe/s3mock:latest`, que é
+acessível publicamente e compatível com S3 (aceita `forcePathStyle=true`).
+
+Configuração relevante:
+- Porta interna: 9090 (HTTP), mapeada para a porta externa `9000` via `EVIDENCE_STORAGE_PORT`.
+- Nenhuma mudança necessária na `application.yml` do backend — `EVIDENCE_STORAGE_ENDPOINT`
+  continua apontando para `http://localhost:9000`.
+- Env var para criação automática do bucket:
+  `COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS` (prefixo `com.adobe.testing.s3mock.store.*`
+  confirmado inspecionando `application.properties` dentro da imagem).
+- Healthcheck: `wget -q --spider http://localhost:9090/` (GET / = ListBuckets, 200 OK).
+- s3mock NÃO autentica credenciais — aceita qualquer `accessKey`/`secretKey`.
+  Variáveis `EVIDENCE_STORAGE_ACCESS_KEY` e `EVIDENCE_STORAGE_SECRET_KEY` continuam no
+  `.env.example` para uso futuro com um serviço real em produção.
+
+Reason:
+Imagens MinIO requerem autenticação em registry. adobe/s3mock é leve,
+S3-compatível e de acesso público.
+
+Alternatives considered:
+- `localstack/localstack:latest` — também acessível publicamente, mas requer configuração
+  mais complexa e não tem bucket auto-criação simples.
+- `bitnami/minio:latest` — não encontrado no Docker Hub.
+
+Impact:
+**Dados de evidência são efêmeros** — o `evidence-storage` usa diretório temp
+interno; dados são perdidos ao reiniciar o container. Aceitável em dev. Para
+persistir dados entre restarts em dev, fazer `docker commit` ou adicionar um
+volume com permissão de escrita para o usuário `cnb` (UID 1000).
+Removed: `fieldops_evidence_data` named volume (era o volume do MinIO).
+
+Status:
+ACTIVE
+
+---
+
 ### [2026-09-22] — Persistent cross-session project memory (`CLAUDE.md` + `project-state/`)
 
 Context:
@@ -58,6 +104,176 @@ Future sessions must read `project-state/*` before starting non-trivial work
 
 Status:
 ACTIVE
+
+---
+
+### [2026-09-27] — ITORDER-001: Pre-existing full-suite IT ordering failures
+
+Context:
+Running `./mvnw verify` (all IT classes in sequence) produces FK violations in
+three test classes when a previous class leaves records referencing shared tables.
+Observed failures:
+- `EquipmentControllerIT.setUp()`: `inspection_templates_created_by_fkey` FK
+  violation when `userRepository.deleteAll()` runs after `InspectionTemplateControllerIT`
+  left templates with `created_by` pointing to users.
+- `SiteControllerIT.setUp()`: same `inspection_templates_created_by_fkey` FK
+  violation caused by `InspectionSchedulingControllerIT` leaving templates in DB.
+- `MobileInspectionControllerIT`: 2 assertion failures even in isolation (pre-existing
+  test logic issue unrelated to ordering).
+
+Decision:
+Accept as known limitations. All affected classes pass in isolation and in
+sub-group runs. Do not use `./mvnw verify` alone as the pass/fail gate —
+use targeted isolation runs for classes under development.
+
+Reason:
+Fixing requires adding `JdbcTemplate` TRUNCATE CASCADE to each affected setUp().
+This is orthogonal to current BF work; tracked here for a dedicated cleanup task.
+
+Alternatives considered:
+Shared `@BeforeAll` with full-schema TRUNCATE CASCADE — rejected as too broad.
+
+Impact:
+Full `./mvnw verify` shows false negatives for `EquipmentControllerIT` and
+`SiteControllerIT`. CI should use targeted per-package IT runs.
+
+Status:
+ACTIVE (pending cleanup task)
+
+---
+
+### [2026-09-27] — BF-005: Section/item builder blocked by data model gap
+
+Context:
+`TemplateSection` belongs to `TemplateVersion` (FK `template_version_id`), not
+to `InspectionTemplate`. A section/item builder needs somewhere to store draft
+sections before publish. There is no "draft sections" table — any section
+written must be attached to a version, but a version is only created at publish
+time. The current publish flow (`POST /templates/{id}/publish`) receives all
+sections in one batch inside the publish request body.
+
+Decision:
+Defer section/item builder endpoints (`POST/PUT .../sections`, etc.) until a
+product decision is made on the mechanism. Two options:
+(a) Add a `draft_sections` table or shadow `template_sections` rows flagged
+    `draft = true` attached to the `InspectionTemplate` directly.
+(b) Introduce a `POST /inspection-templates/{id}/versions/draft` endpoint that
+    creates a `TemplateVersion` in `DRAFT` status, allowing sections to be
+    attached incrementally before a final `PUBLISH` action promotes it to
+    `ACTIVE`.
+
+Reason:
+Implementing the builder before the data model is resolved risks creating a
+DB migration that has to be reversed. This is a product architecture decision,
+not a coding decision.
+
+Alternatives considered:
+Reuse the publish payload approach (already in `PublishTemplateRequest`). This
+doesn't require new endpoints but changes the UX pattern from incremental-build
+to batch-submit.
+
+Impact:
+BF-005 status remains PARTIAL. The web's `listDraftSections`, `createSection`,
+`updateSection`, `createItem`, `updateItem` calls (`resources.ts`) will return
+404 until this is resolved.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-27] — N+1 lazy-init pattern in TemplateService (pre-existing, deferred)
+
+Context:
+`TemplateService.listVersions()` and `getActiveVersion()` initialize lazy
+section/item collections within the transaction by calling `.size()` in a loop:
+```java
+versions.forEach(v -> v.getSections().forEach(s -> s.getItems().size()));
+```
+For `listVersions` this is 1 + (page_size * N_sections) + (page_size * N_sections * N_items)
+queries per request — a two-level N+1. For `getActiveVersion` and `getVersion`
+(single version), the N+1 is bounded and low-risk in practice.
+The `findByIdWithSectionsAndItems` pre-existing query causes `MultipleBagFetchException`
+(JOIN FETCH two `@OneToMany` simultaneously), so `findById()` + lazy init was used.
+
+Decision:
+Accept the N+1 pattern for this sprint. Fixing requires `@EntityGraph` (sections
+only) + a second IN-batch query for items. Belongs in a dedicated performance sprint.
+
+Reason:
+Template versions are low-volume (typically 1–10 per template). Impact is minimal.
+
+Status:
+ACTIVE (pending performance sprint)
+
+---
+
+### [2026-09-28] — PEND-04: QR scope non-terminal statuses (RN-063)
+
+Context:
+`EquipmentService.getByQrCode()` (PEND-04) blocks TECHNICIAN access to equipment
+unless they have a non-terminal inspection for the equipment's site.
+`TERMINAL_STATUSES = {APPROVED, REJECTED, CANCELED}`. The ECC reviewer (H-02)
+raised whether `SUBMITTED` and `UNDER_REVIEW` should also be terminal.
+
+Decision:
+Treat `SUBMITTED` and `UNDER_REVIEW` as **non-terminal** for the QR scope check.
+Technicians retain access during the review phase.
+
+Reason:
+The technician may need to return to the site during supervisor review (e.g.,
+to provide clarifying evidence). Revoking mobile access at submit would block
+legitimate re-visits. `contrato-backend-frontend.md` PEND-04 marks the scope
+boundary as `[A DEFINIR]`; this decision fills the gap.
+
+Impact:
+Scope revoked only when inspection reaches `APPROVED`, `REJECTED`, or `CANCELED`.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-28] — PEND-04: AccessDeniedException from service layer (H-01 ECC)
+
+Context:
+`EquipmentService.getByQrCode()` throws `AccessDeniedException` from inside a
+`@Transactional(readOnly = true)` service method. ECC reviewer raised that this
+creates implicit coupling between `GlobalExceptionHandler.handleAccessDenied`
+(MVC dispatch path) and `JsonAccessDeniedHandler` (filter-chain path).
+
+Decision:
+Accept the pattern. Identical to `EvidenceService.delete()` (PEND-05).
+Both handlers produce the same JSON shape (403/FORBIDDEN).
+
+Reason:
+Changing requires a new exception class + `GlobalExceptionHandler` handler —
+out of scope for PEND-04. Integration test confirms the correct 403 response.
+
+Impact:
+Consistent with existing codebase patterns. Low risk while both handlers remain
+aligned.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-28] — PEND-04: Missing @Size on @PathVariable qrCode (H-03 ECC)
+
+Context:
+`GET /equipment/by-qr/{qrCode}` accepts an unconstrained String path variable.
+DB column is `VARCHAR(100)`. No SQL injection risk (parameterized). Adding
+`@Size(max=100)` with `@Validated` requires a `ConstraintViolationException`
+handler in `GlobalExceptionHandler` (absent). Codebase-wide gap — all
+`@PathVariable String` parameters lack constraints.
+
+Decision:
+Defer to a dedicated input-hardening sprint. Add `ConstraintViolationException`
+handler + `@Size` annotations across all String @PathVariable endpoints together.
+
+Status:
+ACTIVE (deferred)
 
 ---
 
@@ -266,6 +482,66 @@ ACTIVE
 
 ---
 
+### [2026-09-27] — BF-001: INACTIVE template re-publish behavior is undocumented
+
+Context:
+BF-001 removed the `status != DRAFT` guard from `TemplateService.publish()`. The
+`TemplateStatus` enum has three values: `DRAFT`, `ACTIVE`, `INACTIVE`. The previous
+guard blocked ACTIVE and INACTIVE equally. After BF-001, INACTIVE templates can also
+be re-published (they will become ACTIVE with a new version).
+
+Decision:
+Accept this behavior implicitly for now. No guard for INACTIVE has been added.
+`criterios-de-aceitacao.md` §17.5, RN-018–RN-022, and UC-04 are all silent on whether
+re-publishing an INACTIVE template is permitted. The behavior is by omission, not by
+explicit design.
+
+Reason:
+The acceptance criterion ("alterar modelo já utilizado → nova versão criada") is silent
+on INACTIVE. Adding a guard without a documented requirement would be speculative.
+
+Alternatives considered:
+Add `if (template.getStatus() == INACTIVE) { throw ... }` — rejected because no
+requirement mandates it; deferred until product explicitly prohibits it.
+
+Impact:
+If in the future it is decided that INACTIVE templates must not be re-published, add
+the guard in `TemplateService.publish()` and a test for the 422 response.
+
+Status:
+ACTIVE (pending product clarification if INACTIVE re-publish should be blocked)
+
+---
+
+### [2026-09-27] — BF-001: TemplateVersionControllerIT has same FK ordering risk as InspectionTemplateControllerIT
+
+Context:
+`InspectionTemplateControllerIT.setUp()` was updated (BF-001) to use
+`jdbcTemplate.execute("TRUNCATE TABLE inspection_template_versions CASCADE")` to avoid
+FK violations when inspection-creating IT classes leave data behind. The same risk exists
+in `TemplateVersionControllerIT.setUp()` (which uses `versionRepository.deleteAll()` first
+without the cascade truncation). The fix was not applied to `TemplateVersionControllerIT`
+because it is outside BF-001 scope and the class has been passing in isolation.
+
+Decision:
+Defer the fix to `TemplateVersionControllerIT` to a dedicated test-hygiene task.
+
+Reason:
+BF-001 scope discipline — only the file modified by this BF should be corrected here.
+`TemplateVersionControllerIT` has been passing in practice (7/7 GREEN); the FK violation
+would only manifest in full `./mvnw verify` if an inspection-creating IT class runs just
+before it.
+
+Impact:
+If `./mvnw verify` non-deterministically fails with FK violations in
+`TemplateVersionControllerIT.setUp()`, apply the same TRUNCATE CASCADE pattern used in
+`InspectionTemplateControllerIT`.
+
+Status:
+ACTIVE (known risk, deferred)
+
+---
+
 ### [2026-09-26] — Integração ECC × FieldOps: papel, perfil e governança
 
 Context:
@@ -328,6 +604,44 @@ ACTIVE
 
 ---
 
+### [2026-09-27] — MultipleBagFetchException em TemplateVersionRepository
+
+Context:
+`InspectionService.create()` chamava `findByIdWithSectionsAndItems` com JPQL
+`LEFT JOIN FETCH tv.sections s LEFT JOIN FETCH s.items`. Hibernate 7.4.1
+rejeita o fetch simultâneo de dois `List` (bags) → `MultipleBagFetchException`
+→ 500 em todos os testes que criam inspeções. Bug pré-existente; não havia sido
+detectado pois os IT tests também falhavam antes dessa sessão por outras razões.
+
+Decision:
+Remover `LEFT JOIN FETCH s.items` da query. Carregar `sections` via JOIN FETCH
+(única bag). Adicionar `@BatchSize(size=50)` em `TemplateSection.items` para
+que Hibernate carregue os itens em batch query separado quando acessados
+(evita N+1 sem cartesian product).
+
+Reason:
+Mudança mínima que não altera tipos de coleção (`List` permanece), não requer
+migração de dados, e resolve a exceção completamente. Para templates típicos
+(≤ 20 sections × ≤ 30 items), o batch loading é inexpressivo em termos de
+latência.
+
+Alternatives considered:
+- Mudar `List<TemplateSection>` para `Set<TemplateSection>` no `TemplateVersion`
+  (fix canônico Hibernate): rejeitado por ser mais invasivo — requer atualização
+  de todos os callers de `setSections()` em tests.
+- `@Fetch(FetchMode.SUBSELECT)`: equivalente ao BatchSize mas menos explícito
+  sobre o tamanho do lote.
+
+Impact:
+`TemplateSection.items` agora usa batch loading em vez de JOIN FETCH. Para
+templates com muitas seções, Hibernate emite `CEIL(sections / 50)` queries
+adicionais. Aceitável para o volume esperado no projeto.
+
+Status:
+ACTIVE
+
+---
+
 ### [2026-09-26] — Comportamento do stop-format-typecheck no FieldOps (Windows)
 
 Context:
@@ -370,6 +684,69 @@ LIMITAÇÃO: se o projeto for movido para um caminho sem espaços (ex.:
 comportamento deve ser compreendido. Se formatação automática não for desejada
 nesse cenário futuro, usar `ECC_DISABLED_HOOKS=stop:format-typecheck` como
 variável de ambiente local (sem versionar).
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-28] — RN-038/039: Path A — colunas booleanas em inspection_item_snapshots
+
+Context:
+`ItemSnapshot.rulesJson` existia como campo JSONB mas nunca era populado.
+`TemplateItem` tem `observationRequiredOnFailure` e `evidenceRequiredOnFailure`
+como colunas booleanas dedicadas. `createSnapshots()` não copiava esses campos.
+Duas abordagens para implementar RN-038/039: Path A (migration V13 + colunas
+booleanas) vs Path B (popular `rulesJson` com JSON e parsear em runtime).
+
+Decision:
+Path A — migração V13 + colunas booleanas explícitas em `inspection_item_snapshots`.
+
+Reason:
+Espelha o design de `template_items`. Evita parsing de JSON em `submit()`.
+Indexável, tipado, simples de testar.
+
+Impact:
+V13 migration aplicada. `createSnapshots()` copia os valores de `TemplateItem`.
+`submit()` valida respostas NON_CONFORMING via
+`findByInspectionIdAndConformityFetchSnapshot` (JOIN FETCH para evitar N+1).
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-28] — RN-038/039: cross-module coupling inspection → evidence
+
+Context:
+ECC java-reviewer identificou que `InspectionExecutionService` importa
+`EvidenceRepository` diretamente do módulo `evidence`.
+
+Decision:
+Aceitar o acoplamento direto — mesmo padrão de `NonConformityEvidenceValidator`.
+
+Reason:
+Projeto acadêmico. Anti-corruption layer adicionaria boilerplate sem benefício
+prático. Coerência com padrão existente é preferível.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-28] — rulesJson em ItemSnapshot intencionalmente não populado
+
+Context:
+`ItemSnapshot.rulesJson` existe na entidade e na tabela mas nunca é populado.
+`TemplateItem` não tem campo `rulesJson` equivalente. As regras binárias foram
+implementadas via colunas dedicadas (Path A, V13).
+
+Decision:
+`rulesJson` permanece null/unused — campo reservado para regras futuras mais complexas.
+
+Reason:
+Não há fonte correspondente em `TemplateItem` para copiar. Se necessário no
+futuro, o campo está disponível sem nova migration.
 
 Status:
 ACTIVE

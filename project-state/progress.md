@@ -1,85 +1,310 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-09-26
+Last updated: 2026-09-28 (BF-007)
 
 ## Current State
 
 Backend audit completed (2026-09-22, see `project-state/backend-audit.md`).
 
-The backend is not yet functionally complete relative to `./docs/**`.
+Todos os itens críticos do audit (BF-001 a BF-006) estão implementados e commitados.
+A branch `feat/BF-001` está 6 commits à frente de `main` (BF-002 a BF-005 + BF-001 —
+BF-006 já está em `main` desde `132b2c4`). Nenhum commit pendente na working tree.
 
-BF-006 (evidence upload block on APPROVED inspections) implemented on
-2026-09-26 and committed on 2026-09-27 (commit `132b2c4 feat: evidence read
-only`) — see pending-features.md for updated status. Backend now enforces
-RN-049 for both upload and delete paths.
+### BF-001 — Template Versioning — commitado `7553bc7`
 
-Persistent project memory (`CLAUDE.md` + `project-state/`) was set up on
-2026-09-22 in a dedicated, non-implementation task — see `decisions.md` for
-the rationale.
+`POST /inspection-templates/{id}/publish` agora funciona para templates em qualquer
+status (não apenas `DRAFT`). Chamar em template `ACTIVE` cria nova versão com
+`versionNumber` auto-incrementado, desativa versões ativas anteriores
+(`activeForNewInspections = false`) e mantém o template `ACTIVE`. Publishes
+concorrentes protegidos por `@Version` em `InspectionTemplate` → 409.
+3/3 novos IT tests + 17/17 `InspectionTemplateControllerIT` + 46/46 unit tests GREEN.
+`InspectionTemplateControllerIT.setUp()` atualizado com TRUNCATE CASCADE via
+`JdbcTemplate` para evitar violações de FK entre IT classes.
 
-## Completed Work Referenced by Recent Git History
+### BF-002 — Lock Inspection Responses — commitado `42d86fd`
 
-Verified against `git log --oneline --decorate` on `main` (HEAD `c929ea3`) on
-2026-09-22:
+Guard clause em `InspectionExecutionService.upsertResponse()` bloqueia alterações de
+respostas quando a inspeção está em `SUBMITTED`, `UNDER_REVIEW` ou `APPROVED` (RN-043,
+RN-082). `SynchronizationService.apply()` captura `ResourceConflictException` e retorna
+`Outcome.rejected()`. 4 novos IT tests GREEN (3 HTTP + 1 sync path).
 
-| Ref (task id inferred from branch name) | Commit | Summary |
+### BF-003 — Persist `conformity` — commitado `2c4893f`
+
+Campo `conformity` adicionado a `InspectionResponseCreateRequest`,
+`InspectionResponseSyncPayload` e `InspectionResponseDto`. Validação `@Pattern` → 400
+para strings de enum inválidas. 4 novos IT tests GREEN.
+
+### BF-004 — Dashboard + Inspection History — commitado `1545467`
+
+`GET /dashboard/summary`, `GET /dashboard/inspections-by-status`,
+`GET /dashboard/non-conformities-by-severity` e `GET /inspections/{id}/history`
+implementados. 13/13 IT tests GREEN. 2 HIGHs do ECC corrigidos antes do commit.
+
+### BF-005 — Template Version Read Endpoints — commitado `228825c` (PARTIAL)
+
+`GET /inspection-templates/{id}/versions` e `GET /inspection-template-versions/{versionId}`
+implementados. `TemplateController` com dual mapping `/templates/*` + `/inspection-templates/*`.
+Pre-req fixes: `FlywayMigrationIT` version assertion + `TemplateItemRequest` boolean → Boolean.
+7/7 IT tests GREEN. Section/item builder ainda **BLOQUEADO** — decisão de produto pendente
+sobre armazenamento de seções draft (ver `decisions.md` 2026-09-27).
+
+### NESTED-NAV — Nested Navigation Endpoints — não commitado ainda
+
+`GET /clients/{clientId}/sites` e `GET /sites/{siteId}/equipment` implementados
+(openapi.yaml §12.7, §12.8; web client `resources.ts` linhas 214/235 chamavam
+esses endpoints e recebiam 404).
+
+Abordagem: endpoints adicionados diretamente em `ClientController` e
+`SiteController` respectivamente. Cada endpoint valida existência do pai
+(`clientService.getById` / `siteService.getById`) retornando 404 se não
+encontrado, depois delega ao `SiteService.list` / `EquipmentService.list`
+já existentes. Sem nova migration ou novo service.
+
+16/16 `ClientControllerIT` GREEN (incluindo 4 novos testes da rota nested).
+17/17 `SiteControllerIT` GREEN (incluindo 4 novos testes da rota nested).
+13/13 `EquipmentControllerIT` GREEN. 46/46 unit tests GREEN.
+
+Pre-existing full-suite ordering failures (não relacionadas a esta BF):
+`EquipmentControllerIT` + `SiteControllerIT` falham no `./mvnw verify` completo
+por FK ordering entre IT classes (ver `decisions.md` 2026-09-27 — ITORDER-001).
+Todos passam em isolamento e em grupos de classes relacionadas.
+
+### PEND-15 — Admin Filters on `GET /inspections` — não commitado ainda
+
+5 filtros documentados no `openapi.yaml` adicionados a `GET /inspections`:
+`supervisorId` (UUID), `equipmentId` (UUID), `scheduledFrom` (Instant),
+`scheduledTo` (Instant), `overdue` (Boolean). Sem migration necessária — todos
+os campos já existiam na entidade `Inspection`.
+
+Side-fix: `MultipleBagFetchException` pré-existente em `POST /inspections`
+corrigida como bloqueador de teste: removido `LEFT JOIN FETCH s.items` da query
+`TemplateVersionRepository.findByIdWithSectionsAndItems`; adicionado
+`@BatchSize(size=50)` em `TemplateSection.items`.
+
+19/19 `InspectionSchedulingControllerIT` GREEN (incluindo 6 novos testes dos filtros
++ 2 novos testes de overdue). 52/52 nos 4 inspection IT classes. 24/24 nos template IT
+classes. 0 regressões.
+
+### PEND-04 — QR Lookup Scope (RN-063) — não commitado ainda
+
+`GET /equipment/by-qr/{qrCode}` now enforces RN-063: a TECHNICIAN can only read
+equipment data if they have a non-terminal inspection assigned to that equipment's
+site. ADMIN and SUPERVISOR are unrestricted.
+
+Scope definition: non-terminal = any status except APPROVED, REJECTED, CANCELED
+(see `decisions.md` 2026-09-28 for the SUBMITTED/UNDER_REVIEW rationale).
+
+Implementation:
+- `InspectionRepository` — `existsByTechnicianIdAndSiteIdAndStatusNotIn()`
+- `EquipmentService.getByQrCode()` — new params `(UUID userId, boolean isTechnician)`,
+  scope check via repository query, `AccessDeniedException` → 403 if out of scope
+- `EquipmentController.getByQrCode()` — extracts JWT claims, passes to service
+- `EquipmentControllerIT` — added `@AfterEach` tearDown (cross-class FK fix),
+  renamed `technicianCanGetEquipmentByQrCode` → `technicianCannotGetEquipmentByQrCodeOutOfScope`
+  (now expects 403), added `technicianCanGetEquipmentByQrCodeWithActiveInspection` (200),
+  added `technicianCannotGetEquipmentByQrCodeFromDifferentSite` (403)
+- `EquipmentServiceTest` — new unit test class (4 tests for scope logic)
+
+ECC java-reviewer results: 0 CRITICAL, 3 HIGH — all resolved:
+  - H-01 (AccessDeniedException from service): accepted, matches PEND-05 pattern (decisions.md)
+  - H-02 (SUBMITTED/UNDER_REVIEW scope): explicit decision recorded (decisions.md)
+  - H-03 (@Size on @PathVariable): deferred, codebase-wide gap (decisions.md)
+4 MEDIUM findings: M-02 fixed (EquipmentServiceTest), M-03 fixed (different-site test),
+M-01 and M-04 documented/deferred.
+
+Test results:
+- EquipmentControllerIT: 15/15 GREEN (3 new PEND-04 tests)
+- EquipmentControllerIT + SiteControllerIT: 31/31 GREEN (@AfterEach fixed cross-class FK)
+- Unit tests: 50/50 GREEN (4 new in EquipmentServiceTest)
+- InspectionSchedulingControllerIT + SiteControllerIT: pre-existing ITORDER-001 failure,
+  not caused by PEND-04
+
+---
+
+### RN-038/039 — Submit Validation (Observation + Evidence on Non-Conforming) — não commitado ainda
+
+Validação de submit ampliada para cobrir RN-038/039:
+- **RN-038**: se `ItemSnapshot.observationRequiredOnFailure = true` e a resposta tem
+  `conformity = NON_CONFORMING`, o campo `observation` é obrigatório; ausência → 422.
+- **RN-039**: se `ItemSnapshot.evidenceRequiredOnFailure = true` e a resposta tem
+  `conformity = NON_CONFORMING`, pelo menos uma evidência vinculada ao response é
+  obrigatória; ausência → 422.
+
+Prerequisito corrigido: `createSnapshots()` não copiava `observationRequiredOnFailure`
+nem `evidenceRequiredOnFailure` do `TemplateItem` para o `ItemSnapshot`. Path A escolhido:
+migração V13 adicionou as colunas à `inspection_item_snapshots`.
+
+Implementation:
+- `V13__add_snapshot_failure_rules.sql` — `ALTER TABLE inspection_item_snapshots ADD COLUMN
+  observation_required_on_failure BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN
+  evidence_required_on_failure BOOLEAN NOT NULL DEFAULT FALSE`
+- `ItemSnapshot.java` — dois novos campos booleanos + `@PrePersist` defaults
+- `InspectionService.createSnapshots()` — copia os dois campos de `TemplateItem`
+- `InspectionResponseRepository` — `findByInspectionIdAndConformityFetchSnapshot`
+  (JPQL com `JOIN FETCH r.snapshot` para evitar N+1)
+- `EvidenceRepository` — `existsByInspectionIdAndResponseId`
+- `InspectionExecutionService` — `EvidenceRepository` injetado; bloco de validação
+  RN-038/039 após o bloco RN-037 existente
+- `InspectionExecutionControllerIT` — `@AfterEach tearDown()` adicionado (fix cross-class
+  FK — mesmo padrão de PEND-04 `EquipmentControllerIT`); 6 novos testes (5 RN-038/039 + 1
+  CONFORMING coexistence)
+
+ECC java-reviewer: 0 CRITICAL, 3 HIGH — todos resolvidos:
+- H-1 (N+1): corrigido com JOIN FETCH query
+- H-2 (readOnly): `@Transactional(readOnly = true)` adicionado ao método
+- H-3 (InspectionSchedulingControllerIT teardown): aceito — testes passam GREEN,
+  `@AfterEach` em `InspectionExecutionControllerIT` cobre o cleanup; registrado em decisions.md
+MEDIUM/LOW findings: cross-module coupling aceito (mesmo padrão), conforming coexistence
+test adicionado, error code renomeado de `CRITICAL_NON_CONFORMING` para `NON_CONFORMING`.
+
+Test results:
+- InspectionExecutionControllerIT: 18/18 GREEN (6 novos testes)
+- Regression: 115/115 GREEN (InspectionExecution + InspectionResponse + InspectionScheduling
+  + SyncPush + FlywayMigrationIT + todos *Test unitários)
+
+---
+
+### PEND-05 — Evidence Deletion Ownership — não commitado ainda
+
+Guard de ownership adicionado a `EvidenceService.delete()`: TECHNICIAN só pode deletar
+evidências de inspeções onde é o técnico atribuído. ADMIN e SUPERVISOR mantêm acesso
+irrestrito. Guard reordenado: ownership (403) antes do APPROVED check (409) para evitar
+vazamento de estado a usuários não autorizados.
+
+EvidenceController.delete(): extraído `isTechnician` de `jwt.getClaimAsString(JwtClaims.ROLE)`,
+repassado ao service junto com `userId`.
+
+12/12 `EvidenceControllerIT` GREEN (incluindo 1 novo teste `technicianCannotDeleteEvidenceFromOtherTechniciansInspection`).
+46/46 unit tests GREEN. Outros ITs em isolamento: 19/19 InspectionSchedulingControllerIT,
+12/12 InspectionExecutionControllerIT, 10/10 SyncPushControllerIT.
+
+Side-fix: 3 MEDIUMs do ECC java-reviewer corrigidos antes de finalizar:
+- Guard ordering invertido (ownership antes de APPROVED)
+- Asserção pós-rejeição adicionada ao novo teste (evidência ainda existe no DB)
+- Upload setup no teste agora tem asserção de sucesso
+
+---
+
+### BF-006 — Evidence Read-Only After Approval — commitado `132b2c4` (em `main`)
+
+Guard clause em `EvidenceService.upload()` bloqueia uploads em inspeções `APPROVED`
+(RN-049). 11/11 `EvidenceControllerIT` + 46/46 unit tests GREEN.
+
+---
+
+## Completed Work — Git History Atualizado
+
+Verificado contra `git log --oneline` em `feat/BF-001` em 2026-09-27:
+
+| Commit | Branch/contexto | Resumo |
 |---|---|---|
-| INT-001 | `a25f337` (branch `task/int-001-align-templates-api`) | fix: align templates API integration |
-| INT-005 | `358b1ec` (branch `task/int-005-technician-start-inspection`) | fix: allow technicians to start assigned inspections |
-| INT-010 | `4f31cda` (branch `task/int-010-web-login`) | feat: implement web authentication flow |
-| INT-006 | `b311fd5` (branch `task/int-006-align-inspection-detail-contract`) | fix: align mobile inspection detail contract |
-| — | `c929ea3` | Merge pull request #263 (merges INT-006 branch into `main`) |
+| `7553bc7` | `feat/BF-001` | feat: template versioning feature (BF-001) |
+| `228825c` | `feat/BF-001` | feat: template versions and sections endpoints (BF-005) |
+| `1545467` | `feat/BF-001` | feat: implement dashboard and inspection history endpoints (BF-004) |
+| `89b8d50` | `feat/BF-001` | doc: pending-features update |
+| `2c4893f` | `feat/BF-001` | feat: persist conformity field (BF-003) |
+| `42d86fd` | `feat/BF-001` | feat: lock inspection responses after submission/approval (BF-002) |
+| `b885ae0` | `feat/BF-001` (base) | docs: correlação de stale data |
+| `132b2c4` | `main` (HEAD) | feat: evidence read only (BF-006) |
+| `c929ea3` | `main` | Merge pull request #263 (INT-006) |
+| `9a33c5c` | `main` | Merge pull request #267 (INT-005) |
 
-These entries are read directly from `git log`/`git branch -a` and are
-current as of this update. Re-verify with `git log` in future sessions rather
-than trusting this table indefinitely — it will go stale as work continues.
+Re-verificar com `git log` em sessões futuras — esta tabela envelhecerá com novos merges.
 
-## Latest Backend Audit
+---
 
-44 features analyzed (see `project-state/backend-audit.md` for full detail
-and evidence):
+## Status Atualizado do Audit
 
-- 28 implemented (🟢)
-- 6 partial (🟡)
-- 7 not implemented (🔴)
-- 2 without test evidence (⚪)
-- 0 mock/placeholder (🔵)
-- 1 not integrated (🟣)
+Audit base: 2026-09-22, HEAD `c929ea3`, 44 features (ver `backend-audit.md`).
+
+Desde o audit, os seguintes itens 🔴 foram resolvidos:
+
+| BF | Item audit | Status anterior | Status atual |
+|---|---|---|---|
+| BF-006 | 🔴 #6 evidence upload bloqueado em APPROVED | 🔴 | 🟢 |
+| BF-002 | 🔴 #5 lock responses após submit/approval | 🔴 | 🟢 |
+| BF-003 | 🟡 #4 persist `conformity` | 🟡 | 🟢 |
+| BF-004 | 🔴 #4/#7 dashboard + history | 🔴 | 🟢 |
+| BF-005 | 🔴 #2/#3 template version read endpoints | 🔴 | 🟡 (partial — builder bloqueado) |
+| BF-001 | 🔴 #1 template re-versioning | 🔴 | 🟢 |
+
+---
 
 ## Current Pending Work
 
-See `project-state/pending-features.md` (BF-001 through BF-007).
+Ver `project-state/pending-features.md` para detalhe de cada item.
+
+Itens ainda pendentes:
+- **BF-005** (PARTIAL/BLOCKED) — section/item builder endpoints aguardam decisão de produto
+- ~~BF-007 (mobile sync)~~ — **CONCLUÍDA** em 2026-09-28 (ver BF-007 abaixo)
+- ~~PEND-04 (QR scope)~~ — **RESOLVIDA** em 2026-09-28 (ver PEND-04 acima)
+- ~~PEND-05 (evidence ownership)~~ — **RESOLVIDA** em 2026-09-28 (ver PEND-05 acima)
+- ~~PEND-15 (admin filters)~~ — **RESOLVIDA** em 2026-09-28 (commitado em `22b7d31`)
+- ~~RN-038/039 (submit validation)~~ — **RESOLVIDA** em 2026-09-28 (ver acima)
+- **Hardening** — `@Size` em `@PathVariable String` + handler `ConstraintViolationException` (codebase-wide, deferred)
+
+---
+
+### BF-007 — Mobile Sync Integration — não commitado ainda
+
+Offline-first sync implementada no mobile (Expo SDK 57 / React Native):
+
+- `mobile/src/services/local-db.ts` — outbox SQLite com INSERT OR REPLACE
+  por UUID; `synced = 0` na gravação, `synced = 1` após confirmação do servidor.
+- `mobile/src/services/sync-service.ts` — `isOnline()` via `expo-network`,
+  `getOrCreateDeviceId()` via `expo-secure-store`; `syncPending()` envia batches
+  de 50 para `POST /mobile/sync/push`; SINGLE_CHOICE mapeado para `valueChoice`.
+- `mobile/src/features/sync/use-sync.ts` — `useSyncOnForeground()`: dispara na
+  montagem e ao voltar do background via `AppState`.
+- `use-checklist.ts` `send()` reescrito: escreve no outbox SQLite primeiro,
+  chama `syncPendingIfOnline()` em background (void), nunca chama a API diretamente.
+- `summary.tsx`: sync-on-mount antes de avaliar conclusão; `submit()` verifica
+  `isOnline()` e drena o outbox antes de POST /inspections/{id}/submit.
+- `_layout.tsx`: `useSyncOnForeground()` chamado incondicionalmente.
+- `jest.setup.js`: mocks de `expo-network` (padrão online=true) e `expo-sqlite`
+  (Map em memória com reset no `beforeEach`).
+- `checklist-screen.test.tsx`: teste "grava resposta" removeu asserção do mock DB;
+  teste de erro reescrito para simular falha SQLite via `mockRejectedValueOnce`.
+
+Validação: `npm test` não executado (node_modules ausente). Lógica revisada
+manualmente. Mock design verificado contra strings SQL de `local-db.ts`.
+
+---
 
 ## Recommended Next Task
 
-BF-001 — Template Versioning
+Todos os backend BFs do audit estão concluídos ou formalmente bloqueados. Opções:
 
-This is a planning/state recommendation carried over from the audit report,
-not an instruction to implement it automatically. The actual next task
-should be chosen with the project owner, considering product priorities not
-captured by this audit (the audit deliberately avoided ranking pendencies by
-complexity/priority — see `backend-audit.md` methodology).
+1. **Abrir PR de `feat/PEND-004` → `main`** — integrar tudo: BF-002..005, NESTED-NAV,
+   PEND-04/05/15, RN-038/039. **Fortemente recomendado** — a branch está 10+ commits à
+   frente de `main`, acumulando risco de divergência.
+
+2. **Decisão de produto sobre BF-005** — seções draft (tabela separada vs. `TemplateVersion`
+   em `DRAFT`). Decisão de produto/arquitetura, não de código (ver `decisions.md` 2026-09-27).
+
+3. **BF-007** — integração mobile sync (tarefa do lado mobile).
+
+4. **Input hardening** — `@Size` em `@PathVariable String` + `ConstraintViolationException`
+   handler (codebase-wide, deferred).
+
+---
 
 ## Environment Limitations Observed
 
-- The 2026-09-22 backend audit was read-only and evidence-based on static
-  analysis: it read test files as evidence of coverage but did **not**
-  execute the test suites (`./mvnw test`/`verify`, `npm test` in web/mobile).
-  Treat "🟢 implemented + tested" findings as "a corresponding test file
-  exists and appears to cover the case," not as "the suite was run and
-  passed in this session."
-- Backend integration tests (`*IT.java`) use Testcontainers and require a
-  running Docker daemon — availability not verified in this session.
-- This session ran on Windows (win32); path/shell specifics in `CLAUDE.md`
-  §10 apply.
+- Docker esteve **disponível** em 2026-09-27 — IT tests via Testcontainers executados
+  com sucesso (todos os ITs verificados passaram em isolamento nesta sessão).
+- iOS: Expo Go no App Store travado em SDK 54 enquanto o projeto usa SDK 57; requer
+  macOS para o simulador (`ESTADO-DO-PROJETO.md` §8).
+- Android via Expo Go funciona no Windows com o APK linkado (`ESTADO-DO-PROJETO.md` §8).
+- Mobile web preview (`npx expo start --web`) não exercita camera/QR/GPS/SecureStore
+  de forma confiável (`ESTADO-DO-PROJETO.md` §9).
+- Windows (win32) / PowerShell como shell primário; Bash disponível via Git Bash.
+
+---
 
 ## Historical Note
 
-`ESTADO-DO-PROJETO.md` (dated 2026-08-18) states "A API (Java/Spring) não
-existe neste repositório." This is now stale — `backend/` contains 184 Java
-files, 12 Flyway migrations, and 27 test files as of 2026-09-22. The document
-was written from the `web` branch before the backend was merged into `main`.
-Do not use `ESTADO-DO-PROJETO.md` as the source of truth for backend state;
-use `project-state/backend-audit.md` instead. (Recorded as a documentation
-divergence in `project-state/backend-audit.md` rather than corrected in
-place, per the read-only audit rules that produced it.)
+`ESTADO-DO-PROJETO.md` (2026-08-18) afirma "A API (Java/Spring) não existe neste
+repositório" — informação stale. O `backend/` tem 184+ Java files, 12 Flyway
+migrations e vários test files. Usar `project-state/backend-audit.md` como fonte de
+verdade do estado do backend, não `ESTADO-DO-PROJETO.md`.

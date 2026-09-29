@@ -15,6 +15,7 @@ import com.codemind.fieldops.shared.error.BusinessRuleViolationException;
 import com.codemind.fieldops.shared.error.ResourceConflictException;
 import com.codemind.fieldops.shared.error.ResourceNotFoundException;
 import com.codemind.fieldops.shared.storage.EvidenceStorageClient;
+import org.springframework.security.access.AccessDeniedException;
 import com.codemind.fieldops.shared.storage.EvidenceStorageProperties;
 import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.repository.UserRepository;
@@ -162,8 +163,11 @@ public class EvidenceService {
     }
 
     @Transactional
-    public void delete(UUID id, UUID userId) {
+    public void delete(UUID id, UUID userId, boolean isTechnician) {
         Evidence evidence = getById(id);
+        if (isTechnician && !evidence.getInspection().getTechnician().getId().equals(userId)) {
+            throw new AccessDeniedException("You do not have access to this inspection");
+        }
         if (evidence.getInspection().getStatus() == InspectionStatus.APPROVED) {
             throw new ResourceConflictException(EVIDENCE_READ_ONLY_CODE,
                 "Evidence of an approved inspection is read-only");

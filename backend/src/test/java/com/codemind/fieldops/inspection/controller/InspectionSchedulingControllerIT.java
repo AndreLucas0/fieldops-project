@@ -7,6 +7,12 @@ import com.codemind.fieldops.TestcontainersConfiguration;
 import com.codemind.fieldops.client.domain.Client;
 import com.codemind.fieldops.client.domain.ClientStatus;
 import com.codemind.fieldops.client.repository.ClientRepository;
+import com.codemind.fieldops.equipment.domain.Equipment;
+import com.codemind.fieldops.equipment.domain.EquipmentStatus;
+import com.codemind.fieldops.equipment.repository.EquipmentRepository;
+import com.codemind.fieldops.inspection.domain.Inspection;
+import com.codemind.fieldops.inspection.domain.InspectionPriority;
+import com.codemind.fieldops.inspection.domain.InspectionStatus;
 import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
@@ -89,8 +95,12 @@ class InspectionSchedulingControllerIT {
     @Autowired
     private JwtEncoder jwtEncoder;
 
+    @Autowired
+    private EquipmentRepository equipmentRepository;
+
     private User adminUser;
     private User technicianUser;
+    private User supervisorUser;
     private String adminToken;
     private String technicianToken;
     private Client testClient;
@@ -103,6 +113,7 @@ class InspectionSchedulingControllerIT {
         inspectionResponseRepository.deleteAll();
         itemSnapshotRepository.deleteAll();
         inspectionRepository.deleteAll();
+        equipmentRepository.deleteAll();
         templateVersionRepository.deleteAll();
         templateRepository.deleteAll();
         siteRepository.deleteAll();
@@ -111,6 +122,7 @@ class InspectionSchedulingControllerIT {
 
         adminUser = userRepository.save(newUser("Admin", "admin.insp@fieldops.local", UserRole.ADMIN));
         technicianUser = userRepository.save(newUser("Technician", "tech.insp@fieldops.local", UserRole.TECHNICIAN));
+        supervisorUser = userRepository.save(newUser("Supervisor", "supervisor.insp@fieldops.local", UserRole.SUPERVISOR));
         adminToken = mintAccessToken(adminUser);
         technicianToken = mintAccessToken(technicianUser);
 
@@ -392,6 +404,188 @@ class InspectionSchedulingControllerIT {
             .hasStatusOk()
             .bodyJson()
             .extractingPath("$.content[*].status").asList().containsOnly("DRAFT");
+    }
+
+    @Test
+    void filterInspectionsBySupervisorId() {
+        mvc.post().uri("/inspections").header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(buildCreatePayloadWithSupervisor(supervisorUser.getId())).exchange();
+        mvc.post().uri("/inspections").header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON).content(buildCreatePayload("LOW")).exchange();
+
+        assertThat(mvc.get()
+            .uri("/inspections?supervisorId=" + supervisorUser.getId())
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content").asList().hasSize(1);
+    }
+
+    @Test
+    void filterInspectionsByEquipmentId() {
+        Equipment equipment = equipmentRepository.save(Equipment.builder()
+            .site(testSite)
+            .name("Test Equipment")
+            .qrCode("QR-FILTER-001")
+            .status(EquipmentStatus.ACTIVE)
+            .build());
+
+        mvc.post().uri("/inspections").header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(buildCreatePayloadWithEquipment(equipment.getId())).exchange();
+        mvc.post().uri("/inspections").header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON).content(buildCreatePayload("LOW")).exchange();
+
+        assertThat(mvc.get()
+            .uri("/inspections?equipmentId=" + equipment.getId())
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content").asList().hasSize(1);
+    }
+
+    @Test
+    void filterInspectionsByScheduledFrom() {
+        mvc.post().uri("/inspections").header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(buildCreatePayloadWithScheduledFor("2020-06-01T10:00:00Z")).exchange();
+        mvc.post().uri("/inspections").header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(buildCreatePayloadWithScheduledFor("2030-06-01T10:00:00Z")).exchange();
+
+        assertThat(mvc.get()
+            .uri("/inspections?scheduledFrom=2025-01-01T00:00:00Z")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content").asList().hasSize(1);
+    }
+
+    @Test
+    void filterInspectionsByScheduledTo() {
+        mvc.post().uri("/inspections").header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(buildCreatePayloadWithScheduledFor("2020-06-01T10:00:00Z")).exchange();
+        mvc.post().uri("/inspections").header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(buildCreatePayloadWithScheduledFor("2030-06-01T10:00:00Z")).exchange();
+
+        assertThat(mvc.get()
+            .uri("/inspections?scheduledTo=2025-01-01T00:00:00Z")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content").asList().hasSize(1);
+    }
+
+    @Test
+    void overdueFilterReturnsPastDueActiveInspections() {
+        inspectionRepository.save(Inspection.builder()
+            .templateVersion(activeTemplateVersion)
+            .client(testClient).site(testSite).technician(technicianUser).createdBy(adminUser)
+            .priority(InspectionPriority.MEDIUM).status(InspectionStatus.DRAFT)
+            .scheduledFor(Instant.parse("2020-01-01T10:00:00Z"))
+            .build());
+        inspectionRepository.save(Inspection.builder()
+            .templateVersion(activeTemplateVersion)
+            .client(testClient).site(testSite).technician(technicianUser).createdBy(adminUser)
+            .priority(InspectionPriority.MEDIUM).status(InspectionStatus.DRAFT)
+            .scheduledFor(Instant.parse("2030-01-01T10:00:00Z"))
+            .build());
+
+        assertThat(mvc.get()
+            .uri("/inspections?overdue=true")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content").asList().hasSize(1);
+    }
+
+    @Test
+    void overdueFilterExcludesNonActiveStatuses() {
+        inspectionRepository.save(Inspection.builder()
+            .templateVersion(activeTemplateVersion)
+            .client(testClient).site(testSite).technician(technicianUser).createdBy(adminUser)
+            .priority(InspectionPriority.MEDIUM).status(InspectionStatus.DRAFT)
+            .scheduledFor(Instant.parse("2020-01-01T10:00:00Z"))
+            .build());
+        inspectionRepository.save(Inspection.builder()
+            .templateVersion(activeTemplateVersion)
+            .client(testClient).site(testSite).technician(technicianUser).createdBy(adminUser)
+            .priority(InspectionPriority.MEDIUM).status(InspectionStatus.APPROVED)
+            .scheduledFor(Instant.parse("2020-01-01T10:00:00Z"))
+            .build());
+
+        assertThat(mvc.get()
+            .uri("/inspections?overdue=true")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content").asList().hasSize(1);
+
+        assertThat(mvc.get()
+            .uri("/inspections?overdue=false")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content").asList().hasSize(1);
+    }
+
+    private String buildCreatePayloadWithSupervisor(UUID supervisorId) {
+        return """
+            {
+              "templateVersionId": "%s",
+              "clientId": "%s",
+              "siteId": "%s",
+              "technicianId": "%s",
+              "supervisorId": "%s",
+              "priority": "MEDIUM",
+              "scheduledFor": "2027-01-15T10:00:00Z"
+            }""".formatted(
+            activeTemplateVersion.getId(),
+            testClient.getId(),
+            testSite.getId(),
+            technicianUser.getId(),
+            supervisorId
+        );
+    }
+
+    private String buildCreatePayloadWithEquipment(UUID equipmentId) {
+        return """
+            {
+              "templateVersionId": "%s",
+              "clientId": "%s",
+              "siteId": "%s",
+              "technicianId": "%s",
+              "equipmentId": "%s",
+              "priority": "MEDIUM",
+              "scheduledFor": "2027-01-15T10:00:00Z"
+            }""".formatted(
+            activeTemplateVersion.getId(),
+            testClient.getId(),
+            testSite.getId(),
+            technicianUser.getId(),
+            equipmentId
+        );
+    }
+
+    private String buildCreatePayloadWithScheduledFor(String scheduledFor) {
+        return """
+            {
+              "templateVersionId": "%s",
+              "clientId": "%s",
+              "siteId": "%s",
+              "technicianId": "%s",
+              "priority": "MEDIUM",
+              "scheduledFor": "%s"
+            }""".formatted(
+            activeTemplateVersion.getId(),
+            testClient.getId(),
+            testSite.getId(),
+            technicianUser.getId(),
+            scheduledFor
+        );
     }
 
 }

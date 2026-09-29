@@ -5,14 +5,18 @@ import com.codemind.fieldops.equipment.domain.EquipmentStatus;
 import com.codemind.fieldops.equipment.dto.EquipmentCreateRequest;
 import com.codemind.fieldops.equipment.dto.EquipmentUpdateRequest;
 import com.codemind.fieldops.equipment.repository.EquipmentRepository;
+import com.codemind.fieldops.inspection.domain.InspectionStatus;
+import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.shared.error.ResourceConflictException;
 import com.codemind.fieldops.shared.error.ResourceNotFoundException;
 import com.codemind.fieldops.site.application.SiteService;
 import com.codemind.fieldops.site.domain.InspectionSite;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,12 +25,17 @@ public class EquipmentService {
 
     private static final String EQUIPMENT_NOT_FOUND_CODE = "EQUIPMENT_NOT_FOUND";
     private static final String QR_CODE_ALREADY_EXISTS_CODE = "QR_CODE_ALREADY_EXISTS";
+    private static final Set<InspectionStatus> TERMINAL_STATUSES =
+            Set.of(InspectionStatus.APPROVED, InspectionStatus.REJECTED, InspectionStatus.CANCELED);
 
     private final EquipmentRepository equipmentRepository;
+    private final InspectionRepository inspectionRepository;
     private final SiteService siteService;
 
-    public EquipmentService(EquipmentRepository equipmentRepository, SiteService siteService) {
+    public EquipmentService(EquipmentRepository equipmentRepository, InspectionRepository inspectionRepository,
+            SiteService siteService) {
         this.equipmentRepository = equipmentRepository;
+        this.inspectionRepository = inspectionRepository;
         this.siteService = siteService;
     }
 
@@ -46,9 +55,16 @@ public class EquipmentService {
     }
 
     @Transactional(readOnly = true)
-    public Equipment getByQrCode(String qrCode) {
-        return equipmentRepository.findByQrCode(qrCode)
+    public Equipment getByQrCode(String qrCode, UUID userId, boolean isTechnician) {
+        Equipment equipment = equipmentRepository.findByQrCode(qrCode)
             .orElseThrow(() -> new ResourceNotFoundException(EQUIPMENT_NOT_FOUND_CODE, "Equipment not found for QR code"));
+        if (isTechnician) {
+            UUID siteId = equipment.getSite().getId();
+            if (!inspectionRepository.existsByTechnicianIdAndSiteIdAndStatusNotIn(userId, siteId, TERMINAL_STATUSES)) {
+                throw new AccessDeniedException("Equipment is not in scope for this technician");
+            }
+        }
+        return equipment;
     }
 
     @Transactional

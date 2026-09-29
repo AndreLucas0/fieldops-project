@@ -16,6 +16,7 @@ public record InspectionResponseDto(
     LocalDate valueDate,
     String valueChoice,
     String observation,
+    String conformity,
     Instant respondedAt,
     Instant updatedAt,
     int version) {

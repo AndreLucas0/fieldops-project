@@ -14,6 +14,7 @@ public interface InspectionResponseMapper {
     @Mapping(source = "inspection.id", target = "inspectionId")
     @Mapping(source = "snapshot.id", target = "snapshotId")
     @Mapping(source = "respondedBy.id", target = "respondedById")
+    @Mapping(source = "conformity", target = "conformity")
     InspectionResponseDto toDto(InspectionResponse response);
 
     @Mapping(source = "inspection.id", target = "inspectionId")

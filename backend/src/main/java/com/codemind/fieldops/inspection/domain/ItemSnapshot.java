@@ -63,6 +63,12 @@ public class ItemSnapshot {
     @Column(nullable = false)
     private Boolean required;
 
+    @Column(name = "observation_required_on_failure", nullable = false)
+    private Boolean observationRequiredOnFailure;
+
+    @Column(name = "evidence_required_on_failure", nullable = false)
+    private Boolean evidenceRequiredOnFailure;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "rules_json", columnDefinition = "jsonb")
     private String rulesJson;
@@ -85,6 +91,12 @@ public class ItemSnapshot {
         createdAt = Instant.now();
         if (required == null) {
             required = false;
+        }
+        if (observationRequiredOnFailure == null) {
+            observationRequiredOnFailure = false;
+        }
+        if (evidenceRequiredOnFailure == null) {
+            evidenceRequiredOnFailure = false;
         }
     }
 

@@ -10,9 +10,11 @@ import com.codemind.fieldops.inspection.dto.InspectionCreateRequest;
 import com.codemind.fieldops.inspection.dto.InspectionResponse;
 import com.codemind.fieldops.inspection.dto.InspectionUpdateRequest;
 import com.codemind.fieldops.inspection.mapper.InspectionMapper;
+import com.codemind.fieldops.shared.audit.AuditEventDto;
 import com.codemind.fieldops.shared.pagination.PageResponse;
 import com.codemind.fieldops.shared.pagination.SortFieldValidator;
 import jakarta.validation.Valid;
+import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -54,9 +56,17 @@ public class InspectionController {
             @RequestParam(required = false) UUID technicianId,
             @RequestParam(required = false) InspectionStatus status,
             @RequestParam(required = false) InspectionPriority priority,
+            @RequestParam(required = false) UUID supervisorId,
+            @RequestParam(required = false) UUID equipmentId,
+            @RequestParam(required = false) Instant scheduledFrom,
+            @RequestParam(required = false) Instant scheduledTo,
+            @RequestParam(required = false) Boolean overdue,
             @PageableDefault(size = 20) Pageable pageable) {
         SortFieldValidator.validate(pageable.getSort(), SORTABLE_FIELDS);
-        Page<Inspection> inspections = inspectionService.list(clientId, siteId, technicianId, status, priority, pageable);
+        Page<Inspection> inspections = inspectionService.list(
+            clientId, siteId, technicianId, status, priority,
+            supervisorId, equipmentId, scheduledFrom, scheduledTo, overdue,
+            pageable);
         return PageResponse.from(inspections.map(inspectionMapper::toResponse));
     }
 
@@ -94,6 +104,13 @@ public class InspectionController {
                                       @AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
         return inspectionMapper.toResponse(inspectionService.cancel(id, userId, request));
+    }
+
+    @GetMapping("/{id}/history")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public PageResponse<AuditEventDto> history(@PathVariable UUID id,
+                                                @PageableDefault(size = 20) Pageable pageable) {
+        return inspectionService.getHistory(id, pageable);
     }
 
 }

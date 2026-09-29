@@ -19,70 +19,87 @@ tracked task waiting to be picked up deliberately.
 
 ## BF-001 — Template Versioning
 
-Status: PENDING
+Status: DONE
 
 Description:
-Allow publishing a new version of a template that already has an `ACTIVE`
-version. Currently `TemplateService.update()`/`publish()` require
-`status == DRAFT` and there is no path back to `DRAFT` or forward to a new
-version from `ACTIVE`.
+`POST /inspection-templates/{id}/publish` now works for templates in any status
+(not only `DRAFT`). Calling it on an `ACTIVE` template creates a new version
+with an auto-incremented `versionNumber`, deactivates all previous active
+versions (`activeForNewInspections = false`), and keeps the template `ACTIVE`.
+Concurrent publish attempts are guarded by the existing `@Version` column on
+`InspectionTemplate` — a concurrent call receives 409 instead of 500.
 
 Source:
 Backend audit — 2026-09-22 (`project-state/backend-audit.md`, 🔴 #1).
-Requirements: RN-018, RN-019, RN-020, RN-022; `casos-de-uso.md` UC-04/UC-05;
-`criterios-de-aceitacao.md` §17.5.
+Requirements: RN-019, RN-020; `casos-de-uso.md` UC-04; `criterios-de-aceitacao.md` §17.5.
 
-Dependencies:
-Product decision on the mechanism (reopen the same `InspectionTemplate` for a
-new draft cycle? new endpoint `POST /inspection-templates/{id}/versions/draft`?).
-To be determined from documentation and code analysis before implementation.
+Implementation (2026-09-27):
+- `TemplateService.publish()`: removed `status != DRAFT` guard; added deactivation
+  of previous active versions; added `ObjectOptimisticLockingFailureException` catch → 409.
+- `InspectionTemplateControllerIT`: added `JdbcTemplate` TRUNCATE CASCADE setUp (HIGH #2 fix),
+  added `TemplateVersionRepository` injection, 3 new IT tests.
 
-Relates to: BF-005 (same "reopen template for edit" redesign should likely be
-decided together).
+Open: `TemplateService.update()` still requires `DRAFT` status — metadata changes on
+ACTIVE templates are not yet unlocked (out of scope for BF-001; tracked here if needed).
+INACTIVE template re-publish behavior is undocumented — recorded in decisions.md.
 
-Validation:
-To be defined during implementation — needs a test that publishes a second
-version of an already-`ACTIVE` template (no such test exists today).
+Validation (2026-09-27):
+- `InspectionTemplateControllerIT.publishNewVersionOnActiveTemplateCreatesVersionTwo` — GREEN
+- `InspectionTemplateControllerIT.getActiveVersionAfterRepublishReturnsVersionTwo` — GREEN
+- `InspectionTemplateControllerIT.previousVersionIsDeactivatedAfterRepublish` — GREEN
+- All 17/17 `InspectionTemplateControllerIT` tests GREEN (0 regressions)
+- All 46/46 unit tests GREEN
+- All 7/7 `TemplateVersionControllerIT` tests GREEN
+
+Commitado: `7553bc7 feat: template versioning feature` (branch `feat/BF-001`, não mergeado em `main`).
 
 ---
 
 ## BF-002 — Lock Inspection Responses After Submission/Approval
 
-Status: PENDING
+Status: DONE
 
 Description:
 Prevent changes to checklist responses once an inspection reaches
-`SUBMITTED`, `UNDER_REVIEW`, or `APPROVED`. Today `InspectionExecutionService.
-upsertResponse` never reads `inspection.getStatus()`.
+`SUBMITTED`, `UNDER_REVIEW`, or `APPROVED`. Guard clause added to
+`InspectionExecutionService.upsertResponse()`. `SynchronizationService.apply()`
+updated to catch `ResourceConflictException` and return `Outcome.rejected()`.
 
 Source:
 Backend audit — 2026-09-22 (`project-state/backend-audit.md`, 🔴 #5).
 Requirements: RN-043, RN-082.
 
-Scope:
-- direct response endpoint (`PUT /inspections/{id}/responses/{snapshotId}`, `InspectionResponseController`)
-- mobile sync flow (`SynchronizationService.applyInspectionResponse`, which reuses the same service method)
+Validation:
+- `InspectionResponseControllerIT.upsertResponseOnSubmittedInspectionReturns409` — new test, GREEN.
+- `InspectionResponseControllerIT.upsertResponseOnUnderReviewInspectionReturns409` — new test, GREEN.
+- `InspectionResponseControllerIT.upsertResponseOnApprovedInspectionReturns409` — new test, GREEN.
+- `SyncPushControllerIT.syncResponseOnApprovedInspectionIsRejected` — new test, GREEN.
+- All 46 unit tests pass.
+- IT tests run on 2026-09-27 (Docker available): 4/4 targeted BF-002 tests GREEN.
+- Pre-existing failures em `FlywayMigrationIT` e `InspectionTemplateControllerIT` foram corrigidas no BF-005.
 
-Important: a fix in `InspectionExecutionService.upsertResponse` covers both
-paths at once, but tests for **both** call sites need to be written —
-`InspectionResponseControllerIT` and `SyncPushControllerIT` currently have no
-"respond after approved/submitted" case.
+Commitado: `42d86fd feat: lock inspection responses after submission/approval` (branch `feat/BF-001`).
 
-Impact: high — core data-integrity rule (an approved inspection's record
-should not be rewritable).
+Relates to: BF-006 (same "approved = immutable" rule category).
 
 ---
 
 ## BF-003 — Persist `conformity`
 
-Status: PENDING
+Status: DONE
 
 Description:
 The `conformity` field (used by the `CONFORMITY` response type, required in
-the MVP per `funcionalidades.md` §8.5) is never set by any client-facing
-write route (`InspectionResponseCreateRequest`, `InspectionResponseSyncPayload`
-don't include it). This also blocks validating RN-036 and RN-038, since there
-is no conformity value to validate against.
+the MVP per `funcionalidades.md` §8.5) was never set by any client-facing
+write route. Fixed 2026-09-27: added `String conformity` to
+`InspectionResponseCreateRequest`, `InspectionResponseSyncPayload`, and
+`InspectionResponseDto`; wired `Conformity.valueOf()` in
+`InspectionExecutionService.upsertResponse()`; updated
+`SynchronizationService.applyInspectionResponse()` and `toChange()` (pull
+path). Input validation added: `@Pattern` on `InspectionResponseCreateRequest.conformity`
++ `@Valid` on controller `@RequestBody` so invalid enum strings return 400
+instead of 500. Explicit `@Mapping` added to `InspectionResponseMapper.toDto()`
+for consistency with `toMobileResponseDto()`.
 
 Source:
 Backend audit — 2026-09-22 (`project-state/backend-audit.md`, 🟡 #4).
@@ -91,50 +108,91 @@ Requirements: RN-035, RN-036, RN-038; `modelo-de-dados.md` §10.8.4;
 
 Dependencies: none technically blocking.
 
+Validation:
+- `InspectionResponseControllerIT.upsertResponseWithConformityPersistsField` — new test, GREEN.
+- `InspectionResponseControllerIT.upsertResponseWithNullConformityStoresNull` — new test, GREEN.
+- `InspectionResponseControllerIT.upsertResponseWithInvalidConformityReturns400` — new test, GREEN (HIGH finding fix).
+- `SyncPushControllerIT.syncResponseWithConformityIsAppliedAndFieldPersisted` — new test, GREEN.
+- All 46 unit tests pass. `InspectionResponseControllerIT` 16/16 in isolation. `SyncPushControllerIT` 10/10 in isolation.
+
+Commitado: `2c4893f feat: persist conformity field` (branch `feat/BF-001`).
+
 ---
 
 ## BF-004 — Dashboard and Inspection History Endpoints
 
-Status: PENDING
+Status: DONE
 
 Description:
-Implement the documented/consumed endpoints:
-- `GET /dashboard/summary`, `/dashboard/inspections-by-status`, `/dashboard/non-conformities-by-severity`
-- `GET /inspections/{id}/history`
+Implemented the documented/consumed endpoints:
+- `GET /dashboard/summary` → `DashboardSummaryDto` (7 aggregate fields)
+- `GET /dashboard/inspections-by-status` → `List<StatusCountDto>` (GROUP BY)
+- `GET /dashboard/non-conformities-by-severity` → `List<SeverityCountDto>` (GROUP BY)
+- `GET /inspections/{id}/history` → `PageResponse<AuditEventDto>` (paginated, ordered by occurredAt ASC)
 
 Source:
 Backend audit — 2026-09-22 (`project-state/backend-audit.md`, 🔴 #4 and #7).
 Requirements: RN-086, UC-18, `api-rest.md` §12.10 (history); `api-rest.md`
 §12.16, `plano-implementacao-backend.md` Sprint 8, UC-19 (dashboard).
 
-Dependencies:
-- History: none — `AuditEventRepository` already exists and is already populated by `AuditEventPublisher`; only the read side (controller/service) is missing.
-- Dashboard: none technically blocking — aggregate queries over existing tables (`inspections`, `non_conformities`). Consider implementing alongside the advanced `/inspections` filters (see `backend-audit.md` 🟡 #3) to avoid duplicating "overdue" logic.
+Validation (2026-09-27):
+- 13/13 targeted IT tests GREEN (`DashboardControllerIT` 8/8, `InspectionHistoryControllerIT` 5/5)
+- 46/46 unit tests GREEN (no regressions)
+- ECC java-reviewer: 0 CRITICAL, 2 HIGH (both fixed before merge):
+  - Overdue exclusion set expanded to include `SUBMITTED` + `UNDER_REVIEW` (matches `shared/mocks/store.ts` `CLOSED_STATUSES`)
+  - History existence guard moved into `InspectionService.getHistory()` — single `@Transactional(readOnly = true)` boundary
 
-Impact: high for the admin UX — the web `/dashboard` screen (FE-W02) is
-already built and calls these three endpoints; they currently 404.
+New files:
+- `shared/audit/AuditEventDto.java`, `shared/audit/AuditService.java`
+- `dashboard/dto/DashboardSummaryDto.java`, `StatusCountDto.java`, `SeverityCountDto.java`
+- `dashboard/DashboardService.java`
+- `dashboard/controller/DashboardController.java`
+
+Modified files:
+- `inspection/application/InspectionService.java` — added `getHistory()`, injected `AuditService`
+- `inspection/controller/InspectionController.java` — added `GET /{id}/history`, delegates to `inspectionService.getHistory()`
+- `inspection/repository/InspectionRepository.java` — added `countByStatus`, `countOverdue`, `countGroupByStatus` + `StatusCountView` projection
+- `nonconformity/repository/NonConformityRepository.java` — added `countByStatus`, `countGroupBySeverity` + `SeverityCountView` projection
+
+Commitado: `1545467 feat: implement dashboard and inspection history endpoints (BF-004)` (branch `feat/BF-001`).
 
 ---
 
 ## BF-005 — Template Versions and Sections Endpoints
 
-Status: PENDING
+Status: PARTIAL
 
 Description:
-Implement the endpoints for:
-- listing/reading published template versions: `GET /inspection-templates/{id}/versions`, `GET /inspection-template-versions/{versionId}`
-- incremental section/item builder: `POST/PUT .../sections`, `POST/PUT .../sections/{id}/items`
+Read endpoints implemented on 2026-09-27 (partial):
+- `GET /inspection-templates/{id}/versions` → `PageResponse<TemplateVersionResponse>` — paginated, ordered by version_number DESC
+- `GET /inspection-template-versions/{versionId}` → `TemplateVersionResponse` (with sections/items)
+- `TemplateController` now responds at BOTH `/templates/*` AND `/inspection-templates/*` (dual mapping) to match the web client's API calls (`resources.ts`)
+- Pre-req fixes: `FlywayMigrationIT` version assertion "9" → "12"; `TemplateItemRequest` 3 `boolean` fields → `Boolean` (boxed)
+
+Still pending:
+- Section/item builder endpoints (`POST/PUT .../sections`, `POST/PUT .../sections/{id}/items`) — blocked by data model decision: draft sections have no storage location (`TemplateSection` belongs to `TemplateVersion`, not `InspectionTemplate`; see `decisions.md` 2026-09-27)
 
 Source:
 Backend audit — 2026-09-22 (`project-state/backend-audit.md`, 🔴 #2 and #3).
-Requirements: RN-020, RN-022, `api-rest.md` §12.9.
+Requirements: RN-019, RN-020, RN-022, `api-rest.md` §12.9.
 
-Dependencies:
-- Version listing depends on BF-001 to have more than one version to actually list (the read endpoint itself can technically be built today against `TemplateVersionRepository`, which already supports multiple versions in the data model).
-- Section/item endpoints have no technical dependency — additive to the current `TemplateController`.
+Validation (2026-09-27):
+- 7/7 IT tests GREEN (`TemplateVersionControllerIT`): adminCanListVersions(200), supervisorCanListVersions(200), technicianCannotListVersions(403), listVersionsForNonExistentTemplate(404), adminCanGetVersionDetail(200), technicianCannotGetVersionDetail(403), versionDetailNotFound(404)
+- 46/46 unit tests GREEN (no regressions)
+- ECC java-reviewer: 0 CRITICAL, 3 HIGH — 2 were not real issues (annotation present, open-in-view is pre-existing codebase pattern); 1 N+1 recorded in `decisions.md` for future sprint; 2 MEDIUM findings fixed (sort validation + technician-403 test for detail endpoint)
 
-Impact: the web already assumes this contract (`resources.ts:239-250`) — the
-model builder/versions screens don't work against the real backend without it.
+New files:
+- `template/controller/InspectionTemplateVersionController.java` — `GET /inspection-template-versions/{versionId}`
+- `template/controller/TemplateVersionControllerIT.java` (test)
+
+Modified files:
+- `template/controller/TemplateController.java` — dual mapping `{"/templates", "/inspection-templates"}`, added `GET /{id}/versions` with sort validation
+- `template/application/TemplateService.java` — added `listVersions()`, `getVersion()`
+- `template/repository/TemplateVersionRepository.java` — added `findByTemplateIdOrderByVersionNumberDesc(UUID, Pageable)`
+- `shared/FlywayMigrationIT.java` — version assertion "9" → "12"
+- `template/dto/TemplateItemRequest.java` — `boolean` → `Boolean` (3 fields)
+
+Commitado: `228825c feat: template versions and sections endpoints` (branch `feat/BF-001`).
 
 ---
 
@@ -162,31 +220,112 @@ Validation:
 
 ---
 
-## BF-007 — Mobile Sync Integration
+## RN-038/039 — Submit Validation: Observation and Evidence on Non-Conforming Answers
 
-Status: PENDING
+Status: DONE
 
 Description:
-Integrate the mobile app with the sync mechanism already implemented and
-tested on the backend (`POST /mobile/sync/push`, `GET /mobile/sync/pull`).
-`mobile/src` currently has no local queue, outbox, or reference to these
-endpoints at all — the "Sincronizar" button on the home screen just reloads
-the list and fakes a 2s wait.
+`InspectionExecutionService.submit()` now enforces RN-038 and RN-039 in addition
+to the existing RN-037 (required responses) check:
+- **RN-038**: if `ItemSnapshot.observationRequiredOnFailure = true` and the response
+  has `conformity = NON_CONFORMING`, the `observation` field must be non-blank → 422
+  (`MISSING_OBSERVATION_ON_NON_CONFORMING`).
+- **RN-039**: if `ItemSnapshot.evidenceRequiredOnFailure = true` and the response
+  has `conformity = NON_CONFORMING`, at least one evidence record linked to that
+  response must exist → 422 (`MISSING_EVIDENCE_ON_NON_CONFORMING`).
+
+Prerequisite gap fixed: `createSnapshots()` in `InspectionService` was not copying
+`observationRequiredOnFailure`/`evidenceRequiredOnFailure` from `TemplateItem` to
+`ItemSnapshot`. Fixed via Path A (Flyway V13 migration + boolean columns on snapshot
+table). Path B (populate `rulesJson`) was considered and rejected (see `decisions.md`
+2026-09-28).
+
+Source:
+Backend audit 2026-09-22 (`project-state/backend-audit.md`, 🟡 #5).
+Requirements: RN-038, RN-039; `regras-de-negocio.md` §9.5.
+
+Validation (2026-09-28):
+- `submitWithNonConformingAnswerMissingObservationReturns422` — GREEN
+- `submitWithNonConformingAnswerWithObservationSucceeds` — GREEN
+- `submitWithNonConformingAnswerObservationRuleNotSetSucceeds` — GREEN
+- `submitWithCriticalNonConformingAnswerMissingEvidenceReturns422` — GREEN
+- `submitWithCriticalNonConformingAnswerWithEvidenceSucceeds` — GREEN
+- `submitWithOnlyConformingAnswersWhenObservationRuleSetSucceeds` — GREEN
+- InspectionExecutionControllerIT: 18/18 GREEN; regression 115/115 GREEN
+
+ECC java-reviewer: 0 CRITICAL, 3 HIGH (all resolved — N+1 fixed via JOIN FETCH,
+`@Transactional(readOnly = true)` added, cross-class FK fixed via `@AfterEach`).
+
+Files modified:
+- `V13__add_snapshot_failure_rules.sql` (new migration)
+- `ItemSnapshot.java` (2 new boolean fields + `@PrePersist` defaults)
+- `InspectionService.createSnapshots()` (copies the 2 fields from `TemplateItem`)
+- `InspectionResponseRepository` (new `findByInspectionIdAndConformityFetchSnapshot` with JOIN FETCH)
+- `EvidenceRepository` (new `existsByInspectionIdAndResponseId`)
+- `InspectionExecutionService` (`EvidenceRepository` injected; RN-038/039 validation block)
+- `InspectionExecutionControllerIT` (`@AfterEach` teardown; 6 new tests)
+
+---
+
+## BF-007 — Mobile Sync Integration
+
+Status: DONE
+
+Description:
+Offline-first sync integrated into the mobile app (Expo SDK 57 / React Native).
+
+User instruction fulfilled: "toda vez que ocorrer um salvamento, esta mudança
+irá para este banco com um UUID próprio e com o status de sync = false para
+evitar duplicatas e o expo deve verificar se o dispositivo possui internet.
+Caso o dispositivo possua internet, o expo deve sincronizar com o banco
+postgres, caso não, deve ficar armazenado localmente no dispositivo até a
+internet voltar. Essa sincronização deve ser realizada de forma automática."
+
+New files (2026-09-28):
+- `mobile/src/services/local-db.ts` — SQLite outbox with `upsertOutboxEntry`,
+  `getPendingEntries`, `countPendingEntries`, `markEntriesSynced`,
+  `incrementErrorCount`. Uses `expo-sqlite` v15 (openDatabaseAsync, runAsync,
+  getAllAsync, getFirstAsync).
+- `mobile/src/services/sync-service.ts` — `isOnline()` (expo-network v7),
+  `getOrCreateDeviceId()` (expo-secure-store), `syncPending()`,
+  `syncPendingIfOnline()`. Batches outbox entries 50 at a time to
+  `POST /mobile/sync/push`. Handles APPLIED, ALREADY_APPLIED (mark synced),
+  REJECTED/CONFLICT/DEPENDENCY_FAILED (incrementErrorCount). SINGLE_CHOICE
+  responseType mapped to `valueChoice` in sync payload.
+- `mobile/src/features/sync/use-sync.ts` — `useSyncOnForeground()` hook;
+  fires on mount and every time app comes to foreground via AppState listener.
+
+Modified files (2026-09-28):
+- `mobile/src/services/index.ts` — re-exports isOnline, syncPending,
+  syncPendingIfOnline, getOrCreateDeviceId, SyncResult from sync-service.
+- `mobile/src/features/checklist/use-checklist.ts` — `send()` now writes to
+  SQLite outbox (upsertOutboxEntry) then fires syncPendingIfOnline() in the
+  background (void). Server API is no longer called directly on save.
+- `mobile/app/(protected)/inspections/[inspectionId]/summary.tsx` —
+  sync-on-mount useEffect to flush pending before evaluateCompletion sees the
+  server state; submit() guards with isOnline() + syncPending() before
+  calling POST /inspections/{id}/submit.
+- `mobile/app/(protected)/_layout.tsx` — calls useSyncOnForeground()
+  unconditionally before early returns (correct per Rules of Hooks).
+- `mobile/jest.setup.js` — added expo-network mock (online=true default) and
+  expo-sqlite mock (in-memory Map outbox store, full runAsync/getAllAsync/
+  getFirstAsync implementation, reset via beforeEach mockReset + mockImpl).
+- `mobile/__tests__/checklist-screen.test.tsx` — removed getMockDatabase()
+  .responses assertion from "grava a resposta" (responses go to SQLite now);
+  rewrote "mostra erro do servidor" → "mostra erro local" (simulates
+  SQLite disk full via mockRejectedValueOnce, checks value preserved and
+  "gravar localmente" error label).
 
 Source:
 Backend audit — 2026-09-22 (`project-state/backend-audit.md`, 🟣 #1);
-`ESTADO-DO-PROJETO.md` §5, §9-10 (mobile team's own account, 2026-08-18).
+`ESTADO-DO-PROJETO.md` §5, §9-10.
 
-Important:
-**This is a mobile-integration task, not a backend implementation task** —
-the backend side (BF category) is already 🟢 done and tested. Do not confuse
-this with a backend pendency when planning work.
-
-`ESTADO-DO-PROJETO.md` marks the underlying mobile-side work (local
-persistence, outbox, FE-M04 screen) as the release blocker (§10,
-"Bloqueante para a entrega") since `criterios-de-aceitacao.md` §17.19
-(AC-RELEASE) requires demonstrating offline completion → reconnect → sync
-without duplication.
+Validation (2026-09-28):
+- Cannot run `npm test` — `node_modules` absent, no `npm install` run.
+  Environment limitation recorded. All logic changes are manually reviewed.
+  Jest mock design verified against local-db.ts SQL strings and sync-service.ts
+  outbox behavior.
+- TypeScript check not run — same environment limitation (no node_modules).
 
 ---
 
@@ -196,9 +335,31 @@ These came out of the same audit but are **not** "feature not built" — see
 `backend-audit.md` "Contract divergences" section for full detail. Listed
 here only so they aren't lost:
 
-- `TemplateController` base path is `/templates`, not `/inspection-templates` as documented — affects every template-related contract-divergence item above.
+- ~~`TemplateController` base path is `/templates`~~ — **RESOLVIDA** em BF-005 (`228825c`): `TemplateController` agora responde em ambos `/templates/*` e `/inspection-templates/*` (dual mapping).
+- ~~`GET /clients/{clientId}/sites` e `GET /sites/{siteId}/equipment` retornavam 404~~ — **RESOLVIDA** em 2026-09-27: endpoints adicionados a `ClientController` e `SiteController` (ver `progress.md` NESTED-NAV).
 - `PUT /inspections/{id}/responses/{snapshotId}` uses the snapshot id, not a device-generated response id as `api-rest.md` §12.11 describes.
 - `POST /inspections/{id}/responses:batch` doesn't exist (mitigated by sync).
 - QR lookup (`GET /equipment/by-qr/{qrCode}`) doesn't scope results to the technician's assigned inspection (RN-063, PEND-04) — a security-hardening item, tracked here rather than as its own BF because it's a scope/authorization refinement, not a missing feature.
-- Evidence deletion has no ownership check (any `TECHNICIAN`, not just the inspection's owner, can delete) — PEND-05, same nature as the QR item above.
-- `InspectionSpecifications` is missing several documented admin filters (`supervisorId, equipmentId, scheduledFrom/To, overdue`, text search `q`) — PEND-15.
+- ~~Evidence deletion has no ownership check~~ — **RESOLVIDA** em PEND-05 (2026-09-28): `EvidenceService.delete()` agora verifica ownership para TECHNICIAN; guard reordenado (ownership 403 antes do APPROVED 409). 12/12 `EvidenceControllerIT` GREEN.
+- ~~`InspectionSpecifications` is missing several documented admin filters~~ — **RESOLVIDA** em PEND-15 (2026-09-27): `supervisorId`, `equipmentId`, `scheduledFrom`, `scheduledTo`, `overdue` implementados. Texto livre `q` ainda não implementado (não coberto pelo openapi.yaml, baixa prioridade).
+- `InspectionResponseController.upsertResponse()` double-loads the inspection: once in `getInspectionForTechnician()` (controller) and again in `upsertResponse()` (service). Pre-existing; identified during BF-002 review. Low priority — optimization refactor only.
+- ~~`QR lookup não restringe ao escopo do técnico`~~ — **RESOLVIDA** em PEND-04 (2026-09-28): `GET /equipment/by-qr/{qrCode}` agora bloqueia TECHNICIAN sem inspeção não-terminal no mesmo site (RN-063). Scope boundary SUBMITTED/UNDER_REVIEW documentado em `decisions.md`.
+- `Missing @Size validation on @PathVariable String` — todas as rotas com `@PathVariable String` carecem de constraint de tamanho. Requer `ConstraintViolationException` handler no `GlobalExceptionHandler`. Deferred — ver `decisions.md` 2026-09-28 (PEND-04 H-03).
+
+## Pre-existing IT failures — RESOLVIDAS (BF-005, 2026-09-27)
+
+As duas falhas pré-existentes identificadas durante BF-002 foram corrigidas como
+pre-requisito do BF-005:
+
+1. **`FlywayMigrationIT`** — asserção `"9"` → `"12"` (schema atual). **RESOLVIDA** em
+   `228825c`.
+
+2. **`InspectionTemplateControllerIT`** — `TemplateItemRequest` com campos `boolean`
+   primitivos → `Boolean` (boxed), eliminando o erro 500 em `POST .../publish`.
+   **RESOLVIDA** em `228825c`. A classe agora tem 17/17 tests GREEN (incluindo 3 novos
+   testes de BF-001 adicionados em `7553bc7`).
+
+Além disso, o setUp de `InspectionTemplateControllerIT` foi atualizado (em `7553bc7`)
+para usar `TRUNCATE TABLE inspection_template_versions CASCADE` via `JdbcTemplate`,
+eliminando o risco de violação de FK quando ITs que criam inspeções executam antes
+desta classe em `./mvnw verify`.

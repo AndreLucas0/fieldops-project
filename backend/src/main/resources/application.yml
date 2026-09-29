@@ -4,6 +4,12 @@ spring:
   docker:
     compose:
       file: ../docker-compose.yml
+      # Desabilitado: o projeto gerencia o Docker Compose externamente via
+      # `docker compose up -d`. A integração automática conflita com esse fluxo
+      # porque tenta ler ConnectionDetails dos containers em execução e falha
+      # quando o container `db` não está acessível no momento do startup.
+      # A datasource é configurada via application-local.yml + variáveis de ambiente.
+      enabled: false
   servlet:
     multipart:
       max-file-size: 12MB
@@ -13,6 +19,14 @@ server:
   port: ${SERVER_PORT:8090}
   servlet:
     context-path: /api/v1
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
 
 fieldops:
   security:

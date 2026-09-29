@@ -326,4 +326,150 @@ class InspectionResponseControllerIT {
             .header("Authorization", bearer(otherTechnicianToken)))
             .hasStatus(HttpStatus.FORBIDDEN);
     }
+
+    // ---- Lock responses after SUBMITTED/APPROVED (RN-043, RN-082) ----
+
+    @Test
+    void upsertResponseOnSubmittedInspectionReturns409() {
+        Inspection submittedInspection = inspectionRepository.save(Inspection.builder()
+            .templateVersion(activeTemplateVersion)
+            .client(testClient)
+            .site(testSite)
+            .technician(technicianUser)
+            .createdBy(adminUser)
+            .priority(InspectionPriority.MEDIUM)
+            .status(InspectionStatus.SUBMITTED)
+            .scheduledFor(Instant.now().plusSeconds(3600))
+            .startedAtServer(Instant.now())
+            .build());
+
+        ItemSnapshot snapshot = itemSnapshotRepository.save(ItemSnapshot.builder()
+            .inspection(submittedInspection)
+            .sectionTitle("Section 1")
+            .sectionOrder(1)
+            .itemTitle("Item 1")
+            .responseType("BOOLEAN")
+            .required(false)
+            .itemOrder(1)
+            .build());
+
+        String payload = """
+            {"valueBoolean": true}""";
+
+        assertThat(mvc.put().uri("/inspections/" + submittedInspection.getId() + "/responses/" + snapshot.getId())
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatus(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void upsertResponseOnUnderReviewInspectionReturns409() {
+        Inspection underReviewInspection = inspectionRepository.save(Inspection.builder()
+            .templateVersion(activeTemplateVersion)
+            .client(testClient)
+            .site(testSite)
+            .technician(technicianUser)
+            .createdBy(adminUser)
+            .priority(InspectionPriority.MEDIUM)
+            .status(InspectionStatus.UNDER_REVIEW)
+            .scheduledFor(Instant.now().plusSeconds(3600))
+            .startedAtServer(Instant.now())
+            .build());
+
+        ItemSnapshot snapshot = itemSnapshotRepository.save(ItemSnapshot.builder()
+            .inspection(underReviewInspection)
+            .sectionTitle("Section 1")
+            .sectionOrder(1)
+            .itemTitle("Item 1")
+            .responseType("BOOLEAN")
+            .required(false)
+            .itemOrder(1)
+            .build());
+
+        String payload = """
+            {"valueBoolean": true}""";
+
+        assertThat(mvc.put().uri("/inspections/" + underReviewInspection.getId() + "/responses/" + snapshot.getId())
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatus(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void upsertResponseOnApprovedInspectionReturns409() {
+        Inspection approvedInspection = inspectionRepository.save(Inspection.builder()
+            .templateVersion(activeTemplateVersion)
+            .client(testClient)
+            .site(testSite)
+            .technician(technicianUser)
+            .createdBy(adminUser)
+            .priority(InspectionPriority.MEDIUM)
+            .status(InspectionStatus.APPROVED)
+            .scheduledFor(Instant.now().plusSeconds(3600))
+            .startedAtServer(Instant.now())
+            .build());
+
+        ItemSnapshot snapshot = itemSnapshotRepository.save(ItemSnapshot.builder()
+            .inspection(approvedInspection)
+            .sectionTitle("Section 1")
+            .sectionOrder(1)
+            .itemTitle("Item 1")
+            .responseType("BOOLEAN")
+            .required(false)
+            .itemOrder(1)
+            .build());
+
+        String payload = """
+            {"valueBoolean": true}""";
+
+        assertThat(mvc.put().uri("/inspections/" + approvedInspection.getId() + "/responses/" + snapshot.getId())
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatus(HttpStatus.CONFLICT);
+    }
+
+    // ---- Persist conformity field (BF-003, RN-035, modelo-de-dados.md §10.8.4) ----
+
+    @Test
+    void upsertResponseWithConformityPersistsField() {
+        String payload = """
+            {"valueBoolean": true, "conformity": "CONFORMING"}""";
+
+        assertThat(mvc.put().uri("/inspections/" + inProgressInspection.getId() + "/responses/" + testSnapshot.getId())
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.conformity").asString().isEqualTo("CONFORMING");
+    }
+
+    @Test
+    void upsertResponseWithNullConformityStoresNull() {
+        String payload = """
+            {"valueBoolean": true}""";
+
+        assertThat(mvc.put().uri("/inspections/" + inProgressInspection.getId() + "/responses/" + testSnapshot.getId())
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.conformity").isNull();
+    }
+
+    @Test
+    void upsertResponseWithInvalidConformityReturns400() {
+        String payload = """
+            {"valueBoolean": true, "conformity": "GARBAGE"}""";
+
+        assertThat(mvc.put().uri("/inspections/" + inProgressInspection.getId() + "/responses/" + testSnapshot.getId())
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatus(HttpStatus.BAD_REQUEST);
+    }
 }

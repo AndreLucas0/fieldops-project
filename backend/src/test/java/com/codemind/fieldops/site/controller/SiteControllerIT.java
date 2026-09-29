@@ -7,6 +7,9 @@ import com.codemind.fieldops.TestcontainersConfiguration;
 import com.codemind.fieldops.client.domain.Client;
 import com.codemind.fieldops.client.domain.ClientStatus;
 import com.codemind.fieldops.client.repository.ClientRepository;
+import com.codemind.fieldops.equipment.domain.Equipment;
+import com.codemind.fieldops.equipment.domain.EquipmentStatus;
+import com.codemind.fieldops.equipment.repository.EquipmentRepository;
 import com.codemind.fieldops.shared.security.JwtClaims;
 import com.codemind.fieldops.site.domain.InspectionSite;
 import com.codemind.fieldops.site.domain.SiteStatus;
@@ -50,6 +53,9 @@ class SiteControllerIT {
     private ClientRepository clientRepository;
 
     @Autowired
+    private EquipmentRepository equipmentRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -68,6 +74,7 @@ class SiteControllerIT {
 
     @BeforeEach
     void setUp() {
+        equipmentRepository.deleteAll();
         siteRepository.deleteAll();
         clientRepository.deleteAll();
         userRepository.deleteAll();
@@ -255,6 +262,62 @@ class SiteControllerIT {
     void anonymousCannotAccessSites() {
         assertThat(mvc.get().uri("/sites"))
             .hasStatus(HttpStatus.UNAUTHORIZED);
+    }
+
+    private Equipment saveEquipment(String name, String qrCode, InspectionSite site) {
+        return equipmentRepository.save(Equipment.builder()
+            .site(site)
+            .name(name)
+            .qrCode(qrCode)
+            .status(EquipmentStatus.ACTIVE)
+            .build());
+    }
+
+    @Test
+    void adminCanListEquipmentBySite() {
+        InspectionSite site = saveSite("Equipment Site", testClient);
+        saveEquipment("Pump A", "QR-PA-001", site);
+        saveEquipment("Pump B", "QR-PB-001", site);
+
+        assertThat(mvc.get().uri("/sites/" + site.getId() + "/equipment")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content").asList().hasSize(2);
+    }
+
+    @Test
+    void technicianCannotListSiteEquipment() {
+        InspectionSite site = saveSite("Forbidden Site", testClient);
+
+        assertThat(mvc.get().uri("/sites/" + site.getId() + "/equipment")
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatus(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void listEquipmentForNonExistentSiteReturnsNotFound() {
+        assertThat(mvc.get().uri("/sites/" + UUID.randomUUID() + "/equipment")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatus(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void listSiteEquipmentOnlyReturnsEquipmentForThatSite() {
+        InspectionSite siteA = saveSite("Site Alpha", testClient);
+        Client clientB = clientRepository.save(
+            Client.builder().name("Client Beta").status(ClientStatus.ACTIVE).build());
+        InspectionSite siteB = siteRepository.save(
+            InspectionSite.builder().client(clientB).name("Site Beta").status(SiteStatus.ACTIVE).build());
+        saveEquipment("Equipment Alpha", "QR-EQA-001", siteA);
+        saveEquipment("Equipment Beta", "QR-EQB-001", siteB);
+
+        assertThat(mvc.get().uri("/sites/" + siteA.getId() + "/equipment")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content[*].siteId").asList()
+            .containsOnly(siteA.getId().toString());
     }
 
 }

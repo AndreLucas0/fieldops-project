@@ -1,9 +1,9 @@
 /**
- * Estado de execução do checklist (FE-M08).
+ * Estado de execução do checklist (FE-M08) — offline-first.
  *
- * Cada resposta vai direto para a API assim que o técnico para de digitar. Não
- * há fila local: o valor fica na tela, o envio acontece em seguida e o estado
- * de gravação é mostrado por item.
+ * Cada resposta é gravada no outbox SQLite local assim que o técnico para de
+ * digitar. O SyncService tenta sincronizar com o servidor em seguida, se
+ * houver conexão. Caso contrário, as respostas ficam armazenadas localmente.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -11,15 +11,15 @@ import { randomUUID } from 'expo-crypto';
 
 import { isAnswered, requiresObservation, type ChecklistValue } from '@/components';
 import {
-  toApiError,
   type ApiError,
   type InspectionDetail,
   type InspectionItemSnapshot,
   type InspectionResponse,
-  type InspectionResponseUpsertRequest,
   type Uuid,
 } from '@/models';
 import { apiClient, type ApiClient } from '@/services';
+import { upsertOutboxEntry } from '@/services/local-db';
+import { syncPendingIfOnline } from '@/services/sync-service';
 
 import {
   groupBySection,
@@ -123,45 +123,43 @@ export function useChecklist(
     async (item: InspectionItemSnapshot, value: ChecklistValue) => {
       if (!inspection) return;
 
-      // O cache só é lido e escrito aqui, fora da renderização.
+      // O cache só é lido aqui para obter a versão base conhecida pelo servidor.
       if (versionsRef.current?.signature !== detailSignature) {
         versionsRef.current = {
           signature: detailSignature,
           responses: indexResponses(inspection.responses ?? []),
         };
       }
-      const versions = versionsRef.current.responses;
+      const known = versionsRef.current.responses.get(item.id);
 
-      const known = versions.get(item.id);
-      const responseId = known?.id ?? generateId();
-
-      const body: InspectionResponseUpsertRequest = {
-        inspectionItemId: item.id,
-        valueText: value.valueText ?? null,
+      // SINGLE_CHOICE usa valueChoice no contrato de sync; os outros tipos usam valueText.
+      const isSingleChoice = item.responseType === 'SINGLE_CHOICE';
+      const syncPayload = {
+        inspectionId: inspection.id,
+        valueText: isSingleChoice ? null : (value.valueText ?? null),
         valueNumber: value.valueNumber ?? null,
         valueBoolean: value.valueBoolean ?? null,
         valueDate: value.valueDate ?? null,
-        valueJson: value.valueJson ?? null,
+        valueChoice: isSingleChoice ? (value.valueText ?? null) : null,
         observation: value.observation ?? null,
-        ...(value.conformity ? { conformity: value.conformity } : {}),
-        answeredAtDevice: new Date().toISOString(),
-        // Resposta nova não tem versão anterior; o servidor cria a partir de zero.
-        baseVersion: known?.version ?? 0,
+        conformity: value.conformity ?? null,
       };
 
-      setSaveState(item.id, { status: 'saving' });
-
       try {
-        const saved = await client.put<InspectionResponse>(
-          `/inspections/${inspection.id}/responses/${responseId}`,
-          body,
-        );
+        await upsertOutboxEntry({
+          id: generateId(),
+          inspectionId: inspection.id,
+          entityType: 'INSPECTION_RESPONSE',
+          entityId: item.id,
+          operationType: 'UPSERT',
+          baseVersion: known?.version ?? 0,
+          payload: JSON.stringify(syncPayload),
+        });
 
-        versions.set(item.id, saved);
-        setResponses(new Map(versions));
         setSaveState(item.id, { status: 'saved' });
-      } catch (thrown) {
-        setSaveState(item.id, { status: 'error', message: describeSaveError(toApiError(thrown)) });
+        void syncPendingIfOnline(client, inspection.id);
+      } catch {
+        setSaveState(item.id, { status: 'error', message: 'Não foi possível gravar localmente.' });
       }
     },
     [client, detailSignature, generateId, inspection, setSaveState],

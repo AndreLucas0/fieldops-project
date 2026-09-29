@@ -12,6 +12,7 @@ import com.codemind.fieldops.nonconformity.dto.NonConformityCreateRequest;
 import com.codemind.fieldops.nonconformity.dto.NonConformityUpdateRequest;
 import com.codemind.fieldops.nonconformity.repository.NonConformityRepository;
 import com.codemind.fieldops.shared.error.BusinessRuleViolationException;
+import com.codemind.fieldops.shared.error.ResourceConflictException;
 import com.codemind.fieldops.shared.error.ResourceNotFoundException;
 import com.codemind.fieldops.nonconformity.application.NonConformityService;
 import com.codemind.fieldops.synchronization.domain.SyncEntityType;
@@ -188,6 +189,8 @@ public class SynchronizationService {
             };
         } catch (ResourceNotFoundException e) {
             return Outcome.rejected(e.getCode(), e.getMessage());
+        } catch (ResourceConflictException e) {
+            return Outcome.rejected(e.getCode(), e.getMessage());
         } catch (BusinessRuleViolationException e) {
             return Outcome.rejected(e.getCode(), e.getMessage());
         } catch (OptimisticLockingFailureException e) {
@@ -250,7 +253,7 @@ public class SynchronizationService {
 
         InspectionResponseCreateRequest request = new InspectionResponseCreateRequest(payload.valueText(),
             payload.valueNumber(), payload.valueBoolean(), payload.valueDate(), payload.valueChoice(),
-            payload.observation());
+            payload.observation(), payload.conformity());
         InspectionResponse saved =
             inspectionExecutionService.upsertResponse(payload.inspectionId(), snapshotId, userId, request);
 
@@ -409,6 +412,7 @@ public class SynchronizationService {
         payload.put("valueDate", toStringOrNull(response.getValueDate()));
         payload.put("valueChoice", response.getValueChoice());
         payload.put("observation", response.getObservation());
+        payload.put("conformity", response.getConformity() != null ? response.getConformity().name() : null);
         return new SyncChange(SyncEntityType.INSPECTION_RESPONSE, response.getSnapshot().getId(),
             SyncOperationType.UPSERT, payload, response.getVersion(), response.getUpdatedAt());
     }

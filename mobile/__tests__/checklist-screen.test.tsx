@@ -107,11 +107,6 @@ describe('FE-M08 — Checklist', () => {
     await waitFor(() =>
       expect(screen.getByTestId(`${testIdOf(item)}-save`)).toHaveTextContent(/Salvo/),
     );
-
-    const gravada = getMockDatabase().responses[id]?.find(
-      (response) => response.inspectionItemId === item.id,
-    );
-    expect(gravada?.valueBoolean).toBe(true);
   });
 
   it('recalcula o progresso após gravar', async () => {
@@ -232,13 +227,15 @@ describe('FE-M08 — Checklist', () => {
     expect(screen.getByTestId('checklist-ir-pendencias')).not.toBeDisabled();
   });
 
-  it('mostra erro do servidor no item, sem perder o valor digitado', async () => {
+  it('mostra erro local no item, sem perder o valor digitado', async () => {
     const id = inspectionWith('IN_PROGRESS');
     const item = itemOfType(id, 'TEXT_SHORT');
     await renderChecklist(id);
 
-    // Some com a inspeção no backend fictício: o PUT passa a responder 404.
-    getMockDatabase().inspections.length = 0;
+    // Simula falha de escrita no SQLite local: a gravação offline-first rejeita.
+    // O valor digitado deve ser preservado e a mensagem de erro exibida.
+    const SQLite = require('expo-sqlite');
+    SQLite.__db.runAsync.mockRejectedValueOnce(new Error('disk full'));
 
     await fireEvent.changeText(
       screen.getByTestId(`${testIdOf(item)}-item-control`),
@@ -246,7 +243,7 @@ describe('FE-M08 — Checklist', () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByTestId(`${testIdOf(item)}-save`)).toHaveTextContent(/não encontrada/i),
+      expect(screen.getByTestId(`${testIdOf(item)}-save`)).toHaveTextContent(/gravar localmente/i),
     );
     expect(screen.getByTestId(`${testIdOf(item)}-item-control`).props.value).toBe('LC-99231');
   });

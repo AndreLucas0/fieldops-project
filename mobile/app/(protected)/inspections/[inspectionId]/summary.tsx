@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -9,7 +9,7 @@ import { captureLocation, describeAccuracy } from '@/features/inspections/locati
 import { useEvidences } from '@/features/inspections/use-evidences';
 import { useInspectionDetail } from '@/features/inspections/use-inspection-detail';
 import { toApiError, type GeoLocation, type Inspection, type SubmitInspectionRequest } from '@/models';
-import { apiClient } from '@/services';
+import { apiClient, isOnline, syncPending } from '@/services';
 
 /**
  * FE-M09 — Resumo e conclusão.
@@ -27,6 +27,23 @@ export default function SummaryScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [locationNotice, setLocationNotice] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+
+  // Sincroniza respostas pendentes ao abrir o resumo para que a avaliação de
+  // conclusão reflita o que foi preenchido offline.
+  useEffect(() => {
+    if (!inspectionId) return;
+    let cancelled = false;
+    void (async () => {
+      const online = await isOnline();
+      if (online && !cancelled) {
+        const result = await syncPending(apiClient, inspectionId);
+        if (!cancelled && result.synced > 0) reload();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [inspectionId, reload]);
 
   if (loading || loadingEvidences) {
     return <LoadingSpinner testID="resumo-loading" message="Reunindo o resumo…" />;
@@ -78,6 +95,20 @@ export default function SummaryScreen() {
     setFailure(null);
 
     try {
+      const online = await isOnline();
+      if (!online) {
+        setFailure('Sem conexão com a internet. Conecte-se e tente novamente.');
+        setSubmitting(false);
+        return;
+      }
+
+      const syncResult = await syncPending(apiClient, detail.id);
+      if (syncResult.failed > 0) {
+        setFailure('Falha ao sincronizar respostas pendentes. Tente novamente.');
+        setSubmitting(false);
+        return;
+      }
+
       const outcome = await captureLocation();
       let location: GeoLocation | null = null;
 

@@ -119,3 +119,77 @@ jest.mock('expo-camera', () => {
 jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: [] })),
 }));
+
+// expo-network não existe no ambiente de teste. Por padrão o dispositivo está
+// online; cada teste pode sobrescrever com mockResolvedValueOnce.
+jest.mock('expo-network', () => ({
+  getNetworkStateAsync: jest.fn(),
+}));
+
+// expo-sqlite é nativo; um Map em memória reproduz o contrato de outbox
+// (insert/update synced/update error_count/select pending) sem I/O real.
+// As funções ficam sem implementação no mock factory para que o beforeEach
+// possa fazer mockReset() + mockImplementation() sem perder a implementação.
+jest.mock('expo-sqlite', () => {
+  const store = new Map();
+  const db = {
+    execAsync: jest.fn(),
+    runAsync: jest.fn(),
+    getAllAsync: jest.fn(),
+    getFirstAsync: jest.fn(),
+  };
+  return { __store: store, __db: db, openDatabaseAsync: jest.fn(async () => db) };
+});
+
+beforeEach(() => {
+  const Network = require('expo-network');
+  Network.getNetworkStateAsync
+    .mockReset()
+    .mockResolvedValue({ isConnected: true, isInternetReachable: true });
+
+  const SQLite = require('expo-sqlite');
+  SQLite.__store.clear();
+  const store = SQLite.__store;
+  const db = SQLite.__db;
+
+  db.execAsync.mockReset().mockResolvedValue(undefined);
+  db.runAsync.mockReset().mockImplementation(async (sql, params) => {
+    if (/INSERT OR REPLACE INTO outbox/i.test(sql)) {
+      const [id, inspection_id, entity_type, entity_id, operation_type, base_version, payload] =
+        params;
+      store.set(id, {
+        id,
+        inspection_id,
+        entity_type,
+        entity_id,
+        operation_type,
+        base_version,
+        payload,
+        synced: 0,
+        error_count: 0,
+        created_at: new Date().toISOString(),
+      });
+    } else if (/UPDATE outbox SET synced = 1/i.test(sql)) {
+      for (const rowId of params) {
+        const row = store.get(rowId);
+        if (row) store.set(rowId, { ...row, synced: 1 });
+      }
+    } else if (/UPDATE outbox SET error_count/i.test(sql)) {
+      const rowId = params[0];
+      const row = store.get(rowId);
+      if (row) store.set(rowId, { ...row, error_count: row.error_count + 1 });
+    }
+  });
+  db.getAllAsync.mockReset().mockImplementation(async (_sql, params) => {
+    const rows = [...store.values()].filter((r) => r.synced === 0);
+    if (params && params.length > 0 && params[0]) {
+      return rows.filter((r) => r.inspection_id === params[0]);
+    }
+    return rows;
+  });
+  db.getFirstAsync
+    .mockReset()
+    .mockImplementation(async () => ({
+      count: [...store.values()].filter((r) => r.synced === 0).length,
+    }));
+});

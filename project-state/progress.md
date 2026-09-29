@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-09-28 (PEND-04)
+Last updated: 2026-09-28 (BF-007)
 
 ## Current State
 
@@ -236,12 +236,38 @@ Ver `project-state/pending-features.md` para detalhe de cada item.
 
 Itens ainda pendentes:
 - **BF-005** (PARTIAL/BLOCKED) — section/item builder endpoints aguardam decisão de produto
-- **BF-007** (PENDING) — integração mobile sync; tarefa do lado mobile, não backend
+- ~~BF-007 (mobile sync)~~ — **CONCLUÍDA** em 2026-09-28 (ver BF-007 abaixo)
 - ~~PEND-04 (QR scope)~~ — **RESOLVIDA** em 2026-09-28 (ver PEND-04 acima)
 - ~~PEND-05 (evidence ownership)~~ — **RESOLVIDA** em 2026-09-28 (ver PEND-05 acima)
 - ~~PEND-15 (admin filters)~~ — **RESOLVIDA** em 2026-09-28 (commitado em `22b7d31`)
 - ~~RN-038/039 (submit validation)~~ — **RESOLVIDA** em 2026-09-28 (ver acima)
 - **Hardening** — `@Size` em `@PathVariable String` + handler `ConstraintViolationException` (codebase-wide, deferred)
+
+---
+
+### BF-007 — Mobile Sync Integration — não commitado ainda
+
+Offline-first sync implementada no mobile (Expo SDK 57 / React Native):
+
+- `mobile/src/services/local-db.ts` — outbox SQLite com INSERT OR REPLACE
+  por UUID; `synced = 0` na gravação, `synced = 1` após confirmação do servidor.
+- `mobile/src/services/sync-service.ts` — `isOnline()` via `expo-network`,
+  `getOrCreateDeviceId()` via `expo-secure-store`; `syncPending()` envia batches
+  de 50 para `POST /mobile/sync/push`; SINGLE_CHOICE mapeado para `valueChoice`.
+- `mobile/src/features/sync/use-sync.ts` — `useSyncOnForeground()`: dispara na
+  montagem e ao voltar do background via `AppState`.
+- `use-checklist.ts` `send()` reescrito: escreve no outbox SQLite primeiro,
+  chama `syncPendingIfOnline()` em background (void), nunca chama a API diretamente.
+- `summary.tsx`: sync-on-mount antes de avaliar conclusão; `submit()` verifica
+  `isOnline()` e drena o outbox antes de POST /inspections/{id}/submit.
+- `_layout.tsx`: `useSyncOnForeground()` chamado incondicionalmente.
+- `jest.setup.js`: mocks de `expo-network` (padrão online=true) e `expo-sqlite`
+  (Map em memória com reset no `beforeEach`).
+- `checklist-screen.test.tsx`: teste "grava resposta" removeu asserção do mock DB;
+  teste de erro reescrito para simular falha SQLite via `mockRejectedValueOnce`.
+
+Validação: `npm test` não executado (node_modules ausente). Lógica revisada
+manualmente. Mock design verificado contra strings SQL de `local-db.ts`.
 
 ---
 

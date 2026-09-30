@@ -48,7 +48,29 @@ Pre-req fixes: `FlywayMigrationIT` version assertion + `TemplateItemRequest` boo
 7/7 IT tests GREEN. Section/item builder ainda **BLOQUEADO** — decisão de produto pendente
 sobre armazenamento de seções draft (ver `decisions.md` 2026-09-27).
 
-### PATHVAR-SIZE — `@Size` no `@PathVariable qrCode` — 2026-09-29, branch `fix/pathvariable-size-validation`, não commitado
+### ITORDER-001 + MobileInspectionControllerIT — suíte completa verde — 2026-09-30, branch `fix/mobile-inspection-it`, não commitado
+
+Não havia BF pendente (BF-001..007 DONE); o usuário escolheu seguir a ordem recomendada
+dos candidatos: B (`MobileInspectionControllerIT`) e C (ITORDER-001). Só arquivos de teste
+alterados — nenhum código de produção.
+- B: as 2 falhas eram asserções erradas (`extractingPath(...).isNull()` falha quando o path
+  não existe); a API já omite `snapshotId` conforme contrato §4.2. Corrigido para
+  `hasPath(inspectionItemId)` + `doesNotHavePath(snapshotId)`. 15/15.
+- C: `SiteControllerIT` com `TRUNCATE TABLE users CASCADE` no `setUp()` e `@AfterEach`
+  removendo equipment/sites/clients/users. RED reproduzido (`InspectionSchedulingControllerIT`
+  → `SiteControllerIT` em ordem alfabética: 0/17, FK `inspection_templates_created_by_fkey`);
+  GREEN 17/17. A 1ª regressão completa expôs 17 erros novos em `SyncPull/PushControllerIT`
+  (`equipment_site_id_fkey` — equipment deixado pelo `SiteControllerIT`, antes mascarado);
+  corrigido com o `@AfterEach`.
+- Regressão: `./mvnw verify` completo **BUILD SUCCESS — unit 50/50, IT 263/263**, primeira
+  execução completa sem falhas registrada. ECC java-reviewer: aprovado, 0 CRITICAL/HIGH;
+  MEDIUM (TRUNCATE em `@BeforeEach` arriscado com execução paralela) registrado em
+  `decisions.md` ITORDER-001 — failsafe roda em série.
+- Ambiente: Docker Desktop precisou ser iniciado nesta sessão (daemon não estava rodando).
+
+---
+
+### PATHVAR-SIZE — `@Size` no `@PathVariable qrCode` — 2026-09-29 — commitado em `4138064` (`fix/error-handler-400-404`) (antes registrado como "não commitado" — corrigido 2026-09-30)
 
 Candidato 3 (decisão deferida PEND-04 H-03). O escopo real era 1 endpoint:
 `qrCode` é o único `@PathVariable String` (os demais são `UUID`, já 400 desde o

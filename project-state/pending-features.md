@@ -454,6 +454,11 @@ pre-requisito do BF-005:
    **RESOLVIDA** em `228825c`. A classe agora tem 17/17 tests GREEN (incluindo 3 novos
    testes de BF-001 adicionados em `7553bc7`).
 
+**Atualização 2026-09-30:** as falhas pré-existentes restantes citadas em BF-005/ERR-HANDLER
+(`MobileInspectionControllerIT` 2 — asserções erradas; `SiteControllerIT` 17 — ITORDER-001)
+foram **RESOLVIDAS** (branch `fix/mobile-inspection-it`, só testes). `./mvnw verify` completo:
+unit 50/50, IT 263/263. Detalhes em `decisions.md` ITORDER-001.
+
 Além disso, o setUp de `InspectionTemplateControllerIT` foi atualizado (em `7553bc7`)
 para usar `TRUNCATE TABLE inspection_template_versions CASCADE` via `JdbcTemplate`,
 eliminando o risco de violação de FK quando ITs que criam inspeções executam antes

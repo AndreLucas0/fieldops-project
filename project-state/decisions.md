@@ -138,7 +138,30 @@ Full `./mvnw verify` shows false negatives for `EquipmentControllerIT` and
 `SiteControllerIT`. CI should use targeted per-package IT runs.
 
 Status:
-ACTIVE (pending cleanup task)
+~~ACTIVE (pending cleanup task)~~ — **RESOLVED 2026-09-30** (branch `fix/mobile-inspection-it`).
+
+Resolution (2026-09-30):
+- `MobileInspectionControllerIT` (2 failures in isolation): not a production bug — the
+  mobile DTOs correctly omit `snapshotId` (contract §4.2), but the tests asserted
+  `extractingPath("...snapshotId").isNull()`, which always fails when the path is absent.
+  Replaced by `hasPath(inspectionItemId)` guard + `doesNotHavePath(snapshotId)`.
+- `SiteControllerIT` (17 errors in the full suite): `setUp()` now starts with
+  `TRUNCATE TABLE users CASCADE` (clears templates/inspections/children left by other
+  classes; `inspections` is the only outside table referencing clients/sites/equipment and
+  it always cascades from `users`), and a new `@AfterEach` removes the equipment/sites it
+  creates — without it, `SyncPullControllerIT`/`SyncPushControllerIT` (next alphabetically)
+  failed with `equipment_site_id_fkey` (17 errors), masked before because `SiteControllerIT`
+  never got past `setUp()`.
+- `EquipmentControllerIT` was already fixed by PEND-04's `@AfterEach`.
+- Result: full `./mvnw verify` GREEN — unit 50/50, IT 263/263, 0 failures/errors.
+  "Do not use `./mvnw verify` alone as the gate" no longer applies.
+
+Residual risk (accepted): `TRUNCATE` in a `@BeforeEach` takes ACCESS EXCLUSIVE locks —
+fine because failsafe runs IT classes serially (no parallel config in `pom.xml`); revisit
+if parallel test execution is ever enabled. Most IT classes still only clean up in
+`setUp()`; a shared cleanup base class would be the structural fix (not done — scope).
+A future table referencing clients/sites/equipment without referencing `users` would
+reintroduce FK failures in `SiteControllerIT.setUp()`.
 
 ---
 

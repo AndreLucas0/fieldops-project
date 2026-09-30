@@ -41,6 +41,12 @@ async function renderList() {
   return result;
 }
 
+/** Os chips de filtro ficam no painel lateral aberto pelo botão de filtros. */
+async function openFilters() {
+  await fireEvent.press(screen.getByTestId('inspections-filter-button'));
+  expect(screen.getByTestId('filtro-estado')).toBeOnTheScreen();
+}
+
 function visibleCount(): string {
   return screen.getByTestId('inspections-count').props.children.join('');
 }
@@ -66,6 +72,7 @@ describe('FE-M03 — Lista de inspeções', () => {
 
   it('filtra por estado sem nova busca', async () => {
     await renderList();
+    await openFilters();
 
     await fireEvent.press(screen.getByTestId('filtro-estado-IN_PROGRESS'));
 
@@ -79,6 +86,7 @@ describe('FE-M03 — Lista de inspeções', () => {
 
   it('combina estados como alternativas', async () => {
     await renderList();
+    await openFilters();
 
     await fireEvent.press(screen.getByTestId('filtro-estado-IN_PROGRESS'));
     await fireEvent.press(screen.getByTestId('filtro-estado-APPROVED'));
@@ -94,6 +102,7 @@ describe('FE-M03 — Lista de inspeções', () => {
 
   it('desmarca o chip ao tocar de novo', async () => {
     await renderList();
+    await openFilters();
     const total = getMockDatabase().inspections.length;
 
     await fireEvent.press(screen.getByTestId('filtro-estado-IN_PROGRESS'));
@@ -104,6 +113,7 @@ describe('FE-M03 — Lista de inspeções', () => {
 
   it('período é exclusivo: escolher outro substitui o anterior', async () => {
     await renderList();
+    await openFilters();
 
     await fireEvent.press(screen.getByTestId('filtro-periodo-today'));
     await fireEvent.press(screen.getByTestId('filtro-periodo-overdue'));
@@ -116,6 +126,7 @@ describe('FE-M03 — Lista de inspeções', () => {
 
   it('limpa todos os filtros', async () => {
     await renderList();
+    await openFilters();
     const total = getMockDatabase().inspections.length;
 
     await fireEvent.press(screen.getByTestId('filtro-estado-APPROVED'));
@@ -132,6 +143,7 @@ describe('FE-M03 — Lista de inspeções', () => {
 
   it('estado vazio por filtro oferece limpar, não recarregar', async () => {
     await renderList();
+    await openFilters();
 
     // Combinação sem resultado: cancelada e crítica não coexistem no mock.
     await fireEvent.press(screen.getByTestId('filtro-estado-CANCELED'));

@@ -14,6 +14,9 @@ import com.codemind.fieldops.inspection.domain.ItemSnapshot;
 import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
+import com.codemind.fieldops.nonconformity.domain.NonConformity;
+import com.codemind.fieldops.nonconformity.domain.NonConformitySeverity;
+import com.codemind.fieldops.nonconformity.domain.NonConformityStatus;
 import com.codemind.fieldops.nonconformity.repository.NonConformityRepository;
 import com.codemind.fieldops.shared.audit.AuditEventRepository;
 import com.codemind.fieldops.shared.security.JwtClaims;
@@ -37,6 +40,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -353,6 +357,59 @@ class SyncPushControllerIT {
             .hasStatusOk()
             .bodyJson()
             .extractingPath("$.results[0].status").asString().isEqualTo("REJECTED");
+    }
+
+    @Test
+    @DisplayName("RN-004, AC-SECURITY - técnico não cria não conformidade via sync na inspeção de outro técnico")
+    void technicianCannotPushNonConformityCreationForAnInspectionTheyDoNotOwn() {
+        String payload = pushPayload(UUID.randomUUID().toString(), "NON_CONFORMITY", UUID.randomUUID().toString(),
+            "UPSERT", "null", """
+            {"inspectionId": "%s", "title": "Intruder NC", "description": "x", "severity": "LOW"}"""
+                .formatted(draftInspection.getId()));
+
+        assertThat(mvc.post().uri("/mobile/sync/push")
+            .header("Authorization", bearer(mintAccessToken(otherTechnicianUser)))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .satisfies(json -> {
+                assertThat(json).extractingPath("$.results[0].status").asString().isEqualTo("REJECTED");
+                assertThat(json).extractingPath("$.results[0].error.code").asString()
+                    .isEqualTo("SYNC_INSPECTION_NOT_OWNED");
+            });
+        assertThat(nonConformityRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("RN-004, AC-SECURITY - técnico não altera via sync a não conformidade de outro técnico")
+    void technicianCannotPushNonConformityUpdateForAnInspectionTheyDoNotOwn() {
+        NonConformity ownerNc = nonConformityRepository.save(NonConformity.builder()
+            .id(UUID.randomUUID())
+            .inspection(draftInspection)
+            .reportedBy(technicianUser)
+            .title("Owner NC")
+            .description("Reported by the assigned technician")
+            .severity(NonConformitySeverity.LOW)
+            .status(NonConformityStatus.OPEN)
+            .build());
+        String payload = pushPayload(UUID.randomUUID().toString(), "NON_CONFORMITY", ownerNc.getId().toString(),
+            "UPSERT", "null", """
+            {"inspectionId": "%s", "title": "Tampered", "description": "x", "severity": "LOW"}"""
+                .formatted(draftInspection.getId()));
+
+        assertThat(mvc.post().uri("/mobile/sync/push")
+            .header("Authorization", bearer(mintAccessToken(otherTechnicianUser)))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .satisfies(json -> {
+                assertThat(json).extractingPath("$.results[0].status").asString().isEqualTo("REJECTED");
+                assertThat(json).extractingPath("$.results[0].error.code").asString()
+                    .isEqualTo("SYNC_INSPECTION_NOT_OWNED");
+            });
+        assertThat(nonConformityRepository.findById(ownerNc.getId()).orElseThrow().getTitle()).isEqualTo("Owner NC");
     }
 
     @Test

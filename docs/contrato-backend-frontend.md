@@ -559,6 +559,7 @@ Tipos desconhecidos **não devem quebrar a tela** — o app deve indicar incompa
 | 401 | Sessão ausente ou inválida | Tentar renovação via `/auth/refresh`; se falhar, redirecionar ao login preservando dados locais não sincronizados (mobile) |
 | 403 | Autenticado sem permissão | Mensagem de acesso negado; **não** deve revelar dados do recurso |
 | 404 | Recurso não encontrado ou não visível ao usuário | Estado "não encontrado", nunca detalhar se o recurso existe para outro usuário |
+| 405 | Método HTTP não permitido na rota | Erro de integração (bug do cliente); mensagem genérica, não tentar novamente |
 | 409 | Conflito de estado, versão otimista ou unicidade | Preservar dado local; oferecer nova tentativa; nunca sobrescrever silenciosamente |
 | 413 | Arquivo acima do limite | Mensagem específica de tamanho; permitir nova captura (evidência) |
 | 415 | Formato de arquivo não suportado | Mensagem específica de formato |

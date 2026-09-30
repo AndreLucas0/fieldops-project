@@ -10,6 +10,7 @@ import com.codemind.fieldops.nonconformity.dto.NonConformityStatusUpdateRequest;
 import com.codemind.fieldops.nonconformity.dto.NonConformityUpdateRequest;
 import com.codemind.fieldops.nonconformity.mapper.NonConformityMapper;
 import com.codemind.fieldops.shared.pagination.PageResponse;
+import com.codemind.fieldops.shared.security.JwtClaims;
 import com.codemind.fieldops.shared.pagination.SortFieldValidator;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -53,14 +54,15 @@ public class NonConformityController {
                                          @Valid @RequestBody NonConformityCreateRequest request,
                                          @AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
-        NonConformity nc = nonConformityService.create(inspectionId, userId, request);
+        NonConformity nc = nonConformityService.create(inspectionId, userId, isTechnician(jwt), request);
         return nonConformityMapper.toResponse(nc);
     }
 
     @GetMapping("/inspections/{inspectionId}/non-conformities")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','TECHNICIAN')")
-    public List<NonConformityResponse> listByInspection(@PathVariable UUID inspectionId) {
-        return nonConformityService.listByInspection(inspectionId)
+    public List<NonConformityResponse> listByInspection(@PathVariable UUID inspectionId,
+                                                        @AuthenticationPrincipal Jwt jwt) {
+        return nonConformityService.listByInspection(inspectionId, UUID.fromString(jwt.getSubject()), isTechnician(jwt))
             .stream()
             .map(nonConformityMapper::toResponse)
             .toList();
@@ -68,15 +70,18 @@ public class NonConformityController {
 
     @GetMapping("/non-conformities/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','TECHNICIAN')")
-    public NonConformityResponse getById(@PathVariable UUID id) {
-        return nonConformityMapper.toResponse(nonConformityService.getById(id));
+    public NonConformityResponse getById(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return nonConformityMapper.toResponse(
+            nonConformityService.getById(id, UUID.fromString(jwt.getSubject()), isTechnician(jwt)));
     }
 
     @PatchMapping("/non-conformities/{id}/status")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','TECHNICIAN')")
     public NonConformityResponse updateStatus(@PathVariable UUID id,
-                                               @Valid @RequestBody NonConformityStatusUpdateRequest request) {
-        return nonConformityMapper.toResponse(nonConformityService.updateStatus(id, request));
+                                               @Valid @RequestBody NonConformityStatusUpdateRequest request,
+                                               @AuthenticationPrincipal Jwt jwt) {
+        return nonConformityMapper.toResponse(
+            nonConformityService.updateStatus(id, request, UUID.fromString(jwt.getSubject()), isTechnician(jwt)));
     }
 
     @GetMapping("/non-conformities")
@@ -94,8 +99,14 @@ public class NonConformityController {
     @PutMapping("/non-conformities/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','TECHNICIAN')")
     public NonConformityResponse update(@PathVariable UUID id,
-                                         @Valid @RequestBody NonConformityUpdateRequest request) {
-        return nonConformityMapper.toResponse(nonConformityService.update(id, request));
+                                         @Valid @RequestBody NonConformityUpdateRequest request,
+                                         @AuthenticationPrincipal Jwt jwt) {
+        return nonConformityMapper.toResponse(
+            nonConformityService.update(id, request, UUID.fromString(jwt.getSubject()), isTechnician(jwt)));
+    }
+
+    private static boolean isTechnician(Jwt jwt) {
+        return "TECHNICIAN".equals(jwt.getClaimAsString(JwtClaims.ROLE));
     }
 
 }

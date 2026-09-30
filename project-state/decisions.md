@@ -165,6 +165,86 @@ reintroduce FK failures in `SiteControllerIT.setUp()`.
 
 ---
 
+### [2026-09-30] — Mobile Jest: `lucide-react-native` mapped to its CJS build
+
+Context:
+`jest-expo` resolves `lucide-react-native` through the `react-native` export condition to an ESM
+`.mjs` file that Jest does not transform → `inspections-screen.test.tsx` failed to load since `cdb7c5b`.
+
+Decision:
+Jest-only `moduleNameMapper` `^lucide-react-native$` → `node_modules/lucide-react-native/dist/cjs/lucide-react-native.js`
+(the package's own `main`/`exports.require`). Metro/runtime unchanged.
+
+Reason:
+Single bare import in the codebase; deterministic and fast; a future dist-layout change fails loudly.
+
+Alternatives considered:
+Extending `transformIgnorePatterns` (covers subpath imports, exercises the real ESM) — rejected for
+now: must replicate the jest-expo default allowlist regex and transform `.mjs` on every run.
+
+Impact:
+A future subpath import (`lucide-react-native/icons/...`) would bypass the mapper and fail the
+same way — extend the mapper or switch to `transformIgnorePatterns` then.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-30] — Technician ownership: 403 for another technician's resource, 404 only when absent
+
+Context:
+AUTHZ-BOUNDARY added RN-004 ownership checks to evidence and non-conformity endpoints (and the
+NC sync path). Returning 403 for an existing-but-not-yours id and 404 for a non-existent one lets
+a technician learn whether a UUID exists.
+
+Decision:
+Keep 403 vs 404 (existence first, then ownership), consistent with the pre-existing
+`getInspectionForTechnician`, `EvidenceService.delete`, `start/submit` and AC-SECURITY tests
+("técnico não acessa inspeção de outro técnico pela URL" → 403). On evidence upload, ownership
+(403) is checked before the APPROVED read-only rule (409) so state is not leaked (PEND-05).
+
+Reason:
+Ids are random UUIDs (not enumerable); `criterios-de-aceitacao`/test-plan expect 403; changing
+to 404 everywhere would be a separate, codebase-wide contract change.
+
+Alternatives considered:
+404 for "not yours" (hides existence) — rejected for now; revisit with RN-005 supervisor scoping.
+
+Impact:
+Denials never include resource data (asserted in `AuthorizationBoundaryIT`).
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-30] — 405 Method Not Allowed documented and returned with `Allow`
+
+Context:
+`HttpRequestMethodNotSupportedException` fell into the catch-all → 500 (logged at ERROR).
+405 was not in `api-rest.md` §12.3, so it was deferred pending a doc decision (ERR-HANDLER).
+
+Decision:
+User decided (2026-09-30) to document 405 and return it for every method not allowed on a
+route. Added to `api-rest.md` §12.3 and `contrato-backend-frontend.md` §5.2; handler returns
+405 `METHOD_NOT_ALLOWED` with the §12.2 body and the `Allow` header.
+
+Reason:
+RFC 9110 §15.5.6 requires `Allow` on 405; 500 is reserved for unforeseen failures (§12.3).
+
+Alternatives considered:
+Omitting `Allow` to hide supported methods — rejected: anonymous callers get 401 before
+method matching (except `permitAll` routes, whose methods are already public in swagger).
+
+Impact:
+Clients get a deterministic 405 instead of 500; no OpenAPI change (undeclared methods).
+
+Status:
+ACTIVE
+
+---
+
 ### [2026-09-27] — BF-005: Section/item builder blocked by data model gap
 
 Context:

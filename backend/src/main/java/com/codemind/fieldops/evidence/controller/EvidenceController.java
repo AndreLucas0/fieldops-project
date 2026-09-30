@@ -56,7 +56,7 @@ public class EvidenceController {
         UUID userId = UUID.fromString(jwt.getSubject());
         EvidenceUploadCommand command = new EvidenceUploadCommand(idempotencyKey, responseId, nonConformityId, type,
             description, parseInstant(capturedAtDevice), latitude, longitude);
-        Evidence evidence = evidenceService.upload(inspectionId, userId, command, file);
+        Evidence evidence = evidenceService.upload(inspectionId, userId, isTechnician(jwt), command, file);
         return toResponse(evidence);
     }
 
@@ -64,25 +64,29 @@ public class EvidenceController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','TECHNICIAN')")
     public List<EvidenceResponse> list(@PathVariable UUID inspectionId,
             @RequestParam(required = false) UUID responseId,
-            @RequestParam(required = false) UUID nonConformityId) {
-        return evidenceService.list(inspectionId, responseId, nonConformityId).stream()
+            @RequestParam(required = false) UUID nonConformityId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return evidenceService.list(inspectionId, UUID.fromString(jwt.getSubject()), isTechnician(jwt), responseId,
+                nonConformityId).stream()
             .map(this::toResponse)
             .toList();
     }
 
     @GetMapping("/evidence/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','TECHNICIAN')")
-    public EvidenceResponse get(@PathVariable UUID id) {
-        return toResponse(evidenceService.getById(id));
+    public EvidenceResponse get(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return toResponse(evidenceService.getById(id, UUID.fromString(jwt.getSubject()), isTechnician(jwt)));
     }
 
     @DeleteMapping("/evidence/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','TECHNICIAN')")
     public void delete(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
-        UUID userId = UUID.fromString(jwt.getSubject());
-        boolean isTechnician = "TECHNICIAN".equals(jwt.getClaimAsString(JwtClaims.ROLE));
-        evidenceService.delete(id, userId, isTechnician);
+        evidenceService.delete(id, UUID.fromString(jwt.getSubject()), isTechnician(jwt));
+    }
+
+    private static boolean isTechnician(Jwt jwt) {
+        return "TECHNICIAN".equals(jwt.getClaimAsString(JwtClaims.ROLE));
     }
 
     private EvidenceResponse toResponse(Evidence evidence) {

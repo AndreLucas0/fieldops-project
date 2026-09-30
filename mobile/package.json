@@ -64,7 +64,8 @@
       "^@babel/runtime/(.*)$": "<rootDir>/node_modules/@babel/runtime/$1",
       "^@fieldops/shared$": "<rootDir>/../shared/src/index.ts",
       "^@fieldops/shared/(.*)$": "<rootDir>/../shared/src/$1",
-      "^@/(.*)$": "<rootDir>/src/$1"
+      "^@/(.*)$": "<rootDir>/src/$1",
+      "^lucide-react-native$": "<rootDir>/node_modules/lucide-react-native/dist/cjs/lucide-react-native.js"
     },
     "collectCoverageFrom": [
       "src/**/*.{ts,tsx}",

@@ -48,7 +48,58 @@ Pre-req fixes: `FlywayMigrationIT` version assertion + `TemplateItemRequest` boo
 7/7 IT tests GREEN. Section/item builder ainda **BLOQUEADO** — decisão de produto pendente
 sobre armazenamento de seções draft (ver `decisions.md` 2026-09-27).
 
-### ITORDER-001 + MobileInspectionControllerIT — suíte completa verde — 2026-09-30, branch `fix/mobile-inspection-it`, não commitado
+### MOBILE-TEST-1 — suíte `inspections-screen.test.tsx` volta a rodar — 2026-09-30, branch `fix/mobile-inspection-it`, não commitado
+
+Candidato F (parte 1). A suíte não carregava desde `cdb7c5b` (lucide-react-native ESM no Jest).
+Correção só de teste/config: `moduleNameMapper` do Jest aponta para a build CJS do lucide; os 6
+testes de filtro (que falharam ao voltar a carregar, pois `cdb7c5b` moveu os chips para um painel
+lateral) passam a abrir o painel antes de tocar nos chips. Resultado: suíte 11/11; `npm test`
+24/24 suítes, **302/302** (volta a bater com a contagem histórica do ESTADO-DO-PROJETO);
+typecheck e lint OK. Candidato E continua bloqueado por decisão de contrato; F-2 (testes
+unitários de `local-db`/`sync-service`) é o próximo executável.
+
+---
+
+### AUTHZ-BOUNDARY — posse do técnico em evidências e não conformidades (RN-004) — 2026-09-30, branch `fix/mobile-inspection-it`, não commitado
+
+Candidato D (cobertura ⚪ do audit + `AuthorizationBoundaryIT` do test-plan §5.8). O teste
+revelou **vulnerabilidade real**: técnico B lia/alterava evidências e não conformidades da
+inspeção do técnico A pela URL (8 endpoints, RED 200/201) e criava/alterava NC via
+`/mobile/sync/push` (RED `APPLIED`, achado HIGH do ECC security-reviewer). Corrigido com
+checagem de posse nos serviços (403 `FORBIDDEN`; sync `REJECTED`/`SYNC_INSPECTION_NOT_OWNED`),
+padrão já usado em `EvidenceService.delete`. ADMIN/SUPERVISOR sem restrição.
+Testes: `AuthorizationBoundaryIT` 11/11 (novo), `SyncPushControllerIT` 12/12 (+2),
+`ConflictDetectionTest` fixture alinhado. `./mvnw verify` completo: 50/50 + 284/284, BUILD SUCCESS.
+HTTP real (Postgres descartável + app :8099, login real de admin/técnico A/técnico B): as 7 rotas
+testáveis → 403 `FORBIDDEN` para B, sync push de B → `REJECTED`/`SYNC_INSPECTION_NOT_OWNED`,
+controles A/admin 200, NC intacta. Limitação de ambiente: upload do dono A deu 500
+(`NoSuchBucketException` — bucket S3 ausente no ambiente descartável, não relacionado); por isso
+`GET /evidence/{id}` de B não foi exercitado via HTTP real — coberto pelo `AuthorizationBoundaryIT`
+(storage fake).
+Follow-ups em `pending-features.md` "AUTHZ-BOUNDARY"; decisão 403 vs 404 em `decisions.md`.
+
+---
+
+### ERR-HANDLER-2 — 400/415 para parâmetro ausente e Content-Type não suportado — 2026-09-30, branch `fix/mobile-inspection-it`, não commitado
+
+Candidato A (follow-up do ERR-HANDLER; nenhuma BF formal pendente). `GlobalExceptionHandler`:
+parâmetro/parte obrigatória ausente → 400 `MISSING_PARAMETER` + `fieldErrors[nome]`;
+Content-Type não suportado → 415 `UNSUPPORTED_CONTENT_TYPE` (api-rest.md §12.3). TDD: 4 RED
+(500) → GREEN; `GlobalExceptionHandlerIT` 10/10; `./mvnw verify` completo 50/50 + 268/268.
+HTTP real (Postgres descartável + app :8099, login real): 400/400/415/415, 401 sem token,
+controles 404/201, sem ERROR no log. ECC java-reviewer sem CRITICAL/HIGH; MEDIUMs corrigidos.
+Follow-ups (header/cookie ausente, 406, ordem 403 vs 400/415) em `pending-features.md`
+"ERR-HANDLER-2".
+
+Extensão 405 (mesmo dia, decisão do usuário): documentado em `api-rest.md` §12.3 e
+`contrato-backend-frontend.md` §5.2; `HttpRequestMethodNotSupportedException` → 405
+`METHOD_NOT_ALLOWED` + cabeçalho `Allow` em todas as rotas. RED 2 (500) → GREEN;
+`GlobalExceptionHandlerIT` 13/13; `./mvnw verify` 50/50 + 271/271; HTTP real 405 com `Allow`
+correto, 401 sem token, sem ERROR no log. ECC security-reviewer: só LOWs aceitos.
+
+---
+
+### ITORDER-001 + MobileInspectionControllerIT — suíte completa verde — 2026-09-30 — commitado em `2bdb53c` (`fix/mobile-inspection-it`)
 
 Não havia BF pendente (BF-001..007 DONE); o usuário escolheu seguir a ordem recomendada
 dos candidatos: B (`MobileInspectionControllerIT`) e C (ITORDER-001). Só arquivos de teste

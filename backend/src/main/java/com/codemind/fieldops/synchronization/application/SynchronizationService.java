@@ -267,6 +267,12 @@ public class SynchronizationService {
             return Outcome.rejected(INVALID_PAYLOAD_CODE, "payload.inspectionId is required");
         }
 
+        Inspection inspection = inspectionRepository.findById(payload.inspectionId())
+            .orElseThrow(() -> new ResourceNotFoundException("INSPECTION_NOT_FOUND", "Inspection not found"));
+        if (!inspection.getTechnician().getId().equals(userId)) {
+            return Outcome.rejected(NOT_OWNER_CODE, "You do not have access to this inspection");
+        }
+
         NonConformity existing = nonConformityRepository.findById(nonConformityId).orElse(null);
         if (existing != null) {
             if (!existing.getInspection().getId().equals(payload.inspectionId())) {

@@ -49,6 +49,7 @@
 | **401** | Sessão ausente ou inválida. |
 | **403** | Usuário autenticado sem permissão. |
 | **404** | Recurso não encontrado ou não visível ao usuário. |
+| **405** | Método HTTP não permitido na rota (resposta inclui o cabeçalho `Allow`). |
 | **409** | Conflito de estado, versão ou unicidade. |
 | **413** | Arquivo acima do limite. |
 | **415** | Formato de arquivo não suportado. |

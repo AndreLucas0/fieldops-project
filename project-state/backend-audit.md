@@ -94,7 +94,7 @@ See `pending-features.md` for the actionable backlog (BF-001..BF-007); this sect
 | Feature | Note |
 |---|---|
 | Audit event recording (RN-086,087) | `AuditEventPublisher` is called on every reviewed transition, but there's no dedicated unit/integration test for it (`AuditControllerIT`/`AuditEventPublisher` test not found). Not proof of absence — just untested. |
-| Cross-cutting ownership authorization | Confirmed tested for inspection/response/mobile controllers; **not** confirmed tested for `NonConformityController`/`EvidenceController` ("technician can't touch another technician's inspection" case). `AuthorizationBoundaryIT` (planned per `test-plan.md` M8) doesn't exist. |
+| Cross-cutting ownership authorization | Confirmed tested for inspection/response/mobile controllers; **not** confirmed tested for `NonConformityController`/`EvidenceController` ("technician can't touch another technician's inspection" case). `AuthorizationBoundaryIT` (planned per `test-plan.md` M8) doesn't exist. **SUPERSEDED 2026-09-30:** the untested case was an actual vulnerability (other technician could read/modify evidence and NCs, incl. via sync push); fixed and covered by `security/AuthorizationBoundaryIT` — see `pending-features.md` AUTHZ-BOUNDARY. |
 
 ## 🔵 Mock/placeholder (0)
 

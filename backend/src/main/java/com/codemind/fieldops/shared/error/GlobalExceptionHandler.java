@@ -11,12 +11,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
@@ -63,6 +67,43 @@ public class GlobalExceptionHandler {
 		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.BAD_REQUEST, "INVALID_PARAMETER",
 			"Request parameter has an invalid value", List.of(new FieldError(ex.getName(), "Invalid value")));
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+	}
+
+	@ExceptionHandler(MissingServletRequestParameterException.class)
+	ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException ex,
+			HttpServletRequest request) {
+		return missingParameter(ex.getParameterName(), request);
+	}
+
+	@ExceptionHandler(MissingServletRequestPartException.class)
+	ResponseEntity<ErrorResponse> handleMissingPart(MissingServletRequestPartException ex, HttpServletRequest request) {
+		return missingParameter(ex.getRequestPartName(), request);
+	}
+
+	private ResponseEntity<ErrorResponse> missingParameter(String name, HttpServletRequest request) {
+		LOG.debug("Missing required parameter '{}' on {} {}", name, request.getMethod(), request.getRequestURI());
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.BAD_REQUEST, "MISSING_PARAMETER",
+			"A required request parameter is missing", List.of(new FieldError(name, "Required")));
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+	}
+
+	@ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+	ResponseEntity<ErrorResponse> handleUnsupportedContentType(HttpMediaTypeNotSupportedException ex,
+			HttpServletRequest request) {
+		LOG.debug("Unsupported Content-Type on {} {}", request.getMethod(), request.getRequestURI());
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+			"UNSUPPORTED_CONTENT_TYPE", "Request Content-Type is not supported by this endpoint");
+		return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(body);
+	}
+
+	@ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+	ResponseEntity<ErrorResponse> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex,
+			HttpServletRequest request) {
+		LOG.debug("Method not allowed: {} {}", request.getMethod(), request.getRequestURI());
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED",
+			"HTTP method is not allowed on this route");
+		// RFC 9110 §15.5.6: a 405 response must list the supported methods in the Allow header
+		return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).headers(ex.getHeaders()).body(body);
 	}
 
 	@ExceptionHandler(NoResourceFoundException.class)

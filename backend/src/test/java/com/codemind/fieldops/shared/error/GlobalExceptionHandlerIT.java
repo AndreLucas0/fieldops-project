@@ -19,6 +19,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -27,10 +28,12 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 /**
  * Malformed requests and unknown routes must follow api-rest.md §12.3
- * (400 "requisição malformada", 404 "recurso não encontrado") with the §12.2
+ * (400 "requisição malformada", 404 "recurso não encontrado",
+ * 415 formato não suportado) with the §12.2
  * error body, instead of falling into the catch-all 500.
  */
 @Import(TestcontainersConfiguration.class)
@@ -129,6 +132,108 @@ class GlobalExceptionHandlerIT {
             .satisfies(json -> {
                 assertThat(json).extractingPath("$.code").asString().isEqualTo("INVALID_PARAMETER");
                 assertThat(json).extractingPath("$.fieldErrors[0].field").asString().isEqualTo("id");
+            });
+    }
+
+    @Test
+    void unsupportedMethodOnCollectionRouteReturns405WithAllowHeader() {
+        var result = mvc.patch().uri("/inspection-templates").header("Authorization", bearer()).exchange();
+
+        assertThat(result).hasStatus(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(result.getResponse().getHeader("Allow")).contains("GET").contains("POST");
+        assertThat(result).bodyJson().satisfies(json -> {
+            assertThat(json).extractingPath("$.status").asNumber().isEqualTo(405);
+            assertThat(json).extractingPath("$.code").asString().isEqualTo("METHOD_NOT_ALLOWED");
+            assertThat(json).extractingPath("$.path").asString().endsWith("/inspection-templates");
+        });
+    }
+
+    @Test
+    void unsupportedMethodOnItemRouteReturns405() {
+        assertThat(mvc.delete().uri("/inspection-templates/" + UUID.randomUUID()).header("Authorization", bearer()))
+            .hasStatus(HttpStatus.METHOD_NOT_ALLOWED)
+            .bodyJson()
+            .extractingPath("$.code").asString().isEqualTo("METHOD_NOT_ALLOWED");
+    }
+
+    @Test
+    void unsupportedMethodWithoutTokenStillReturns401() {
+        assertThat(mvc.patch().uri("/inspection-templates"))
+            .hasStatus(HttpStatus.UNAUTHORIZED);
+    }
+
+    private MockMultipartFile jpegFile() {
+        return new MockMultipartFile("file", "photo.jpg", "image/jpeg", "fake-image-bytes".getBytes());
+    }
+
+    @Test
+    void missingRequiredRequestParameterReturns400() {
+        assertThat(mvc.perform(MockMvcRequestBuilders
+                .multipart("/inspections/" + UUID.randomUUID() + "/evidence")
+                .file(jpegFile())
+                .param("type", "PHOTO")
+                .param("capturedAtDevice", Instant.now().toString())
+                .header("Authorization", bearer())))
+            .hasStatus(HttpStatus.BAD_REQUEST)
+            .bodyJson()
+            .satisfies(json -> {
+                assertThat(json).extractingPath("$.status").asNumber().isEqualTo(400);
+                assertThat(json).extractingPath("$.code").asString().isEqualTo("MISSING_PARAMETER");
+                assertThat(json).extractingPath("$.path").asString().endsWith("/evidence");
+                assertThat(json).extractingPath("$.fieldErrors[0].field").asString().isEqualTo("idempotencyKey");
+                assertThat(json).extractingPath("$.fieldErrors[0].message").asString().isEqualTo("Required");
+            });
+    }
+
+    @Test
+    void missingRequiredRequestParameterWithoutTokenStillReturns401() {
+        assertThat(mvc.perform(MockMvcRequestBuilders
+                .multipart("/inspections/" + UUID.randomUUID() + "/evidence")
+                .file(jpegFile())))
+            .hasStatus(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void missingRequiredMultipartFileReturns400() {
+        assertThat(mvc.perform(MockMvcRequestBuilders
+                .multipart("/inspections/" + UUID.randomUUID() + "/evidence")
+                .param("idempotencyKey", UUID.randomUUID().toString())
+                .param("type", "PHOTO")
+                .param("capturedAtDevice", Instant.now().toString())
+                .header("Authorization", bearer())))
+            .hasStatus(HttpStatus.BAD_REQUEST)
+            .bodyJson()
+            .satisfies(json -> {
+                assertThat(json).extractingPath("$.status").asNumber().isEqualTo(400);
+                assertThat(json).extractingPath("$.code").asString().isEqualTo("MISSING_PARAMETER");
+                assertThat(json).extractingPath("$.fieldErrors[0].field").asString().isEqualTo("file");
+                assertThat(json).extractingPath("$.fieldErrors[0].message").asString().isEqualTo("Required");
+            });
+    }
+
+    @Test
+    void jsonSentToMultipartEndpointReturns415() {
+        assertThat(mvc.post().uri("/inspections/" + UUID.randomUUID() + "/evidence").header("Authorization", bearer())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{}"))
+            .hasStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+            .bodyJson()
+            .satisfies(json -> {
+                assertThat(json).extractingPath("$.status").asNumber().isEqualTo(415);
+                assertThat(json).extractingPath("$.code").asString().isEqualTo("UNSUPPORTED_CONTENT_TYPE");
+            });
+    }
+
+    @Test
+    void plainTextSentToJsonEndpointReturns415() {
+        assertThat(mvc.post().uri("/inspection-templates").header("Authorization", bearer())
+            .contentType(MediaType.TEXT_PLAIN)
+            .content("title=x"))
+            .hasStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+            .bodyJson()
+            .satisfies(json -> {
+                assertThat(json).extractingPath("$.status").asNumber().isEqualTo(415);
+                assertThat(json).extractingPath("$.code").asString().isEqualTo("UNSUPPORTED_CONTENT_TYPE");
             });
     }
 

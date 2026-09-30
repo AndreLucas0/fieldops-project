@@ -111,7 +111,12 @@ class ConflictDetectionTest {
     void nonConformityWithStaleBaseVersionIsReportedAsConflict() {
         UUID inspectionId = UUID.randomUUID();
         UUID nonConformityId = UUID.randomUUID();
-        Inspection inspection = Inspection.builder().id(inspectionId).version(1).build();
+        Inspection inspection = Inspection.builder()
+            .id(inspectionId)
+            .technician(User.builder().id(userId).build())
+            .version(1)
+            .build();
+        when(inspectionRepository.findById(inspectionId)).thenReturn(Optional.of(inspection));
         NonConformity existing = NonConformity.builder()
             .id(nonConformityId)
             .inspection(inspection)

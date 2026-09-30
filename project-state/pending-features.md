@@ -379,8 +379,16 @@ Validation (2026-09-29) — reopened and fixed, now actually validated:
   lucide ESM) — pre-existing since `cdb7c5b` (2026-09-15), unrelated to BF-007.
 
 Follow-ups (not implemented — outside BF-007 validation scope):
-- `inspections-screen.test.tsx` cannot load: Jest does not transform
-  `lucide-react-native` ESM (needs `transformIgnorePatterns` or a mock). Broken since `cdb7c5b`.
+- ~~`inspections-screen.test.tsx` cannot load: Jest does not transform
+  `lucide-react-native` ESM (needs `transformIgnorePatterns` or a mock). Broken since `cdb7c5b`.~~ —
+  **RESOLVIDO** 2026-09-30 (MOBILE-TEST-1, branch `fix/mobile-inspection-it`, não commitado):
+  jest-only `moduleNameMapper` `^lucide-react-native$` → build CJS do próprio pacote
+  (`dist/cjs/lucide-react-native.js`; o `jest-expo` resolvia pela condição `react-native` para o
+  `.mjs` ESM). Ao voltar a carregar, 6 testes de filtro falharam: `cdb7c5b` moveu os chips para um
+  painel lateral (`Modal`) aberto por `inspections-filter-button` — mudança intencional de UI, não
+  bug (`telas-frontend.md` §10.8 não fixa o posicionamento). Testes passam a abrir o painel
+  (`openFilters()`), asserções de comportamento inalteradas. Suíte 11/11; mobile completo
+  24/24 suítes, 302/302 testes; typecheck OK; lint OK. Metro/app não afetados.
 - `local-db.ts`, `sync-service.ts`, `use-sync.ts` have no direct unit tests — only
   exercised through screen tests with mocks (batching, REJECTED/CONFLICT handling untested).
 - `npx expo install --check` still flags patch updates unrelated to BF-007:
@@ -414,13 +422,115 @@ Validation:
 - ECC security-reviewer: 0 CRITICAL/HIGH; MEDIUM (no logging after leaving catch-all) fixed.
 
 Follow-ups (not implemented — out of scope):
-- `HttpRequestMethodNotSupportedException` (405), `HttpMediaTypeNotSupportedException` (415)
-  and `MissingServletRequestParameterException` still fall into the catch-all 500.
-  405 is not in the `api-rest.md` §12.3 table — needs doc decision first.
+- ~~`HttpRequestMethodNotSupportedException` (405), `HttpMediaTypeNotSupportedException` (415)
+  and `MissingServletRequestParameterException` still fall into the catch-all 500.~~ —
+  415 and missing parameter **RESOLVIDOS** em 2026-09-30 (ver "ERR-HANDLER-2" abaixo).
+  405 **RESOLVIDO** em 2026-09-30 após decisão de documentação do usuário (ver "ERR-HANDLER-2").
 - `AuthenticationException` handler echoes `ex.getMessage()` (pre-existing).
 - Swagger/api-docs are `permitAll` — confirm they are disabled in a production profile.
 - Type-mismatch 400 is raised before method security, so an authenticated non-admin gets
   400 (not 403) on admin routes with a bad UUID — LOW, accepted.
+
+---
+
+## ERR-HANDLER-2 — 400/415 for missing parameters and unsupported Content-Type
+
+Status: DONE (2026-09-30, branch `fix/mobile-inspection-it`, não commitado)
+
+Origin: ERR-HANDLER follow-up. Requirement: `api-rest.md` §12.3 (400 = requisição malformada,
+415 = formato não suportado, 500 only for unforeseen failures), §12.2 body; RN-090.
+
+Implementation — `GlobalExceptionHandler` (DEBUG log, generic messages, no media-type list):
+- `MissingServletRequestParameterException` / `MissingServletRequestPartException` → 400
+  `MISSING_PARAMETER`, `fieldErrors[{field: <param|part>, message: "Required"}]`. Today only
+  `POST /inspections/{id}/evidence` has required `@RequestParam`/`@RequestPart`.
+- `HttpMediaTypeNotSupportedException` → 415 `UNSUPPORTED_CONTENT_TYPE` (distinct from the
+  evidence file-format code raised by `UnsupportedMediaTypeException`).
+
+Validation:
+- RED: `GlobalExceptionHandlerIT` 4 new tests failing with 500 (5 existing GREEN).
+- GREEN: 10/10 (+1 test after review: no token + missing param → still 401).
+- Full `./mvnw verify`: unit 50/50, IT 268/268, BUILD SUCCESS.
+- Real HTTP (throwaway Postgres :5499 + app :8099, real `/auth/login`): 400/400/415/415 with
+  §12.2 body; no token → 401; controls 404 (`INSPECTION_NOT_FOUND`) and 201; 0 ERROR log lines.
+- ECC java-reviewer: 0 CRITICAL/HIGH. MEDIUMs fixed (split dual-exception handler with cast;
+  stronger test assertions). OpenAPI already documents 400/415 on evidence upload — no doc change.
+
+405 extension (2026-09-30, user decision: "implementar erro 405 para todas as ações que
+deveriam resultar em not allowed invés de retornar 500"):
+- Docs: `api-rest.md` §12.3 and `contrato-backend-frontend.md` §5.2 gained a 405 row
+  ("Método HTTP não permitido na rota", response carries `Allow`).
+- `HttpRequestMethodNotSupportedException` → 405 `METHOD_NOT_ALLOWED` + `Allow` header
+  (RFC 9110 §15.5.6), global — applies to every mapped route. Anonymous callers still get 401
+  first, except on `permitAll` routes (`/auth/login|refresh`, swagger), whose methods are public anyway.
+- RED: 2 new tests failing with 500 (anonymous 401 test already GREEN); GREEN
+  `GlobalExceptionHandlerIT` 13/13; full `./mvnw verify` 50/50 + 271/271.
+- Real HTTP: PATCH collection → 405 `Allow: GET, POST`; DELETE item → 405 `Allow: GET, PUT`;
+  anonymous GET `/auth/login` → 405 `Allow: POST`; PATCH without token → 401; control GET → 200;
+  0 ERROR log lines (the catch-all used to log these at ERROR).
+- ECC security-reviewer: 0 CRITICAL/HIGH/MEDIUM; 2 LOW accepted (Allow on public routes only
+  reveals what swagger shows; DEBUG URI logging follows the existing pattern). OPTIONS/HEAD unchanged.
+- OpenAPI unchanged: 405 applies to undeclared methods, which OpenAPI cannot list per path.
+
+Follow-ups (not implemented — out of scope):
+- `MissingRequestHeaderException`, `MissingRequestCookieException`, `HttpMediaTypeNotAcceptableException`
+  (406) and other `ServletRequestBindingException` subclasses still fall into the catch-all 500
+  (no endpoint currently requires a header/cookie param).
+- If CORS is ever configured for the web app, preflight must be allowed in the security chain
+  (anonymous OPTIONS is 401 today — pre-existing).
+- Authenticated users without the role get 400/415 (argument resolution / `consumes` matching)
+  before `@PreAuthorize` returns 403 — same pre-existing ordering as the other 400 handlers
+  (accepted LOW in ERR-HANDLER); parameter names are already public in `openapi.yaml`.
+- 415 response omits the `Accept` header Spring would normally add (deliberate — no hint of
+  supported types); revisit if clients need it.
+
+---
+
+## AUTHZ-BOUNDARY — Technician ownership on evidence and non-conformities (RN-004, AC-SECURITY)
+
+Status: DONE (2026-09-30, branch `fix/mobile-inspection-it`, não commitado)
+
+Origin: candidate D ("⚪ cross-cutting ownership authorization not confirmed for
+`NonConformityController`/`EvidenceController`", backend audit 2026-09-22) + `test-plan.md` §5.8
+`security/AuthorizationBoundaryIT.java`. Writing the test revealed a **real vulnerability**, not
+just missing coverage: a technician could read/modify another technician's data by URL.
+
+RED (confirmed live, 200/201 instead of 403) on 8 HTTP endpoints + 2 sync paths:
+- `POST/GET /inspections/{id}/evidence`, `GET /evidence/{id}`
+- `POST/GET /inspections/{id}/non-conformities`, `GET /non-conformities/{id}`,
+  `PATCH /non-conformities/{id}/status`, `PUT /non-conformities/{id}`
+- `POST /mobile/sync/push` `NON_CONFORMITY` create/update on another technician's inspection
+  → `APPLIED` (found by ECC security-reviewer; the other sync entity types already checked).
+
+Fix (mirrors existing `EvidenceService.delete` / `getInspectionForTechnician`):
+- `EvidenceService` (upload/list/getById; delete reuses the helper) and `NonConformityService`
+  (create/listByInspection/getById/updateStatus/update overloads) take `(userId, isTechnician)` and
+  throw `AccessDeniedException` → 403 `FORBIDDEN` when the technician is not the assignee.
+  ADMIN/SUPERVISOR unrestricted. Ownership 403 before APPROVED 409 on upload (PEND-05 ordering).
+- Controllers pass `isTechnician` from the JWT role claim.
+- `SynchronizationService.applyNonConformity` rejects with `SYNC_INSPECTION_NOT_OWNED` (same as
+  `applyInspectionResponse`). Sync keeps calling the unguarded `create(id, …)`/`update(id, req)`
+  overloads (public because sync is another package), now behind its own check.
+
+Validation:
+- `AuthorizationBoundaryIT` (new, 11): 8 RED → GREEN; owner/admin controls GREEN; 403 body checked
+  for code `FORBIDDEN` and no NC title / file name / storage URL.
+- `SyncPushControllerIT` +2 (RED `APPLIED` → GREEN `REJECTED`, NC unchanged/not created).
+- `ConflictDetectionTest` fixture aligned (inspection owner stubbed, like the sibling tests).
+- Full `./mvnw verify` — see progress.md for the final numbers.
+- ECC security-reviewer + java-reviewer: HIGH (sync bypass) fixed; MEDIUMs on tests fixed.
+
+Follow-ups (not implemented — out of scope):
+- `NonConformityService.create` accepts a `responseId` from another inspection (snapshotId is
+  validated, responseId is not; evidence upload validates both). Pre-existing integrity gap.
+- NC create/update/status have no read-only guard for APPROVED/CANCELED inspections (evidence has
+  RN-049); `updateStatus` has no transition rules (single `OPEN` value today, RN-057).
+- Supervisor scope (RN-005) not implemented — supervisors see everything.
+- `isTechnician` is a deny-list (fails open for a future 4th role); consider a positive
+  ADMIN/SUPERVISOR check or a shared helper (duplicated in 2 services + several controllers).
+- 403 (other technician's id) vs 404 (non-existent id) is an existence oracle for UUIDs —
+  consistent with the existing pattern; recorded in `decisions.md`.
+- `SynchronizationService.pull` does a full scan + in-memory filter (performance).
 
 ---
 

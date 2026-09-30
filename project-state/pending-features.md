@@ -192,9 +192,10 @@ Validation (2026-09-29):
 
 Follow-ups (not implemented — out of BF-005 scope):
 - Pessimistic lock on template row for publish/draft creation (races now → 409, not serialized).
-- `GlobalExceptionHandler` catch-all returns 500 for unknown routes
+- ~~`GlobalExceptionHandler` catch-all returns 500 for unknown routes
   (`NoResourceFoundException`) and malformed JSON (`HttpMessageNotReadableException`) —
-  should be 404/400. Pre-existing, codebase-wide.
+  should be 404/400. Pre-existing, codebase-wide.~~ — **RESOLVIDO** em 2026-09-29
+  (branch `fix/error-handler-404-400`, ver "ERR-HANDLER" abaixo).
 - Delete section/item endpoints are not documented nor implemented.
 - `TemplateService.update()` still DRAFT-only (metadata of ACTIVE templates) — see BF-001 note.
 
@@ -384,6 +385,42 @@ Follow-ups (not implemented — outside BF-007 validation scope):
   exercised through screen tests with mocks (batching, REJECTED/CONFLICT handling untested).
 - `npx expo install --check` still flags patch updates unrelated to BF-007:
   `expo-splash-screen ~57.0.9`, `react-native 0.86.3`, `eslint-config-expo ~57.0.2`, `jest-expo ~57.0.5`.
+
+---
+
+## ERR-HANDLER — 400/404 instead of 500 for malformed requests and unknown routes
+
+Status: DONE (2026-09-29, branch `fix/error-handler-404-400`)
+
+Origin: follow-up found during BF-005 (catch-all `Exception` → 500).
+Requirement: `api-rest.md` §12.2 (error body) and §12.3 (400 = requisição malformada,
+404 = recurso não encontrado, 500 only for unforeseen failures); RN-090.
+
+Implementation — `GlobalExceptionHandler` gains three handlers (DEBUG log, no stack trace/body):
+- `HttpMessageNotReadableException` (malformed JSON / missing body) → 400 `MALFORMED_REQUEST`
+  (generic message; parser details not exposed).
+- `MethodArgumentTypeMismatchException` (e.g. non-UUID path variable) → 400
+  `INVALID_PARAMETER`, `fieldErrors[{field: <param>, message: "Invalid value"}]`.
+- `NoResourceFoundException` (no route) → 404 `ROUTE_NOT_FOUND`. Anonymous callers still
+  get 401 first (security filter chain) — no route enumeration.
+
+Validation:
+- RED: `GlobalExceptionHandlerIT` 4/5 failing with 500 (first attempt failed for the wrong
+  reason — 401, token subject must be a real user — test fixed before implementing).
+- GREEN: 5/5. Full `./mvnw verify`: unit 50/50; 261 ITs with only the known
+  pre-existing failures (`MobileInspectionControllerIT` 2, `SiteControllerIT` 17 / ITORDER-001).
+- Real HTTP (throwaway Postgres + app :8099): 404/401/400/400/400 with §12.2 body; valid
+  controls 200/201; no ERROR log lines; `X-Content-Type-Options: nosniff` present.
+- ECC security-reviewer: 0 CRITICAL/HIGH; MEDIUM (no logging after leaving catch-all) fixed.
+
+Follow-ups (not implemented — out of scope):
+- `HttpRequestMethodNotSupportedException` (405), `HttpMediaTypeNotSupportedException` (415)
+  and `MissingServletRequestParameterException` still fall into the catch-all 500.
+  405 is not in the `api-rest.md` §12.3 table — needs doc decision first.
+- `AuthenticationException` handler echoes `ex.getMessage()` (pre-existing).
+- Swagger/api-docs are `permitAll` — confirm they are disabled in a production profile.
+- Type-mismatch 400 is raised before method security, so an authenticated non-admin gets
+  400 (not 403) on admin routes with a bad UUID — LOW, accepted.
 
 ---
 

@@ -7,12 +7,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -27,6 +30,31 @@ public class GlobalExceptionHandler {
 		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
 			"Request payload failed validation", fieldErrors);
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+	}
+
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex, HttpServletRequest request) {
+		// Parser details are not exposed (api-rest.md §12.3: 400 "requisição malformada")
+		LOG.debug("Malformed request body on {} {}", request.getMethod(), request.getRequestURI());
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST",
+			"Request body is missing or is not valid JSON");
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+	}
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+		LOG.debug("Invalid parameter '{}' on {} {}", ex.getName(), request.getMethod(), request.getRequestURI());
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.BAD_REQUEST, "INVALID_PARAMETER",
+			"Request parameter has an invalid value", List.of(new FieldError(ex.getName(), "Invalid value")));
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+	}
+
+	@ExceptionHandler(NoResourceFoundException.class)
+	ResponseEntity<ErrorResponse> handleNoRoute(NoResourceFoundException ex, HttpServletRequest request) {
+		LOG.debug("No route for {} {}", request.getMethod(), request.getRequestURI());
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.NOT_FOUND, "ROUTE_NOT_FOUND",
+			"No endpoint matches this route");
+		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
 	}
 
 	@ExceptionHandler(AuthenticationException.class)

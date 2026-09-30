@@ -48,7 +48,25 @@ Pre-req fixes: `FlywayMigrationIT` version assertion + `TemplateItemRequest` boo
 7/7 IT tests GREEN. Section/item builder ainda **BLOQUEADO** — decisão de produto pendente
 sobre armazenamento de seções draft (ver `decisions.md` 2026-09-27).
 
-### BF-007 — validação e correção de dependências — 2026-09-29, não commitado ainda
+### ERR-HANDLER — 400/404 em vez de 500 — 2026-09-29, branch `fix/error-handler-404-400`, não commitado
+
+Candidato 2 da lista de próximos ciclos. `GlobalExceptionHandler`: JSON malformado/corpo
+ausente → 400 `MALFORMED_REQUEST`; parâmetro com tipo inválido (ex. UUID) → 400
+`INVALID_PARAMETER`; rota inexistente → 404 `ROUTE_NOT_FOUND` (anônimo continua 401).
+Conforme `api-rest.md` §12.3. `GlobalExceptionHandlerIT` 5/5; regressão completa sem
+falhas novas (261 ITs, só as pré-existentes Mobile 2 + Site 17); HTTP real validado;
+ECC security-reviewer sem CRITICAL/HIGH. Follow-ups (405/415/param ausente, Swagger
+público) em `pending-features.md` "ERR-HANDLER".
+
+Nota de ambiente: uma execução do IT levou 1616 s (contexto Spring lento, provável
+contenção de CPU com o language server Java do VS Code); as execuções seguintes, 35 s.
+
+Nota de histórico: a BF-005 foi commitada junto com a BF-007 em `c1d4733`
+(branch `fix/BF-007`), não em commit próprio.
+
+---
+
+### BF-007 — validação e correção de dependências — 2026-09-29 — commitado em `c1d4733` (`fix/BF-007`)
 
 Candidato 1 da lista de próximos ciclos. A validação revelou que a BF-007 não
 instalava em máquina limpa: `expo-sqlite ~15.0.0`/`expo-network ~7.0.0` (versões de
@@ -65,7 +83,7 @@ suíte que não carrega não entra no total.
 
 ---
 
-### BF-005 (builder) — Section/Item Builder via DRAFT version — 2026-09-29, não commitado ainda
+### BF-005 (builder) — Section/Item Builder via DRAFT version — 2026-09-29 — commitado em `c1d4733` (`fix/BF-007`)
 
 Completa a BF-005 (antes PARTIAL). Decisão de produto do usuário: opção (b),
 rascunho como `TemplateVersion` em status `DRAFT` (`decisions.md` 2026-09-29).

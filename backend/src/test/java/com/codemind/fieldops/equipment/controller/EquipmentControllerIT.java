@@ -230,6 +230,26 @@ class EquipmentControllerIT {
     }
 
     @Test
+    void getByQrCodeLongerThanColumnLimitReturns400() {
+        // equipment.qr_code is VARCHAR(100), same limit as EquipmentCreateRequest.qrCode
+        String tooLong = "Q".repeat(101);
+
+        assertThat(mvc.get().uri("/equipment/by-qr/" + tooLong).header("Authorization", bearer(adminToken)))
+            .hasStatus(HttpStatus.BAD_REQUEST)
+            .bodyJson()
+            .satisfies(json -> {
+                assertThat(json).extractingPath("$.code").asString().isEqualTo("VALIDATION_ERROR");
+                assertThat(json).extractingPath("$.fieldErrors[0].field").asString().isEqualTo("qrCode");
+            });
+    }
+
+    @Test
+    void getByQrCodeAtColumnLimitIsAcceptedAndReturns404WhenUnknown() {
+        assertThat(mvc.get().uri("/equipment/by-qr/" + "Q".repeat(100)).header("Authorization", bearer(adminToken)))
+            .hasStatus(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
     void technicianCannotGetEquipmentByQrCodeOutOfScope() {
         saveEquipment("QR Equipment Tech", "QR-TECH-001");
 

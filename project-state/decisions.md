@@ -325,7 +325,19 @@ Defer to a dedicated input-hardening sprint. Add `ConstraintViolationException`
 handler + `@Size` annotations across all String @PathVariable endpoints together.
 
 Status:
-ACTIVE (deferred)
+SUPERSEDED (2026-09-29) — implemented in branch `fix/pathvariable-size-validation`.
+Two premises above were wrong when checked against the code:
+- Scope: `qrCode` is the **only** `@PathVariable String` in the backend (all other
+  path variables are `UUID`, already 400 via `MethodArgumentTypeMismatchException`
+  since ERR-HANDLER). Not codebase-wide.
+- Exception: on Spring Framework 7 a constraint on a controller parameter (no
+  `@Validated`) is enforced by built-in MVC method validation, which raises
+  `HandlerMethodValidationException` — not `ConstraintViolationException` (observed
+  in the RED run). The handler added is for `HandlerMethodValidationException`
+  (400 `VALIDATION_ERROR` + `fieldErrors`); no `ConstraintViolationException`
+  handler was added (nothing in the codebase raises it — no `@Validated`).
+`@Size(max = 100)` on `qrCode` matches `equipment.qr_code VARCHAR(100)` and
+`EquipmentCreateRequest.qrCode`.
 
 ---
 

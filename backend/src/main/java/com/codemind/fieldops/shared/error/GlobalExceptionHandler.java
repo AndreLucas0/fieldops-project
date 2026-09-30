@@ -2,6 +2,7 @@ package com.codemind.fieldops.shared.error;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -13,6 +14,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -29,6 +31,20 @@ public class GlobalExceptionHandler {
 			.toList();
 		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
 			"Request payload failed validation", fieldErrors);
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+	}
+
+	@ExceptionHandler(HandlerMethodValidationException.class)
+	ResponseEntity<ErrorResponse> handleMethodValidation(HandlerMethodValidationException ex, HttpServletRequest request) {
+		// Constraints on controller parameters (e.g. @Size on a @PathVariable) — built-in MVC method validation
+		List<FieldError> fieldErrors = ex.getParameterValidationResults().stream()
+			.flatMap(result -> result.getResolvableErrors().stream()
+				.map(error -> new FieldError(
+					Objects.requireNonNullElse(result.getMethodParameter().getParameterName(), "parameter"),
+					error.getDefaultMessage())))
+			.toList();
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+			"Request parameters failed validation", fieldErrors);
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
 	}
 

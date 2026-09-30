@@ -48,7 +48,21 @@ Pre-req fixes: `FlywayMigrationIT` version assertion + `TemplateItemRequest` boo
 7/7 IT tests GREEN. Section/item builder ainda **BLOQUEADO** — decisão de produto pendente
 sobre armazenamento de seções draft (ver `decisions.md` 2026-09-27).
 
-### ERR-HANDLER — 400/404 em vez de 500 — 2026-09-29, branch `fix/error-handler-404-400`, não commitado
+### PATHVAR-SIZE — `@Size` no `@PathVariable qrCode` — 2026-09-29, branch `fix/pathvariable-size-validation`, não commitado
+
+Candidato 3 (decisão deferida PEND-04 H-03). O escopo real era 1 endpoint:
+`qrCode` é o único `@PathVariable String` (os demais são `UUID`, já 400 desde o
+ERR-HANDLER). `GET /equipment/by-qr/{qrCode}` com `@Size(max = 100)` (=
+`equipment.qr_code VARCHAR(100)`); >100 → 400 `VALIDATION_ERROR` com
+`fieldErrors[qrCode]` via novo handler de `HandlerMethodValidationException`
+(Spring 7 — não `ConstraintViolationException`, como previa a decisão original).
+Testes: `EquipmentControllerIT` 17/17 (+2: 101 → 400, 100 → 404), `GlobalExceptionHandlerIT`
+5/5; regressão completa 263 ITs, só as pré-existentes (Mobile 2, Site 17). HTTP real:
+101 → 400, 100 existente → 200, sem token → 401. `openapi.yaml`: `maxLength: 100` + 400.
+
+---
+
+### ERR-HANDLER — 400/404 em vez de 500 — 2026-09-29 — commitado em `c0cfd2a` (`fix/error-handler-400-404`)
 
 Candidato 2 da lista de próximos ciclos. `GlobalExceptionHandler`: JSON malformado/corpo
 ausente → 400 `MALFORMED_REQUEST`; parâmetro com tipo inválido (ex. UUID) → 400

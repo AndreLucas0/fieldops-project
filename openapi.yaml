@@ -784,7 +784,7 @@ paths:
         - name: qrCode
           in: path
           required: true
-          schema: { type: string }
+          schema: { type: string, maxLength: 100 }
       responses:
         '200':
           description: Equipamento encontrado.
@@ -792,6 +792,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Equipment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':

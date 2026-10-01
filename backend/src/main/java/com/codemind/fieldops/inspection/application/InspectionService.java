@@ -44,6 +44,7 @@ public class InspectionService {
 
     private static final String INSPECTION_NOT_FOUND_CODE = "INSPECTION_NOT_FOUND";
     private static final String TEMPLATE_VERSION_NOT_FOUND_CODE = "TEMPLATE_VERSION_NOT_FOUND";
+    private static final String TEMPLATE_VERSION_NOT_PUBLISHED_CODE = "TEMPLATE_VERSION_NOT_PUBLISHED";
     private static final String USER_NOT_FOUND_CODE = "USER_NOT_FOUND";
     private static final String TECHNICIAN_NOT_ACTIVE_CODE = "TECHNICIAN_NOT_ACTIVE";
     private static final String USER_NOT_TECHNICIAN_CODE = "USER_NOT_TECHNICIAN";
@@ -114,6 +115,10 @@ public class InspectionService {
     public Inspection create(UUID createdByUserId, InspectionCreateRequest request) {
         TemplateVersion templateVersion = templateVersionRepository.findByIdWithSectionsAndItems(request.templateVersionId())
             .orElseThrow(() -> new ResourceNotFoundException(TEMPLATE_VERSION_NOT_FOUND_CODE, "Template version not found"));
+        if (templateVersion.isDraft()) {
+            throw new BusinessRuleViolationException(TEMPLATE_VERSION_NOT_PUBLISHED_CODE,
+                "Inspections can only be scheduled on a published template version");
+        }
 
         Client client = clientService.getById(request.clientId());
         InspectionSite site = siteService.getById(request.siteId());

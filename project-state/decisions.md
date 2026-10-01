@@ -138,7 +138,140 @@ Full `./mvnw verify` shows false negatives for `EquipmentControllerIT` and
 `SiteControllerIT`. CI should use targeted per-package IT runs.
 
 Status:
-ACTIVE (pending cleanup task)
+~~ACTIVE (pending cleanup task)~~ — **RESOLVED 2026-09-30** (branch `fix/mobile-inspection-it`).
+
+Resolution (2026-09-30):
+- `MobileInspectionControllerIT` (2 failures in isolation): not a production bug — the
+  mobile DTOs correctly omit `snapshotId` (contract §4.2), but the tests asserted
+  `extractingPath("...snapshotId").isNull()`, which always fails when the path is absent.
+  Replaced by `hasPath(inspectionItemId)` guard + `doesNotHavePath(snapshotId)`.
+- `SiteControllerIT` (17 errors in the full suite): `setUp()` now starts with
+  `TRUNCATE TABLE users CASCADE` (clears templates/inspections/children left by other
+  classes; `inspections` is the only outside table referencing clients/sites/equipment and
+  it always cascades from `users`), and a new `@AfterEach` removes the equipment/sites it
+  creates — without it, `SyncPullControllerIT`/`SyncPushControllerIT` (next alphabetically)
+  failed with `equipment_site_id_fkey` (17 errors), masked before because `SiteControllerIT`
+  never got past `setUp()`.
+- `EquipmentControllerIT` was already fixed by PEND-04's `@AfterEach`.
+- Result: full `./mvnw verify` GREEN — unit 50/50, IT 263/263, 0 failures/errors.
+  "Do not use `./mvnw verify` alone as the gate" no longer applies.
+
+Residual risk (accepted): `TRUNCATE` in a `@BeforeEach` takes ACCESS EXCLUSIVE locks —
+fine because failsafe runs IT classes serially (no parallel config in `pom.xml`); revisit
+if parallel test execution is ever enabled. Most IT classes still only clean up in
+`setUp()`; a shared cleanup base class would be the structural fix (not done — scope).
+A future table referencing clients/sites/equipment without referencing `users` would
+reintroduce FK failures in `SiteControllerIT.setUp()`.
+
+---
+
+### [2026-09-30] — Sync push: per-operation transactions owned by the sync service (RN-070)
+
+Context:
+Domain services called from `processOne` joined its transaction; any domain exception marked it
+rollback-only and the whole `/mobile/sync/push` returned 500 (`UnexpectedRollbackException`).
+BF-002 and NC-APPROVED-LOCK had patched individual service methods with `noRollbackFor`.
+
+Decision:
+The sync service owns the transaction boundaries: `processOne` is non-transactional;
+`applyAndRecord` (REQUIRES_NEW) commits the domain change together with its `sync_operations` record;
+on a domain exception that transaction rolls back fully and `recordOutcome` (REQUIRES_NEW) records
+the REJECTED/CONFLICT outcome. `push()` is non-transactional (one connection at a time).
+
+Reason:
+Atomicity of change + idempotency record (RN-067/068), no partial writes on failure, failure isolation
+per operation (RN-070), and no need for `noRollbackFor` on every domain method.
+
+Alternatives considered:
+`noRollbackFor` on every sync-called domain method — rejected (scattered, commits partial writes).
+Inner REQUIRES_NEW only for the domain change, record in `processOne`'s tx — rejected after review:
+change and record were no longer atomic, and a push held up to 3 connections.
+
+Impact:
+New domain services called by sync need no transaction tweaks. `Outcome` is a public nested record.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-30] — Mobile Jest: `lucide-react-native` mapped to its CJS build
+
+Context:
+`jest-expo` resolves `lucide-react-native` through the `react-native` export condition to an ESM
+`.mjs` file that Jest does not transform → `inspections-screen.test.tsx` failed to load since `cdb7c5b`.
+
+Decision:
+Jest-only `moduleNameMapper` `^lucide-react-native$` → `node_modules/lucide-react-native/dist/cjs/lucide-react-native.js`
+(the package's own `main`/`exports.require`). Metro/runtime unchanged.
+
+Reason:
+Single bare import in the codebase; deterministic and fast; a future dist-layout change fails loudly.
+
+Alternatives considered:
+Extending `transformIgnorePatterns` (covers subpath imports, exercises the real ESM) — rejected for
+now: must replicate the jest-expo default allowlist regex and transform `.mjs` on every run.
+
+Impact:
+A future subpath import (`lucide-react-native/icons/...`) would bypass the mapper and fail the
+same way — extend the mapper or switch to `transformIgnorePatterns` then.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-30] — Technician ownership: 403 for another technician's resource, 404 only when absent
+
+Context:
+AUTHZ-BOUNDARY added RN-004 ownership checks to evidence and non-conformity endpoints (and the
+NC sync path). Returning 403 for an existing-but-not-yours id and 404 for a non-existent one lets
+a technician learn whether a UUID exists.
+
+Decision:
+Keep 403 vs 404 (existence first, then ownership), consistent with the pre-existing
+`getInspectionForTechnician`, `EvidenceService.delete`, `start/submit` and AC-SECURITY tests
+("técnico não acessa inspeção de outro técnico pela URL" → 403). On evidence upload, ownership
+(403) is checked before the APPROVED read-only rule (409) so state is not leaked (PEND-05).
+
+Reason:
+Ids are random UUIDs (not enumerable); `criterios-de-aceitacao`/test-plan expect 403; changing
+to 404 everywhere would be a separate, codebase-wide contract change.
+
+Alternatives considered:
+404 for "not yours" (hides existence) — rejected for now; revisit with RN-005 supervisor scoping.
+
+Impact:
+Denials never include resource data (asserted in `AuthorizationBoundaryIT`).
+
+Status:
+ACTIVE
+
+---
+
+### [2026-09-30] — 405 Method Not Allowed documented and returned with `Allow`
+
+Context:
+`HttpRequestMethodNotSupportedException` fell into the catch-all → 500 (logged at ERROR).
+405 was not in `api-rest.md` §12.3, so it was deferred pending a doc decision (ERR-HANDLER).
+
+Decision:
+User decided (2026-09-30) to document 405 and return it for every method not allowed on a
+route. Added to `api-rest.md` §12.3 and `contrato-backend-frontend.md` §5.2; handler returns
+405 `METHOD_NOT_ALLOWED` with the §12.2 body and the `Allow` header.
+
+Reason:
+RFC 9110 §15.5.6 requires `Allow` on 405; 500 is reserved for unforeseen failures (§12.3).
+
+Alternatives considered:
+Omitting `Allow` to hide supported methods — rejected: anonymous callers get 401 before
+method matching (except `permitAll` routes, whose methods are already public in swagger).
+
+Impact:
+Clients get a deterministic 405 instead of 500; no OpenAPI change (undeclared methods).
+
+Status:
+ACTIVE
 
 ---
 
@@ -176,6 +309,58 @@ Impact:
 BF-005 status remains PARTIAL. The web's `listDraftSections`, `createSection`,
 `updateSection`, `createItem`, `updateItem` calls (`resources.ts`) will return
 404 until this is resolved.
+
+Status:
+SUPERSEDED (2026-09-29) — product decision taken: option (b). See
+"BF-005: builder over a DRAFT TemplateVersion" below.
+
+---
+
+### [2026-09-29] — BF-005: builder over a DRAFT TemplateVersion
+
+Context:
+The block recorded above (2026-09-27) needed a product decision on where draft
+sections live. The user chose option (b) on 2026-09-29.
+
+Decision:
+- `inspection_template_versions.status` (`DRAFT`/`PUBLISHED`, V14). The builder
+  routes (`POST/PUT .../sections`, `POST .../sections/{id}/items`,
+  `PUT .../items/{id}`) write into the template's single DRAFT version, created
+  lazily on the first builder write (partial unique index: one draft per template).
+- RN-020: when the template already has an active version, the new draft starts
+  as a copy of the active structure (sections + items).
+- `POST .../publish` **without body** (openapi contract) promotes the draft:
+  number = max+1, becomes active, previous active is deactivated (BF-001 rule).
+  Requires ≥1 section and ≥1 item (RN-015/016 → 422).
+- Draft `version_number` is the fixed placeholder `0` (never used by a
+  published version), so draft and legacy publish never collide or leave gaps.
+- The legacy `POST .../publish` **with** `{"sections":[...]}` body is kept
+  (existing tests/clients), but returns 409 `TEMPLATE_DRAFT_IN_PROGRESS` while a
+  draft is open — otherwise the open draft would silently overwrite the legacy
+  structure on the next publish (ECC java-reviewer H2).
+- Drafts are not exposed as versions: excluded from `GET .../versions`,
+  404 on `GET /inspection-template-versions/{id}`, and `POST /inspections`
+  with a draft `templateVersionId` → 422 `TEMPLATE_VERSION_NOT_PUBLISHED`.
+- INACTIVE templates: every builder write and draft publish → 409
+  `TEMPLATE_NOT_EDITABLE` (ECC java-reviewer H1).
+- `GET /inspection-templates/{id}/sections` (already consumed by web
+  `listDraftSections`) returns the draft structure, empty list without draft;
+  added to `openapi.yaml` and `docs/api-rest.md` §12.9.
+
+Reason:
+Reuses the existing `TemplateSection → TemplateVersion` FK (no parallel
+draft tables) and matches the openapi wording "seção na versão em rascunho".
+
+Alternatives considered:
+(a) separate draft tables attached to `InspectionTemplate` — rejected by the
+user (duplicated structure, copy step on publish).
+Delete the open draft on legacy publish — rejected: silent data loss.
+
+Impact:
+Web builder calls stop returning 404. Concurrency: races on draft creation,
+display_order and publish map to 409 (`DataIntegrityViolationException` /
+optimistic lock), not 500; no pessimistic lock was added (follow-up in
+`pending-features.md`).
 
 Status:
 ACTIVE
@@ -273,7 +458,19 @@ Defer to a dedicated input-hardening sprint. Add `ConstraintViolationException`
 handler + `@Size` annotations across all String @PathVariable endpoints together.
 
 Status:
-ACTIVE (deferred)
+SUPERSEDED (2026-09-29) — implemented in branch `fix/pathvariable-size-validation`.
+Two premises above were wrong when checked against the code:
+- Scope: `qrCode` is the **only** `@PathVariable String` in the backend (all other
+  path variables are `UUID`, already 400 via `MethodArgumentTypeMismatchException`
+  since ERR-HANDLER). Not codebase-wide.
+- Exception: on Spring Framework 7 a constraint on a controller parameter (no
+  `@Validated`) is enforced by built-in MVC method validation, which raises
+  `HandlerMethodValidationException` — not `ConstraintViolationException` (observed
+  in the RED run). The handler added is for `HandlerMethodValidationException`
+  (400 `VALIDATION_ERROR` + `fieldErrors`); no `ConstraintViolationException`
+  handler was added (nothing in the codebase raises it — no `@Validated`).
+`@Size(max = 100)` on `qrCode` matches `equipment.qr_code VARCHAR(100)` and
+`EquipmentCreateRequest.qrCode`.
 
 ---
 

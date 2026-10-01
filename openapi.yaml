@@ -784,7 +784,7 @@ paths:
         - name: qrCode
           in: path
           required: true
-          schema: { type: string }
+          schema: { type: string, maxLength: 100 }
       responses:
         '200':
           description: Equipamento encontrado.
@@ -792,6 +792,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Equipment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -930,6 +932,29 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /inspection-templates/{id}/sections:
+    get:
+      operationId: listTemplateDraftSections
+      tags: [Inspection Templates]
+      summary: Listar seções (com itens) da versão em rascunho do modelo
+      description: >
+        Retorna a estrutura do rascunho em edição. Lista vazia quando o modelo
+        não possui versão em rascunho (ex. logo após a publicação).
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Seções do rascunho, ordenadas por displayOrder.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TemplateSectionDetail' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     post:
       operationId: createTemplateSection
       tags: [Inspection Templates]

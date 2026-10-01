@@ -27,10 +27,10 @@
     "expo-linking": "~57.0.6",
     "expo-location": "~57.0.10",
     "expo-router": "~57.0.13",
-    "expo-network": "~7.0.0",
+    "expo-network": "~57.0.1",
     "expo-secure-store": "~57.0.1",
     "expo-splash-screen": "~57.0.6",
-    "expo-sqlite": "~15.0.0",
+    "expo-sqlite": "~57.0.1",
     "expo-status-bar": "~57.0.1",
     "lucide-react-native": "^1.46.0",
     "react": "19.2.3",
@@ -64,7 +64,8 @@
       "^@babel/runtime/(.*)$": "<rootDir>/node_modules/@babel/runtime/$1",
       "^@fieldops/shared$": "<rootDir>/../shared/src/index.ts",
       "^@fieldops/shared/(.*)$": "<rootDir>/../shared/src/$1",
-      "^@/(.*)$": "<rootDir>/src/$1"
+      "^@/(.*)$": "<rootDir>/src/$1",
+      "^lucide-react-native$": "<rootDir>/node_modules/lucide-react-native/dist/cjs/lucide-react-native.js"
     },
     "collectCoverageFrom": [
       "src/**/*.{ts,tsx}",

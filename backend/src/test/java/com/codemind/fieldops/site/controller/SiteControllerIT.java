@@ -20,6 +20,7 @@ import com.codemind.fieldops.user.domain.UserStatus;
 import com.codemind.fieldops.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -64,6 +66,9 @@ class SiteControllerIT {
     @Autowired
     private JwtEncoder jwtEncoder;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private User adminUser;
     private User supervisorUser;
     private User technicianUser;
@@ -74,10 +79,13 @@ class SiteControllerIT {
 
     @BeforeEach
     void setUp() {
+        // TRUNCATE ... CASCADE also clears every table referencing users (templates,
+        // inspections and their children) left behind by other IT classes, preventing
+        // FK violations below when the full suite runs (ITORDER-001).
+        jdbcTemplate.execute("TRUNCATE TABLE users CASCADE");
         equipmentRepository.deleteAll();
         siteRepository.deleteAll();
         clientRepository.deleteAll();
-        userRepository.deleteAll();
         adminUser = userRepository.save(newUser("Admin", "admin.site@fieldops.local", UserRole.ADMIN));
         supervisorUser = userRepository.save(newUser("Supervisor", "supervisor.site@fieldops.local", UserRole.SUPERVISOR));
         technicianUser = userRepository.save(newUser("Technician", "tech.site@fieldops.local", UserRole.TECHNICIAN));
@@ -85,6 +93,15 @@ class SiteControllerIT {
         supervisorToken = mintAccessToken(supervisorUser);
         technicianToken = mintAccessToken(technicianUser);
         testClient = clientRepository.save(Client.builder().name("Test Client").status(ClientStatus.ACTIVE).build());
+    }
+
+    @AfterEach
+    void tearDown() {
+        // Do not leave equipment/sites behind for IT classes that only delete down to sites (ITORDER-001).
+        equipmentRepository.deleteAll();
+        siteRepository.deleteAll();
+        clientRepository.deleteAll();
+        userRepository.deleteAll();
     }
 
     private User newUser(String name, String email, UserRole role) {

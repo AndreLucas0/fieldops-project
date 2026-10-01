@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -75,6 +76,7 @@ public class SynchronizationService {
     private static final String NOT_OWNER_CODE = "SYNC_INSPECTION_NOT_OWNED";
     private static final String ENTITY_ID_MISMATCH_CODE = "SYNC_ENTITY_ID_MISMATCH";
     private static final String VERSION_CONFLICT_CODE = "SYNC_VERSION_CONFLICT";
+    private static final String DATA_INTEGRITY_CODE = "SYNC_DATA_INTEGRITY_VIOLATION";
 
     private static final int PULL_PAGE_LIMIT = 500;
 
@@ -113,7 +115,8 @@ public class SynchronizationService {
         this.self = self;
     }
 
-    @Transactional(readOnly = true)
+    // Deliberately not transactional: each operation opens its own short transaction(s), so a push
+    // holds at most one pooled connection at a time.
     public SyncPushResponse push(UUID userId, SyncPushRequest request) {
         List<SyncOperationResult> results = new ArrayList<>();
         Set<UUID> failedInspectionIds = new HashSet<>();
@@ -140,20 +143,63 @@ public class SynchronizationService {
     }
 
     /**
-     * Processes exactly one operation in its own transaction so a failure
-     * here never rolls back operations already committed earlier in the
-     * batch (RN-070).
+     * Processes exactly one operation, isolated from the rest of the batch (RN-070):
+     * <ul>
+     *   <li>success — the domain change and its {@code sync_operations} record commit together
+     *       ({@link #applyAndRecord}), so a replay is always recognized (RN-067/068);</li>
+     *   <li>domain failure — that transaction rolls back entirely (no partial writes) and the
+     *       REJECTED/CONFLICT outcome is recorded in a separate transaction ({@link #recordOutcome});</li>
+     *   <li>integrity violation (e.g. the same operation pushed concurrently) — the existing record
+     *       is returned when there is one.</li>
+     * </ul>
+     * Not transactional itself: a domain exception must never mark a shared transaction rollback-only.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public SyncOperationResult processOne(UUID userId, UUID deviceId, SyncOperationRequest operation) {
-        return syncOperationRepository.findById(operation.operationId())
-            .map(SynchronizationService::toAlreadyProcessedResult)
-            .orElseGet(() -> applyAndRecord(userId, deviceId, operation));
+        var alreadyProcessed = syncOperationRepository.findById(operation.operationId());
+        if (alreadyProcessed.isPresent()) {
+            return toAlreadyProcessedResult(alreadyProcessed.get());
+        }
+        if (operation.operationType() == SyncOperationType.DELETE) {
+            return self.recordOutcome(userId, deviceId, operation, Outcome.rejected(DELETE_NOT_SUPPORTED_CODE,
+                "Deleting " + operation.entityType() + " via synchronization is not supported"));
+        }
+
+        try {
+            return self.applyAndRecord(userId, deviceId, operation);
+        } catch (ResourceNotFoundException e) {
+            return self.recordOutcome(userId, deviceId, operation, Outcome.rejected(e.getCode(), e.getMessage()));
+        } catch (ResourceConflictException e) {
+            return self.recordOutcome(userId, deviceId, operation, Outcome.rejected(e.getCode(), e.getMessage()));
+        } catch (BusinessRuleViolationException e) {
+            return self.recordOutcome(userId, deviceId, operation, Outcome.rejected(e.getCode(), e.getMessage()));
+        } catch (OptimisticLockingFailureException e) {
+            return self.recordOutcome(userId, deviceId, operation,
+                Outcome.conflict(VERSION_CONFLICT_CODE, "The entity was modified since baseVersion"));
+        } catch (IllegalArgumentException e) {
+            return self.recordOutcome(userId, deviceId, operation, Outcome.rejected(INVALID_PAYLOAD_CODE,
+                "Payload does not match the expected shape: " + e.getMessage()));
+        } catch (DataIntegrityViolationException e) {
+            return syncOperationRepository.findById(operation.operationId())
+                .map(SynchronizationService::toAlreadyProcessedResult)
+                .orElseGet(() -> self.recordOutcome(userId, deviceId, operation,
+                    Outcome.rejected(DATA_INTEGRITY_CODE, "The operation violates a data integrity constraint")));
+        }
     }
 
-    private SyncOperationResult applyAndRecord(UUID userId, UUID deviceId, SyncOperationRequest operation) {
-        Outcome outcome = apply(userId, operation);
+    /** Applies the operation and records its outcome atomically. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public SyncOperationResult applyAndRecord(UUID userId, UUID deviceId, SyncOperationRequest operation) {
+        return record(userId, deviceId, operation, applyOperation(userId, operation));
+    }
 
+    /** Records an outcome whose domain change was rolled back (or never attempted). */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public SyncOperationResult recordOutcome(UUID userId, UUID deviceId, SyncOperationRequest operation,
+            Outcome outcome) {
+        return record(userId, deviceId, operation, outcome);
+    }
+
+    private SyncOperationResult record(UUID userId, UUID deviceId, SyncOperationRequest operation, Outcome outcome) {
         SyncOperation record = SyncOperation.builder()
             .operationId(operation.operationId())
             .deviceId(deviceId)
@@ -173,31 +219,14 @@ public class SynchronizationService {
         return new SyncOperationResult(operation.operationId(), outcome.status(), outcome.entityVersion(), error);
     }
 
-    private Outcome apply(UUID userId, SyncOperationRequest operation) {
-        if (operation.operationType() == SyncOperationType.DELETE) {
-            return Outcome.rejected(DELETE_NOT_SUPPORTED_CODE,
-                "Deleting " + operation.entityType() + " via synchronization is not supported");
-        }
-
-        try {
-            return switch (operation.entityType()) {
-                case INSPECTION -> applyInspectionTransition(userId, operation);
-                case INSPECTION_RESPONSE -> applyInspectionResponse(userId, operation);
-                case NON_CONFORMITY -> applyNonConformity(userId, operation);
-                case EVIDENCE -> Outcome.rejected(EVIDENCE_NOT_SUPPORTED_CODE,
-                    "Evidence must be sent through the multipart upload endpoint");
-            };
-        } catch (ResourceNotFoundException e) {
-            return Outcome.rejected(e.getCode(), e.getMessage());
-        } catch (ResourceConflictException e) {
-            return Outcome.rejected(e.getCode(), e.getMessage());
-        } catch (BusinessRuleViolationException e) {
-            return Outcome.rejected(e.getCode(), e.getMessage());
-        } catch (OptimisticLockingFailureException e) {
-            return Outcome.conflict(VERSION_CONFLICT_CODE, "The entity was modified since baseVersion");
-        } catch (IllegalArgumentException e) {
-            return Outcome.rejected(INVALID_PAYLOAD_CODE, "Payload does not match the expected shape: " + e.getMessage());
-        }
+    private Outcome applyOperation(UUID userId, SyncOperationRequest operation) {
+        return switch (operation.entityType()) {
+            case INSPECTION -> applyInspectionTransition(userId, operation);
+            case INSPECTION_RESPONSE -> applyInspectionResponse(userId, operation);
+            case NON_CONFORMITY -> applyNonConformity(userId, operation);
+            case EVIDENCE -> Outcome.rejected(EVIDENCE_NOT_SUPPORTED_CODE,
+                "Evidence must be sent through the multipart upload endpoint");
+        };
     }
 
     private Outcome applyInspectionTransition(UUID userId, SyncOperationRequest operation) {
@@ -265,6 +294,12 @@ public class SynchronizationService {
         NonConformitySyncPayload payload = convert(operation.payload(), NonConformitySyncPayload.class);
         if (payload.inspectionId() == null) {
             return Outcome.rejected(INVALID_PAYLOAD_CODE, "payload.inspectionId is required");
+        }
+
+        Inspection inspection = inspectionRepository.findById(payload.inspectionId())
+            .orElseThrow(() -> new ResourceNotFoundException("INSPECTION_NOT_FOUND", "Inspection not found"));
+        if (!inspection.getTechnician().getId().equals(userId)) {
+            return Outcome.rejected(NOT_OWNER_CODE, "You do not have access to this inspection");
         }
 
         NonConformity existing = nonConformityRepository.findById(nonConformityId).orElse(null);
@@ -432,7 +467,7 @@ public class SynchronizationService {
         return value != null ? value.toString() : null;
     }
 
-    private record Outcome(SyncOperationStatus status, Integer entityVersion, String errorCode, String errorMessage) {
+    public record Outcome(SyncOperationStatus status, Integer entityVersion, String errorCode, String errorMessage) {
 
         static Outcome applied(Integer entityVersion) {
             return new Outcome(SyncOperationStatus.APPLIED, entityVersion, null, null);

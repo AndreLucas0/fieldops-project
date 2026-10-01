@@ -351,11 +351,12 @@ class MobileInspectionControllerIT {
             .build();
         inspectionResponseRepository.save(response);
 
-        assertThat(mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
-            .header("Authorization", bearer(technicianToken)))
-            .hasStatusOk()
-            .bodyJson()
-            .extractingPath("$.responses[0].snapshotId").isNull();
+        var result = mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
+            .header("Authorization", bearer(technicianToken)).exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().hasPath("$.responses[0].inspectionItemId");
+        assertThat(result).bodyJson().doesNotHavePath("$.responses[0].snapshotId");
     }
 
     // ---- Contract: nonConformities ----
@@ -406,11 +407,12 @@ class MobileInspectionControllerIT {
             .build();
         nonConformityRepository.save(nc);
 
-        assertThat(mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
-            .header("Authorization", bearer(technicianToken)))
-            .hasStatusOk()
-            .bodyJson()
-            .extractingPath("$.nonConformities[0].snapshotId").isNull();
+        var result = mvc.get().uri("/mobile/inspections/" + technicianInspection.getId())
+            .header("Authorization", bearer(technicianToken)).exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().hasPath("$.nonConformities[0].inspectionItemId");
+        assertThat(result).bodyJson().doesNotHavePath("$.nonConformities[0].snapshotId");
     }
 
     // ---- Contract: reviews ----

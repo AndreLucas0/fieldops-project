@@ -160,7 +160,44 @@ Commitado: `1545467 feat: implement dashboard and inspection history endpoints (
 
 ## BF-005 — Template Versions and Sections Endpoints
 
-Status: PARTIAL
+Status: DONE (2026-09-29 — builder completed; was PARTIAL since 2026-09-27)
+
+Builder implementation (2026-09-29, product decision: DRAFT TemplateVersion —
+see `decisions.md` 2026-09-29 "BF-005: builder over a DRAFT TemplateVersion"):
+- V14: `inspection_template_versions.status` (`DRAFT`/`PUBLISHED`), nullable
+  `published_by/published_at` for drafts only, one draft per template (partial
+  unique index), draft never active (CHECK).
+- `GET/POST /inspection-templates/{id}/sections`, `PUT .../sections/{sectionId}`,
+  `POST .../sections/{sectionId}/items`, `PUT .../items/{itemId}` (ADMIN/SUPERVISOR).
+- `POST .../publish` without body promotes the draft (RN-015/016 → 422 without
+  section/item); legacy body publish kept, 409 while a draft is open.
+- ACTIVE template: first builder write clones the active structure (RN-020);
+  published sections/items → 409 (RN-019); INACTIVE template → 409.
+- Drafts hidden from `GET .../versions` and `GET /inspection-template-versions/{id}`;
+  `POST /inspections` with a draft version → 422.
+- Responses now carry `templateVersionId` (section) and `sectionId` (item), as in openapi.
+
+Validation (2026-09-29):
+- RED: 21/21 new tests failing (routes absent) before implementation; +2 RED for review findings H1/H2.
+- GREEN: `TemplateBuilderControllerIT` 23/23; `InspectionSchedulingControllerIT` 20/20
+  (1 new); `FlywayMigrationIT` 2/2 (version 14); `InspectionTemplateControllerIT` 17/17;
+  `TemplateVersionControllerIT` 7/7; unit 50/50.
+- Full `./mvnw verify`: 256 ITs, only failures = `MobileInspectionControllerIT` (2,
+  identical on untouched `main` 7beb028 — pre-existing) and `SiteControllerIT` (17,
+  FK ordering ITORDER-001; 17/17 GREEN in isolation).
+- Real HTTP (throwaway Postgres + app on :8099, 16-step flow): all statuses and
+  persistence as expected.
+- ECC java-reviewer + database-reviewer: H1 (INACTIVE bypass), H2 (stale draft vs
+  legacy publish), concurrency 500s and version-number gaps fixed; rest recorded below.
+
+Follow-ups (not implemented — out of BF-005 scope):
+- Pessimistic lock on template row for publish/draft creation (races now → 409, not serialized).
+- ~~`GlobalExceptionHandler` catch-all returns 500 for unknown routes
+  (`NoResourceFoundException`) and malformed JSON (`HttpMessageNotReadableException`) —
+  should be 404/400. Pre-existing, codebase-wide.~~ — **RESOLVIDO** em 2026-09-29
+  (branch `fix/error-handler-404-400`, ver "ERR-HANDLER" abaixo).
+- Delete section/item endpoints are not documented nor implemented.
+- `TemplateService.update()` still DRAFT-only (metadata of ACTIVE templates) — see BF-001 note.
 
 Description:
 Read endpoints implemented on 2026-09-27 (partial):
@@ -169,7 +206,7 @@ Read endpoints implemented on 2026-09-27 (partial):
 - `TemplateController` now responds at BOTH `/templates/*` AND `/inspection-templates/*` (dual mapping) to match the web client's API calls (`resources.ts`)
 - Pre-req fixes: `FlywayMigrationIT` version assertion "9" → "12"; `TemplateItemRequest` 3 `boolean` fields → `Boolean` (boxed)
 
-Still pending:
+Still pending (SUPERSEDED 2026-09-29 — builder implemented, see top of this BF):
 - Section/item builder endpoints (`POST/PUT .../sections`, `POST/PUT .../sections/{id}/items`) — blocked by data model decision: draft sections have no storage location (`TemplateSection` belongs to `TemplateVersion`, not `InspectionTemplate`; see `decisions.md` 2026-09-27)
 
 Source:
@@ -320,12 +357,282 @@ Source:
 Backend audit — 2026-09-22 (`project-state/backend-audit.md`, 🟣 #1);
 `ESTADO-DO-PROJETO.md` §5, §9-10.
 
-Validation (2026-09-28):
+Validation (2026-09-28) — SUPERSEDED by the 2026-09-29 validation below:
 - Cannot run `npm test` — `node_modules` absent, no `npm install` run.
   Environment limitation recorded. All logic changes are manually reviewed.
   Jest mock design verified against local-db.ts SQL strings and sync-service.ts
   outbox behavior.
 - TypeScript check not run — same environment limitation (no node_modules).
+
+Validation (2026-09-29) — reopened and fixed, now actually validated:
+- Finding: BF-007 declared `expo-sqlite ~15.0.0` / `expo-network ~7.0.0` (old-SDK
+  versions) and never updated `package-lock.json` → `npm ci` failed on a clean
+  machine (`EUSAGE — Missing: expo-network@7.0.5, expo-sqlite@15.0.6 from lock file`).
+  Expo SDK 57 (`expo@57.0.13` `bundledNativeModules.json`) expects `~57.0.1` for both.
+- Fix: `mobile/package.json` → `expo-sqlite ~57.0.1`, `expo-network ~57.0.1`;
+  `npm install` regenerated the lock (diff limited to expo-sqlite 57.0.3,
+  expo-network 57.0.2 and its dep await-lock). No source change needed (same API).
+- `npm ci --dry-run` → OK; `npx expo install --check` → both no longer flagged;
+  `npm run typecheck` → OK; `npm run lint` → OK.
+- `npm test`: 291/291 tests pass; BF-007 suites (`checklist-screen`,
+  `summary-nc-screens`) 26/26. 1 suite fails to load (`inspections-screen.test.tsx`,
+  lucide ESM) — pre-existing since `cdb7c5b` (2026-09-15), unrelated to BF-007.
+
+Follow-ups (not implemented — outside BF-007 validation scope):
+- ~~`inspections-screen.test.tsx` cannot load: Jest does not transform
+  `lucide-react-native` ESM (needs `transformIgnorePatterns` or a mock). Broken since `cdb7c5b`.~~ —
+  **RESOLVIDO** 2026-09-30 (MOBILE-TEST-1, commitado em `2805ca7`):
+  jest-only `moduleNameMapper` `^lucide-react-native$` → build CJS do próprio pacote
+  (`dist/cjs/lucide-react-native.js`; o `jest-expo` resolvia pela condição `react-native` para o
+  `.mjs` ESM). Ao voltar a carregar, 6 testes de filtro falharam: `cdb7c5b` moveu os chips para um
+  painel lateral (`Modal`) aberto por `inspections-filter-button` — mudança intencional de UI, não
+  bug (`telas-frontend.md` §10.8 não fixa o posicionamento). Testes passam a abrir o painel
+  (`openFilters()`), asserções de comportamento inalteradas. Suíte 11/11; mobile completo
+  24/24 suítes, 302/302 testes; typecheck OK; lint OK. Metro/app não afetados.
+- ~~`local-db.ts`, `sync-service.ts`, `use-sync.ts` have no direct unit tests — only
+  exercised through screen tests with mocks (batching, REJECTED/CONFLICT handling untested).~~ —
+  `local-db.ts` + `sync-service.ts` **RESOLVIDO** 2026-09-30 (MOBILE-TEST-2, não commitado):
+  `mobile/__tests__/sync-service.test.ts` (14 testes: offline, APPLIED/ALREADY_APPLIED, lote misto,
+  REJECTED/CONFLICT/DEPENDENCY_FAILED, falha de rede, lotes 50/50/20, lote falho não bloqueia os
+  seguintes, deviceId estável, filtro por inspeção, isOnline). Testes de caracterização (passaram de
+  primeira — sem mudança de comportamento); sensibilidade comprovada por mutação (4/4 mutantes
+  detectados). Mobile 25/25 suítes, 316/316; typecheck/lint OK. Limite: o mock SQLite reproduz o SQL por regex, então a SQL real de `local-db.ts` (WHERE/ORDER BY) não é verificada. `use-sync.ts` (hook AppState) segue
+  sem teste direto.
+- `sync-service.ts` (achados do ECC typescript-reviewer, MOBILE-TEST-2 — não implementados):
+  (a) operação omitida pelo servidor em `results` fica pendente sem `error_count` nem contagem em
+  `failed`; resultado com `operationId` desconhecido é aplicado mesmo assim; (b) `JSON.parse` de um
+  payload corrompido ou `results` ausente rejeitam `syncPending` inteiro fora do `try` — uma entrada
+  "envenenada" bloqueia todas as sincronizações seguintes.
+- **SUSPEITA (confirmada por leitura, não reproduzida ponta a ponta)** — `use-checklist.ts` envia
+  `baseVersion: known?.version ?? 0`, mas `responses`/`versionsRef` só são preenchidos a partir do
+  detalhe da inspeção (nunca atualizados após um sync). O backend devolve CONFLICT quando
+  `baseVersion != existing.version` (`SynchronizationService.applyInspectionResponse`). Assim, a
+  3ª edição do mesmo item na mesma sessão (versões 0 → 1 no servidor, cliente ainda envia 0) deve
+  ficar presa no outbox como CONFLICT, contando `error_count` a cada tentativa — perda silenciosa da
+  edição. Precisa de teste de reprodução (mobile + backend) e decisão de correção (atualizar a versão
+  conhecida a partir do resultado do push, ou enviar `baseVersion` null para respostas
+  last-write-wins). Não implementado.
+- `npx expo install --check` still flags patch updates unrelated to BF-007:
+  `expo-splash-screen ~57.0.9`, `react-native 0.86.3`, `eslint-config-expo ~57.0.2`, `jest-expo ~57.0.5`.
+
+---
+
+## ERR-HANDLER — 400/404 instead of 500 for malformed requests and unknown routes
+
+Status: DONE (2026-09-29, branch `fix/error-handler-404-400`)
+
+Origin: follow-up found during BF-005 (catch-all `Exception` → 500).
+Requirement: `api-rest.md` §12.2 (error body) and §12.3 (400 = requisição malformada,
+404 = recurso não encontrado, 500 only for unforeseen failures); RN-090.
+
+Implementation — `GlobalExceptionHandler` gains three handlers (DEBUG log, no stack trace/body):
+- `HttpMessageNotReadableException` (malformed JSON / missing body) → 400 `MALFORMED_REQUEST`
+  (generic message; parser details not exposed).
+- `MethodArgumentTypeMismatchException` (e.g. non-UUID path variable) → 400
+  `INVALID_PARAMETER`, `fieldErrors[{field: <param>, message: "Invalid value"}]`.
+- `NoResourceFoundException` (no route) → 404 `ROUTE_NOT_FOUND`. Anonymous callers still
+  get 401 first (security filter chain) — no route enumeration.
+
+Validation:
+- RED: `GlobalExceptionHandlerIT` 4/5 failing with 500 (first attempt failed for the wrong
+  reason — 401, token subject must be a real user — test fixed before implementing).
+- GREEN: 5/5. Full `./mvnw verify`: unit 50/50; 261 ITs with only the known
+  pre-existing failures (`MobileInspectionControllerIT` 2, `SiteControllerIT` 17 / ITORDER-001).
+- Real HTTP (throwaway Postgres + app :8099): 404/401/400/400/400 with §12.2 body; valid
+  controls 200/201; no ERROR log lines; `X-Content-Type-Options: nosniff` present.
+- ECC security-reviewer: 0 CRITICAL/HIGH; MEDIUM (no logging after leaving catch-all) fixed.
+
+Follow-ups (not implemented — out of scope):
+- ~~`HttpRequestMethodNotSupportedException` (405), `HttpMediaTypeNotSupportedException` (415)
+  and `MissingServletRequestParameterException` still fall into the catch-all 500.~~ —
+  415 and missing parameter **RESOLVIDOS** em 2026-09-30 (ver "ERR-HANDLER-2" abaixo).
+  405 **RESOLVIDO** em 2026-09-30 após decisão de documentação do usuário (ver "ERR-HANDLER-2").
+- `AuthenticationException` handler echoes `ex.getMessage()` (pre-existing).
+- Swagger/api-docs are `permitAll` — confirm they are disabled in a production profile.
+- Type-mismatch 400 is raised before method security, so an authenticated non-admin gets
+  400 (not 403) on admin routes with a bad UUID — LOW, accepted.
+
+---
+
+## ERR-HANDLER-2 — 400/415 for missing parameters and unsupported Content-Type
+
+Status: DONE (2026-09-30, commitado em `2805ca7`)
+
+Origin: ERR-HANDLER follow-up. Requirement: `api-rest.md` §12.3 (400 = requisição malformada,
+415 = formato não suportado, 500 only for unforeseen failures), §12.2 body; RN-090.
+
+Implementation — `GlobalExceptionHandler` (DEBUG log, generic messages, no media-type list):
+- `MissingServletRequestParameterException` / `MissingServletRequestPartException` → 400
+  `MISSING_PARAMETER`, `fieldErrors[{field: <param|part>, message: "Required"}]`. Today only
+  `POST /inspections/{id}/evidence` has required `@RequestParam`/`@RequestPart`.
+- `HttpMediaTypeNotSupportedException` → 415 `UNSUPPORTED_CONTENT_TYPE` (distinct from the
+  evidence file-format code raised by `UnsupportedMediaTypeException`).
+
+Validation:
+- RED: `GlobalExceptionHandlerIT` 4 new tests failing with 500 (5 existing GREEN).
+- GREEN: 10/10 (+1 test after review: no token + missing param → still 401).
+- Full `./mvnw verify`: unit 50/50, IT 268/268, BUILD SUCCESS.
+- Real HTTP (throwaway Postgres :5499 + app :8099, real `/auth/login`): 400/400/415/415 with
+  §12.2 body; no token → 401; controls 404 (`INSPECTION_NOT_FOUND`) and 201; 0 ERROR log lines.
+- ECC java-reviewer: 0 CRITICAL/HIGH. MEDIUMs fixed (split dual-exception handler with cast;
+  stronger test assertions). OpenAPI already documents 400/415 on evidence upload — no doc change.
+
+405 extension (2026-09-30, user decision: "implementar erro 405 para todas as ações que
+deveriam resultar em not allowed invés de retornar 500"):
+- Docs: `api-rest.md` §12.3 and `contrato-backend-frontend.md` §5.2 gained a 405 row
+  ("Método HTTP não permitido na rota", response carries `Allow`).
+- `HttpRequestMethodNotSupportedException` → 405 `METHOD_NOT_ALLOWED` + `Allow` header
+  (RFC 9110 §15.5.6), global — applies to every mapped route. Anonymous callers still get 401
+  first, except on `permitAll` routes (`/auth/login|refresh`, swagger), whose methods are public anyway.
+- RED: 2 new tests failing with 500 (anonymous 401 test already GREEN); GREEN
+  `GlobalExceptionHandlerIT` 13/13; full `./mvnw verify` 50/50 + 271/271.
+- Real HTTP: PATCH collection → 405 `Allow: GET, POST`; DELETE item → 405 `Allow: GET, PUT`;
+  anonymous GET `/auth/login` → 405 `Allow: POST`; PATCH without token → 401; control GET → 200;
+  0 ERROR log lines (the catch-all used to log these at ERROR).
+- ECC security-reviewer: 0 CRITICAL/HIGH/MEDIUM; 2 LOW accepted (Allow on public routes only
+  reveals what swagger shows; DEBUG URI logging follows the existing pattern). OPTIONS/HEAD unchanged.
+- OpenAPI unchanged: 405 applies to undeclared methods, which OpenAPI cannot list per path.
+
+Follow-ups (not implemented — out of scope):
+- `MissingRequestHeaderException`, `MissingRequestCookieException`, `HttpMediaTypeNotAcceptableException`
+  (406) and other `ServletRequestBindingException` subclasses still fall into the catch-all 500
+  (no endpoint currently requires a header/cookie param).
+- If CORS is ever configured for the web app, preflight must be allowed in the security chain
+  (anonymous OPTIONS is 401 today — pre-existing).
+- Authenticated users without the role get 400/415 (argument resolution / `consumes` matching)
+  before `@PreAuthorize` returns 403 — same pre-existing ordering as the other 400 handlers
+  (accepted LOW in ERR-HANDLER); parameter names are already public in `openapi.yaml`.
+- 415 response omits the `Accept` header Spring would normally add (deliberate — no hint of
+  supported types); revisit if clients need it.
+
+---
+
+## AUTHZ-BOUNDARY — Technician ownership on evidence and non-conformities (RN-004, AC-SECURITY)
+
+Status: DONE (2026-09-30, commitado em `2805ca7`)
+
+Origin: candidate D ("⚪ cross-cutting ownership authorization not confirmed for
+`NonConformityController`/`EvidenceController`", backend audit 2026-09-22) + `test-plan.md` §5.8
+`security/AuthorizationBoundaryIT.java`. Writing the test revealed a **real vulnerability**, not
+just missing coverage: a technician could read/modify another technician's data by URL.
+
+RED (confirmed live, 200/201 instead of 403) on 8 HTTP endpoints + 2 sync paths:
+- `POST/GET /inspections/{id}/evidence`, `GET /evidence/{id}`
+- `POST/GET /inspections/{id}/non-conformities`, `GET /non-conformities/{id}`,
+  `PATCH /non-conformities/{id}/status`, `PUT /non-conformities/{id}`
+- `POST /mobile/sync/push` `NON_CONFORMITY` create/update on another technician's inspection
+  → `APPLIED` (found by ECC security-reviewer; the other sync entity types already checked).
+
+Fix (mirrors existing `EvidenceService.delete` / `getInspectionForTechnician`):
+- `EvidenceService` (upload/list/getById; delete reuses the helper) and `NonConformityService`
+  (create/listByInspection/getById/updateStatus/update overloads) take `(userId, isTechnician)` and
+  throw `AccessDeniedException` → 403 `FORBIDDEN` when the technician is not the assignee.
+  ADMIN/SUPERVISOR unrestricted. Ownership 403 before APPROVED 409 on upload (PEND-05 ordering).
+- Controllers pass `isTechnician` from the JWT role claim.
+- `SynchronizationService.applyNonConformity` rejects with `SYNC_INSPECTION_NOT_OWNED` (same as
+  `applyInspectionResponse`). Sync keeps calling the unguarded `create(id, …)`/`update(id, req)`
+  overloads (public because sync is another package), now behind its own check.
+
+Validation:
+- `AuthorizationBoundaryIT` (new, 11): 8 RED → GREEN; owner/admin controls GREEN; 403 body checked
+  for code `FORBIDDEN` and no NC title / file name / storage URL.
+- `SyncPushControllerIT` +2 (RED `APPLIED` → GREEN `REJECTED`, NC unchanged/not created).
+- `ConflictDetectionTest` fixture aligned (inspection owner stubbed, like the sibling tests).
+- Full `./mvnw verify` — see progress.md for the final numbers.
+- ECC security-reviewer + java-reviewer: HIGH (sync bypass) fixed; MEDIUMs on tests fixed.
+
+Follow-ups (not implemented — out of scope):
+- `NonConformityService.create` accepts a `responseId` from another inspection (snapshotId is
+  validated, responseId is not; evidence upload validates both). Pre-existing integrity gap.
+- ~~NC create/update/status have no read-only guard for APPROVED/CANCELED inspections (evidence has
+  RN-049); `updateStatus` has no transition rules (single `OPEN` value today, RN-057).~~ — APPROVED
+  **RESOLVIDO** 2026-09-30 (NC-APPROVED-LOCK). Correção: o status de NC aceita mais valores que `OPEN`
+  (os testes usam `IN_PROGRESS`); `updateStatus` segue sem regras de transição.
+- Supervisor scope (RN-005) not implemented — supervisors see everything.
+- `isTechnician` is a deny-list (fails open for a future 4th role); consider a positive
+  ADMIN/SUPERVISOR check or a shared helper (duplicated in 2 services + several controllers).
+- 403 (other technician's id) vs 404 (non-existent id) is an existence oracle for UUIDs —
+  consistent with the existing pattern; recorded in `decisions.md`.
+- `SynchronizationService.pull` does a full scan + in-memory filter (performance).
+
+---
+
+## SYNC-ROBUST — one failing sync operation no longer fails the whole push (RN-070)
+
+Status: DONE (2026-09-30, branch `fix/mobile-inspection-it`, não commitado). Item escolhido pelo
+usuário (follow-up pré-existente do NC-APPROVED-LOCK).
+
+Requirement: RN-070 ("falha em uma operação não deverá apagar outras operações pendentes"),
+RN-067/068 (idempotência por operação).
+
+Root cause: `processOne` (REQUIRES_NEW) called domain services that join its transaction; any domain
+exception crossing their `@Transactional` proxy marked it rollback-only, so after `apply()` mapped the
+exception to REJECTED the commit threw `UnexpectedRollbackException` → HTTP 500 for the whole push and
+the rejection was never recorded (client retried forever).
+
+Fix (`SynchronizationService`):
+- `processOne` is no longer transactional: idempotency lookup, then `self.applyAndRecord(...)`
+  (REQUIRES_NEW — domain change **and** `sync_operations` record commit atomically).
+- Domain exception → that transaction rolls back entirely (no partial writes) and
+  `self.recordOutcome(...)` (REQUIRES_NEW) persists REJECTED/CONFLICT.
+- `DataIntegrityViolationException` (e.g. same operation pushed concurrently) → returns the existing
+  record when present, otherwise REJECTED `SYNC_DATA_INTEGRITY_VIOLATION`.
+- `push()` no longer opens a read-only transaction → at most one pooled connection per push at a time
+  (before: 2, and 3 with the first draft of this fix — pool-exhaustion risk flagged by review).
+- `Outcome` record made public (it is in the public, proxied method signatures).
+- Removed the now-redundant `noRollbackFor` added to `NonConformityService` in NC-APPROVED-LOCK.
+- Unit tests `ConflictDetectionTest`/`IdempotencyTest`: `self` was `null`; now a mock delegating the
+  per-operation methods to the real instance (stand-in for the Spring proxy).
+
+Validation:
+- RED: 2 new `SyncPushControllerIT` tests → 500 `UnexpectedRollbackException` (batch [valid start +
+  NC with unknown snapshot]; NC update to CRITICAL without evidence (RN-055) + idempotent replay).
+- GREEN: `SyncPushControllerIT` 16/16 (both REJECTED with code, valid op APPLIED, rejection recorded,
+  replay returns the same REJECTED), `SyncPullControllerIT` 7/7, unit 50/50.
+- ECC java-reviewer: first draft had a HIGH (apply and record no longer atomic) + MEDIUM (3 connections
+  per push) — both fixed by the restructure above.
+
+Follow-ups (not implemented):
+- `InspectionExecutionService.upsertResponse` keeps `noRollbackFor = ResourceConflictException`
+  (BF-002) and a comment saying sync joins its transaction — now redundant/misleading; harmless.
+- No IT for concurrent pushes of the same operationId, nor for OptimisticLock → CONFLICT at commit.
+
+---
+
+## NC-APPROVED-LOCK — Non-conformities read-only on approved inspections (RN-082)
+
+Status: DONE (2026-09-30, branch `fix/mobile-inspection-it`, não commitado). Item escolhido pelo
+usuário entre os follow-ups do AUTHZ-BOUNDARY.
+
+Requirement: RN-082 ("inspeção aprovada ficará bloqueada para edição comum"), RN-076. Scope mirrors
+evidence (RN-049 / BF-006): only APPROVED, all roles, 409.
+
+Implementation — `NonConformityService.checkWritable()` → 409
+`NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION` in `create(id, …)`, `update(id, req)` and
+`updateStatus` (HTTP + sync paths); reads unchanged; ownership 403 still first. ~~The two sync-called
+methods use `@Transactional(noRollbackFor = ResourceConflictException.class)` (same as BF-002): the
+first GREEN attempt without it made sync push return 500 (rollback-only on `processOne`).~~ SUPERSEDED by SYNC-ROBUST (noRollbackFor removed; sync owns its transactions).
+
+Validation:
+- RED: 3 HTTP writes + 1 sync create accepted on APPROVED (201/200/APPLIED).
+- GREEN: `NonConformityControllerIT` 18/18 (+4), `SyncPushControllerIT` 14/14 (+2 incl. update path,
+  REJECTED recorded in `sync_operations`), `AuthorizationBoundaryIT` 11/11.
+- Full-suite side effect fixed: the new sync tests changed JUnit method order and the last
+  `SyncPushControllerIT` test left `sync_operations` rows → 62 errors in template/user ITs
+  (FK `sync_operations_user_id_fkey`). `SyncPushControllerIT` now cleans in `@AfterEach` too (ITORDER-001).
+- ECC java-reviewer: approve, 0 CRITICAL/HIGH; comment guarding `checkWritable` order + sync update
+  test added.
+
+Follow-ups (not implemented):
+- **RESOLVIDO 2026-09-30 (SYNC-ROBUST, ver acima)** — ~~Pre-existing (MEDIUM/HIGH, java-reviewer):~~ other exceptions inside the sync-called NC methods
+  (`ResourceNotFoundException` for snapshot/response/user, `BusinessRuleViolationException` from
+  RN-055 validator, possibly `OptimisticLockingFailureException`) still mark `processOne`
+  rollback-only → one bad NC operation turns the whole `/mobile/sync/push` into 500. Needs RED tests
+  (CRITICAL NC without evidence; unknown snapshotId) and a robust fix (`noRollbackFor` for all
+  domain exceptions or programmatic transaction in `processOne`).
+- SUBMITTED/UNDER_REVIEW/CANCELED keep NCs editable (consistent with evidence) — product decision
+  if they should lock too (BF-002 locked responses in SUBMITTED/UNDER_REVIEW per RN-043).
+- 403-before-409 ordering for a non-owner technician on an approved inspection is not asserted.
 
 ---
 
@@ -344,7 +651,7 @@ here only so they aren't lost:
 - ~~`InspectionSpecifications` is missing several documented admin filters~~ — **RESOLVIDA** em PEND-15 (2026-09-27): `supervisorId`, `equipmentId`, `scheduledFrom`, `scheduledTo`, `overdue` implementados. Texto livre `q` ainda não implementado (não coberto pelo openapi.yaml, baixa prioridade).
 - `InspectionResponseController.upsertResponse()` double-loads the inspection: once in `getInspectionForTechnician()` (controller) and again in `upsertResponse()` (service). Pre-existing; identified during BF-002 review. Low priority — optimization refactor only.
 - ~~`QR lookup não restringe ao escopo do técnico`~~ — **RESOLVIDA** em PEND-04 (2026-09-28): `GET /equipment/by-qr/{qrCode}` agora bloqueia TECHNICIAN sem inspeção não-terminal no mesmo site (RN-063). Scope boundary SUBMITTED/UNDER_REVIEW documentado em `decisions.md`.
-- `Missing @Size validation on @PathVariable String` — todas as rotas com `@PathVariable String` carecem de constraint de tamanho. Requer `ConstraintViolationException` handler no `GlobalExceptionHandler`. Deferred — ver `decisions.md` 2026-09-28 (PEND-04 H-03).
+- ~~`Missing @Size validation on @PathVariable String` — todas as rotas com `@PathVariable String` carecem de constraint de tamanho. Requer `ConstraintViolationException` handler no `GlobalExceptionHandler`. Deferred — ver `decisions.md` 2026-09-28 (PEND-04 H-03).~~ — **RESOLVIDA** em 2026-09-29 (branch `fix/pathvariable-size-validation`): só existia um `@PathVariable String` (`qrCode`), agora `@Size(max = 100)`; handler é para `HandlerMethodValidationException` (Spring 7), não `ConstraintViolationException` — ver `decisions.md` PEND-04 H-03 (SUPERSEDED). 400 `VALIDATION_ERROR` + `fieldErrors[qrCode]`; `openapi.yaml` com `maxLength: 100` + resposta 400. `EquipmentControllerIT` 17/17 (+2); regressão 263 ITs sem falhas novas; HTTP real OK; ECC java-reviewer sem CRITICAL/HIGH/MEDIUM. Follow-ups: constante compartilhada para o limite 100 (hoje repetido em `EquipmentCreate/UpdateRequest` e no path variable); se algum dia houver `@Validated` ou constraints de entidade, `ConstraintViolationException` ainda cai no catch-all 500; `HandlerMethodValidationException` com bean `@Valid` + outro parâmetro rotularia erros pelo nome do parâmetro (não ocorre hoje).
 
 ## Pre-existing IT failures — RESOLVIDAS (BF-005, 2026-09-27)
 
@@ -358,6 +665,11 @@ pre-requisito do BF-005:
    primitivos → `Boolean` (boxed), eliminando o erro 500 em `POST .../publish`.
    **RESOLVIDA** em `228825c`. A classe agora tem 17/17 tests GREEN (incluindo 3 novos
    testes de BF-001 adicionados em `7553bc7`).
+
+**Atualização 2026-09-30:** as falhas pré-existentes restantes citadas em BF-005/ERR-HANDLER
+(`MobileInspectionControllerIT` 2 — asserções erradas; `SiteControllerIT` 17 — ITORDER-001)
+foram **RESOLVIDAS** (branch `fix/mobile-inspection-it`, só testes). `./mvnw verify` completo:
+unit 50/50, IT 263/263. Detalhes em `decisions.md` ITORDER-001.
 
 Além disso, o setUp de `InspectionTemplateControllerIT` foi atualizado (em `7553bc7`)
 para usar `TRUNCATE TABLE inspection_template_versions CASCADE` via `JdbcTemplate`,

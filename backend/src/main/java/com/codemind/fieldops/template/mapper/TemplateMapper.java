@@ -20,8 +20,10 @@ public interface TemplateMapper {
     @Mapping(source = "publishedBy.id", target = "publishedById")
     TemplateVersionResponse toVersionResponse(TemplateVersion version);
 
+    @Mapping(source = "templateVersion.id", target = "templateVersionId")
     TemplateSectionResponse toSectionResponse(TemplateSection section);
 
+    @Mapping(source = "section.id", target = "sectionId")
     TemplateItemResponse toItemResponse(TemplateItem item);
 
 }

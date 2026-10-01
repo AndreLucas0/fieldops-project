@@ -14,7 +14,11 @@ import com.codemind.fieldops.inspection.domain.ItemSnapshot;
 import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
+import com.codemind.fieldops.nonconformity.domain.NonConformity;
+import com.codemind.fieldops.nonconformity.domain.NonConformitySeverity;
+import com.codemind.fieldops.nonconformity.domain.NonConformityStatus;
 import com.codemind.fieldops.nonconformity.repository.NonConformityRepository;
+import com.codemind.fieldops.synchronization.domain.SyncOperationStatus;
 import com.codemind.fieldops.shared.audit.AuditEventRepository;
 import com.codemind.fieldops.shared.security.JwtClaims;
 import com.codemind.fieldops.site.domain.InspectionSite;
@@ -36,7 +40,9 @@ import com.codemind.fieldops.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -91,17 +97,7 @@ class SyncPushControllerIT {
 
     @BeforeEach
     void setUp() {
-        syncOperationRepository.deleteAll();
-        auditEventRepository.deleteAll();
-        nonConformityRepository.deleteAll();
-        inspectionResponseRepository.deleteAll();
-        itemSnapshotRepository.deleteAll();
-        inspectionRepository.deleteAll();
-        templateVersionRepository.deleteAll();
-        templateRepository.deleteAll();
-        siteRepository.deleteAll();
-        clientRepository.deleteAll();
-        userRepository.deleteAll();
+        cleanDatabase();
 
         User adminUser = userRepository.save(newUser("Admin", "admin.sync@fieldops.local", UserRole.ADMIN));
         technicianUser = userRepository.save(newUser("Technician", "tech.sync@fieldops.local", UserRole.TECHNICIAN));
@@ -180,6 +176,27 @@ class SyncPushControllerIT {
             .role(role)
             .status(UserStatus.ACTIVE)
             .build();
+    }
+
+    // sync_operations rows reference users: leaving them behind breaks the user cleanup of the
+    // IT classes that run next (ITORDER-001).
+    @AfterEach
+    void tearDown() {
+        cleanDatabase();
+    }
+
+    private void cleanDatabase() {
+        syncOperationRepository.deleteAll();
+        auditEventRepository.deleteAll();
+        nonConformityRepository.deleteAll();
+        inspectionResponseRepository.deleteAll();
+        itemSnapshotRepository.deleteAll();
+        inspectionRepository.deleteAll();
+        templateVersionRepository.deleteAll();
+        templateRepository.deleteAll();
+        siteRepository.deleteAll();
+        clientRepository.deleteAll();
+        userRepository.deleteAll();
     }
 
     private String mintAccessToken(User user) {
@@ -356,6 +373,59 @@ class SyncPushControllerIT {
     }
 
     @Test
+    @DisplayName("RN-004, AC-SECURITY - técnico não cria não conformidade via sync na inspeção de outro técnico")
+    void technicianCannotPushNonConformityCreationForAnInspectionTheyDoNotOwn() {
+        String payload = pushPayload(UUID.randomUUID().toString(), "NON_CONFORMITY", UUID.randomUUID().toString(),
+            "UPSERT", "null", """
+            {"inspectionId": "%s", "title": "Intruder NC", "description": "x", "severity": "LOW"}"""
+                .formatted(draftInspection.getId()));
+
+        assertThat(mvc.post().uri("/mobile/sync/push")
+            .header("Authorization", bearer(mintAccessToken(otherTechnicianUser)))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .satisfies(json -> {
+                assertThat(json).extractingPath("$.results[0].status").asString().isEqualTo("REJECTED");
+                assertThat(json).extractingPath("$.results[0].error.code").asString()
+                    .isEqualTo("SYNC_INSPECTION_NOT_OWNED");
+            });
+        assertThat(nonConformityRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("RN-004, AC-SECURITY - técnico não altera via sync a não conformidade de outro técnico")
+    void technicianCannotPushNonConformityUpdateForAnInspectionTheyDoNotOwn() {
+        NonConformity ownerNc = nonConformityRepository.save(NonConformity.builder()
+            .id(UUID.randomUUID())
+            .inspection(draftInspection)
+            .reportedBy(technicianUser)
+            .title("Owner NC")
+            .description("Reported by the assigned technician")
+            .severity(NonConformitySeverity.LOW)
+            .status(NonConformityStatus.OPEN)
+            .build());
+        String payload = pushPayload(UUID.randomUUID().toString(), "NON_CONFORMITY", ownerNc.getId().toString(),
+            "UPSERT", "null", """
+            {"inspectionId": "%s", "title": "Tampered", "description": "x", "severity": "LOW"}"""
+                .formatted(draftInspection.getId()));
+
+        assertThat(mvc.post().uri("/mobile/sync/push")
+            .header("Authorization", bearer(mintAccessToken(otherTechnicianUser)))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .satisfies(json -> {
+                assertThat(json).extractingPath("$.results[0].status").asString().isEqualTo("REJECTED");
+                assertThat(json).extractingPath("$.results[0].error.code").asString()
+                    .isEqualTo("SYNC_INSPECTION_NOT_OWNED");
+            });
+        assertThat(nonConformityRepository.findById(ownerNc.getId()).orElseThrow().getTitle()).isEqualTo("Owner NC");
+    }
+
+    @Test
     void evidenceEntityTypeIsRejectedBecauseItMustTravelThroughTheUploadEndpoint() {
         String operationId = UUID.randomUUID().toString();
         String payload = pushPayload(operationId, "EVIDENCE", UUID.randomUUID().toString(), "UPSERT", "null", "{}");
@@ -434,6 +504,158 @@ class SyncPushControllerIT {
             .hasStatusOk()
             .bodyJson()
             .extractingPath("$.results[0].status").asString().isEqualTo("REJECTED");
+    }
+
+    @Test
+    @DisplayName("RN-082 - sync não registra não conformidade em inspeção aprovada")
+    void syncNonConformityOnApprovedInspectionIsRejected() {
+        Inspection approvedInspection = inspectionRepository.save(Inspection.builder()
+            .templateVersion(activeTemplateVersion)
+            .client(testClient)
+            .site(testSite)
+            .technician(technicianUser)
+            .createdBy(technicianUser)
+            .priority(InspectionPriority.MEDIUM)
+            .status(InspectionStatus.APPROVED)
+            .scheduledFor(Instant.now().plusSeconds(3600))
+            .startedAtServer(Instant.now())
+            .build());
+        String payload = pushPayload(UUID.randomUUID().toString(), "NON_CONFORMITY", UUID.randomUUID().toString(),
+            "UPSERT", "null", """
+            {"inspectionId": "%s", "title": "Late NC", "description": "x", "severity": "LOW"}"""
+                .formatted(approvedInspection.getId()));
+
+        assertThat(mvc.post().uri("/mobile/sync/push")
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .satisfies(json -> {
+                assertThat(json).extractingPath("$.results[0].status").asString().isEqualTo("REJECTED");
+                assertThat(json).extractingPath("$.results[0].error.code").asString()
+                    .isEqualTo("NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION");
+            });
+        assertThat(nonConformityRepository.findByInspectionId(approvedInspection.getId())).isEmpty();
+        // The rejection itself is recorded: the conflict did not mark the operation's transaction rollback-only.
+        assertThat(syncOperationRepository.findAll())
+            .anySatisfy(op -> assertThat(op.getErrorCode()).isEqualTo("NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION"));
+    }
+
+    @Test
+    @DisplayName("RN-082 - sync não altera não conformidade de inspeção aprovada")
+    void syncNonConformityUpdateOnApprovedInspectionIsRejected() {
+        Inspection approvedInspection = inspectionRepository.save(Inspection.builder()
+            .templateVersion(activeTemplateVersion)
+            .client(testClient)
+            .site(testSite)
+            .technician(technicianUser)
+            .createdBy(technicianUser)
+            .priority(InspectionPriority.MEDIUM)
+            .status(InspectionStatus.APPROVED)
+            .scheduledFor(Instant.now().plusSeconds(3600))
+            .startedAtServer(Instant.now())
+            .build());
+        NonConformity existing = nonConformityRepository.save(NonConformity.builder()
+            .id(UUID.randomUUID())
+            .inspection(approvedInspection)
+            .reportedBy(technicianUser)
+            .title("Approved NC")
+            .description("Registered before approval")
+            .severity(NonConformitySeverity.LOW)
+            .status(NonConformityStatus.OPEN)
+            .build());
+        String payload = pushPayload(UUID.randomUUID().toString(), "NON_CONFORMITY", existing.getId().toString(),
+            "UPSERT", "null", """
+            {"inspectionId": "%s", "title": "Edited late", "description": "x", "severity": "LOW"}"""
+                .formatted(approvedInspection.getId()));
+
+        assertThat(mvc.post().uri("/mobile/sync/push")
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.results[0].error.code").asString()
+            .isEqualTo("NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION");
+        assertThat(nonConformityRepository.findById(existing.getId()).orElseThrow().getTitle()).isEqualTo("Approved NC");
+    }
+
+    // ---- RN-070: a failing operation never breaks the batch ----
+
+    @Test
+    @DisplayName("RN-070 - operação rejeitada no domínio não derruba o lote e as demais são aplicadas")
+    void domainErrorInOneOperationDoesNotFailTheWholePush() {
+        String startOperation = UUID.randomUUID().toString();
+        String badNcOperation = UUID.randomUUID().toString();
+        String body = """
+            {
+              "deviceId": "%s",
+              "operations": [
+                {"operationId": "%s", "entityType": "INSPECTION", "entityId": "%s", "operationType": "UPSERT",
+                 "baseVersion": null, "payload": {"status": "IN_PROGRESS", "startedAtDevice": "2026-08-26T10:00:00Z"}},
+                {"operationId": "%s", "entityType": "NON_CONFORMITY", "entityId": "%s", "operationType": "UPSERT",
+                 "baseVersion": null,
+                 "payload": {"inspectionId": "%s", "title": "NC", "description": "x", "severity": "LOW",
+                             "snapshotId": "%s"}}
+              ]
+            }""".formatted(UUID.randomUUID(), startOperation, draftInspection.getId(), badNcOperation,
+            UUID.randomUUID(), draftInspection.getId(), UUID.randomUUID());
+
+        assertThat(mvc.post().uri("/mobile/sync/push")
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body))
+            .hasStatusOk()
+            .bodyJson()
+            .satisfies(json -> {
+                assertThat(json).extractingPath("$.results[0].status").asString().isEqualTo("APPLIED");
+                assertThat(json).extractingPath("$.results[1].status").asString().isEqualTo("REJECTED");
+                assertThat(json).extractingPath("$.results[1].error.code").asString().isEqualTo("SNAPSHOT_NOT_FOUND");
+            });
+        assertThat(inspectionRepository.findById(draftInspection.getId()).orElseThrow().getStatus())
+            .isEqualTo(InspectionStatus.IN_PROGRESS);
+        assertThat(nonConformityRepository.findByInspectionId(draftInspection.getId())).isEmpty();
+        assertThat(syncOperationRepository.findById(UUID.fromString(badNcOperation)).orElseThrow().getStatus())
+            .isEqualTo(SyncOperationStatus.REJECTED);
+        assertThat(syncOperationRepository.findById(UUID.fromString(startOperation)).orElseThrow().getStatus())
+            .isEqualTo(SyncOperationStatus.APPLIED);
+    }
+
+    @Test
+    @DisplayName("RN-070, RN-068 - rejeição de domínio é registrada e o reenvio devolve o mesmo resultado")
+    void domainRejectionIsRecordedAndReplayedIdempotently() {
+        NonConformity existing = nonConformityRepository.save(NonConformity.builder()
+            .id(UUID.randomUUID())
+            .inspection(draftInspection)
+            .reportedBy(technicianUser)
+            .title("Low NC")
+            .description("Registered without evidence")
+            .severity(NonConformitySeverity.LOW)
+            .status(NonConformityStatus.OPEN)
+            .build());
+        String operationId = UUID.randomUUID().toString();
+        // RN-055: escalating to CRITICAL without evidence is a business-rule violation
+        String payload = pushPayload(operationId, "NON_CONFORMITY", existing.getId().toString(), "UPSERT", "null",
+            """
+            {"inspectionId": "%s", "title": "Now critical", "description": "x", "severity": "CRITICAL"}"""
+                .formatted(draftInspection.getId()));
+
+        for (int attempt = 0; attempt < 2; attempt++) {
+            assertThat(mvc.post().uri("/mobile/sync/push")
+                .header("Authorization", bearer(technicianToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+                .hasStatusOk()
+                .bodyJson()
+                .satisfies(json -> {
+                    assertThat(json).extractingPath("$.results[0].status").asString().isEqualTo("REJECTED");
+                    assertThat(json).extractingPath("$.results[0].error.code").asString()
+                        .isEqualTo("NON_CONFORMITY_CRITICAL_REQUIRES_EVIDENCE");
+                });
+        }
+        assertThat(syncOperationRepository.findById(UUID.fromString(operationId))).isPresent();
+        assertThat(nonConformityRepository.findById(existing.getId()).orElseThrow().getTitle()).isEqualTo("Low NC");
     }
 
     // ---- Persist conformity via sync (BF-003, modelo-de-dados.md §10.8.4) ----

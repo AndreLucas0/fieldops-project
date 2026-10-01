@@ -254,6 +254,32 @@ class InspectionSchedulingControllerIT {
     }
 
     @Test
+    void createInspectionWithDraftTemplateVersionIsRejected() {
+        // BF-005: a builder write on the ACTIVE template opens a DRAFT version (not yet published)
+        String[] draftVersionId = {null};
+        assertThat(mvc.post().uri("/inspection-templates/" + activeTemplateVersion.getTemplate().getId() + "/sections")
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\": \"Draft section\", \"displayOrder\": 2}"))
+            .hasStatus(HttpStatus.CREATED).bodyJson()
+            .extractingPath("$.templateVersionId").asString().satisfies(s -> draftVersionId[0] = s);
+
+        String payload = """
+            {
+              "templateVersionId": "%s",
+              "clientId": "%s",
+              "siteId": "%s",
+              "technicianId": "%s",
+              "priority": "MEDIUM",
+              "scheduledFor": "2027-01-15T10:00:00Z"
+            }""".formatted(draftVersionId[0], testClient.getId(), testSite.getId(), technicianUser.getId());
+
+        assertThat(mvc.post().uri("/inspections").header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON).content(payload))
+            .hasStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
     void createInspectionWithInactiveTechnicianIsRejected() {
         User inactiveTech = userRepository.save(User.builder()
             .name("Inactive Tech")

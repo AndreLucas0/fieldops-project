@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-09-28 (BF-007)
+Last updated: 2026-09-29 (BF-005 builder)
 
 ## Current State
 
@@ -47,6 +47,193 @@ implementados. `TemplateController` com dual mapping `/templates/*` + `/inspecti
 Pre-req fixes: `FlywayMigrationIT` version assertion + `TemplateItemRequest` boolean → Boolean.
 7/7 IT tests GREEN. Section/item builder ainda **BLOQUEADO** — decisão de produto pendente
 sobre armazenamento de seções draft (ver `decisions.md` 2026-09-27).
+
+### SYNC-ROBUST — uma operação ruim não derruba mais o sync push (RN-070) — 2026-09-30, branch `fix/mobile-inspection-it`, não commitado
+
+Escolhido pelo usuário. Exceções de domínio dentro do processamento de uma operação marcavam a
+transação como rollback-only e o push inteiro virava 500, sem registrar a rejeição. Reestruturado
+em `SynchronizationService`: aplicação + registro atômicos numa transação própria; falha → rollback
+total + registro do REJECTED/CONFLICT em outra transação; `push()` sem transação (1 conexão por vez).
+RED 2 (500) → GREEN; SyncPush 16/16, SyncPull 7/7, unit 50/50. Review Java pegou um HIGH no primeiro
+desenho (aplicação e registro não atômicos) — corrigido. Decisão em `decisions.md`. Regressão final: 50/50 + 292/292, BUILD SUCCESS. HTTP real: lote [início válido + NC com snapshot inexistente] → 200 APPLIED | REJECTED SNAPSHOT_NOT_FOUND (inspeção IN_PROGRESS); NC → CRITICAL sem evidência → REJECTED, reenvio idêntico; 3 registros em sync_operations; 0 ERROR no log. Regressão
+completa e HTTP real: ver relatório.
+
+---
+
+### NC-APPROVED-LOCK — não conformidade somente leitura em inspeção aprovada (RN-082) — 2026-09-30 — commitado em `1a6c450`
+
+Lista A–F esgotada (E bloqueado); análise apresentada e o usuário escolheu este item. Criar,
+alterar e mudar status de NC em inspeção APPROVED → 409 `NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION`
+(HTTP) / `REJECTED` (sync); leitura mantida; mesmo recorte da evidência (RN-049). `noRollbackFor`
+nos métodos chamados pelo sync (padrão BF-002). RED 4 → GREEN; `NonConformityControllerIT` 18/18,
+`SyncPushControllerIT` 14/14, `AuthorizationBoundaryIT` 11/11. Regressão completa revelou 62 erros
+de ordem (sync_operations deixadas pelo `SyncPushControllerIT`) → `@AfterEach` adicionado.
+Regressão final `./mvnw verify`: 50/50 + 290/290, BUILD SUCCESS. HTTP real (inspeção aprovada via SQL no banco descartável): POST/PUT de técnico e PATCH de supervisor → 409; sync → REJECTED; leitura 200; NC intacta; 0 ERROR no log. Follow-up importante (pré-existente): outras
+exceções no sync de NC ainda viram 500 para o push inteiro — ver `pending-features.md`.
+
+---
+
+### MOBILE-TEST-2 — testes unitários do outbox/sync (BF-007) — 2026-09-30 — commitado em `1a92e14`
+
+Candidato F (parte 2). Nova suíte `mobile/__tests__/sync-service.test.ts` (14 testes) cobrindo
+`sync-service.ts` + `local-db.ts` sobre os mocks do `jest.setup.js`. Sem alteração de código de
+produção: os testes são de caracterização (passaram de primeira); sensibilidade validada por 4
+mutações temporárias no `sync-service.ts` (lote 51, sem ALREADY_APPLIED, sem `incrementErrorCount`,
+`isConnected` no lugar de `isInternetReachable`) — todas detectadas; arquivo restaurado (git diff
+vazio). Mobile: 25/25 suítes, **316/316**; typecheck e lint OK. ECC typescript-reviewer: sem CRITICAL/HIGH; ajustes de teste aplicados. Achado registrado (não
+implementado): provável CONFLICT na 3ª edição do mesmo item por `baseVersion` desatualizado em
+`use-checklist.ts` — ver `pending-features.md` BF-007.
+
+---
+
+### MOBILE-TEST-1 — suíte `inspections-screen.test.tsx` volta a rodar — 2026-09-30 — commitado em `2805ca7`
+
+Candidato F (parte 1). A suíte não carregava desde `cdb7c5b` (lucide-react-native ESM no Jest).
+Correção só de teste/config: `moduleNameMapper` do Jest aponta para a build CJS do lucide; os 6
+testes de filtro (que falharam ao voltar a carregar, pois `cdb7c5b` moveu os chips para um painel
+lateral) passam a abrir o painel antes de tocar nos chips. Resultado: suíte 11/11; `npm test`
+24/24 suítes, **302/302** (volta a bater com a contagem histórica do ESTADO-DO-PROJETO);
+typecheck e lint OK. Candidato E continua bloqueado por decisão de contrato; F-2 (testes
+unitários de `local-db`/`sync-service`) é o próximo executável.
+
+---
+
+### AUTHZ-BOUNDARY — posse do técnico em evidências e não conformidades (RN-004) — 2026-09-30 — commitado em `2805ca7`
+
+Candidato D (cobertura ⚪ do audit + `AuthorizationBoundaryIT` do test-plan §5.8). O teste
+revelou **vulnerabilidade real**: técnico B lia/alterava evidências e não conformidades da
+inspeção do técnico A pela URL (8 endpoints, RED 200/201) e criava/alterava NC via
+`/mobile/sync/push` (RED `APPLIED`, achado HIGH do ECC security-reviewer). Corrigido com
+checagem de posse nos serviços (403 `FORBIDDEN`; sync `REJECTED`/`SYNC_INSPECTION_NOT_OWNED`),
+padrão já usado em `EvidenceService.delete`. ADMIN/SUPERVISOR sem restrição.
+Testes: `AuthorizationBoundaryIT` 11/11 (novo), `SyncPushControllerIT` 12/12 (+2),
+`ConflictDetectionTest` fixture alinhado. `./mvnw verify` completo: 50/50 + 284/284, BUILD SUCCESS.
+HTTP real (Postgres descartável + app :8099, login real de admin/técnico A/técnico B): as 7 rotas
+testáveis → 403 `FORBIDDEN` para B, sync push de B → `REJECTED`/`SYNC_INSPECTION_NOT_OWNED`,
+controles A/admin 200, NC intacta. Limitação de ambiente: upload do dono A deu 500
+(`NoSuchBucketException` — bucket S3 ausente no ambiente descartável, não relacionado); por isso
+`GET /evidence/{id}` de B não foi exercitado via HTTP real — coberto pelo `AuthorizationBoundaryIT`
+(storage fake).
+Follow-ups em `pending-features.md` "AUTHZ-BOUNDARY"; decisão 403 vs 404 em `decisions.md`.
+
+---
+
+### ERR-HANDLER-2 — 400/415 para parâmetro ausente e Content-Type não suportado — 2026-09-30 — commitado em `2805ca7`
+
+Candidato A (follow-up do ERR-HANDLER; nenhuma BF formal pendente). `GlobalExceptionHandler`:
+parâmetro/parte obrigatória ausente → 400 `MISSING_PARAMETER` + `fieldErrors[nome]`;
+Content-Type não suportado → 415 `UNSUPPORTED_CONTENT_TYPE` (api-rest.md §12.3). TDD: 4 RED
+(500) → GREEN; `GlobalExceptionHandlerIT` 10/10; `./mvnw verify` completo 50/50 + 268/268.
+HTTP real (Postgres descartável + app :8099, login real): 400/400/415/415, 401 sem token,
+controles 404/201, sem ERROR no log. ECC java-reviewer sem CRITICAL/HIGH; MEDIUMs corrigidos.
+Follow-ups (header/cookie ausente, 406, ordem 403 vs 400/415) em `pending-features.md`
+"ERR-HANDLER-2".
+
+Extensão 405 (mesmo dia, decisão do usuário): documentado em `api-rest.md` §12.3 e
+`contrato-backend-frontend.md` §5.2; `HttpRequestMethodNotSupportedException` → 405
+`METHOD_NOT_ALLOWED` + cabeçalho `Allow` em todas as rotas. RED 2 (500) → GREEN;
+`GlobalExceptionHandlerIT` 13/13; `./mvnw verify` 50/50 + 271/271; HTTP real 405 com `Allow`
+correto, 401 sem token, sem ERROR no log. ECC security-reviewer: só LOWs aceitos.
+
+---
+
+### ITORDER-001 + MobileInspectionControllerIT — suíte completa verde — 2026-09-30 — commitado em `2bdb53c` (`fix/mobile-inspection-it`)
+
+Não havia BF pendente (BF-001..007 DONE); o usuário escolheu seguir a ordem recomendada
+dos candidatos: B (`MobileInspectionControllerIT`) e C (ITORDER-001). Só arquivos de teste
+alterados — nenhum código de produção.
+- B: as 2 falhas eram asserções erradas (`extractingPath(...).isNull()` falha quando o path
+  não existe); a API já omite `snapshotId` conforme contrato §4.2. Corrigido para
+  `hasPath(inspectionItemId)` + `doesNotHavePath(snapshotId)`. 15/15.
+- C: `SiteControllerIT` com `TRUNCATE TABLE users CASCADE` no `setUp()` e `@AfterEach`
+  removendo equipment/sites/clients/users. RED reproduzido (`InspectionSchedulingControllerIT`
+  → `SiteControllerIT` em ordem alfabética: 0/17, FK `inspection_templates_created_by_fkey`);
+  GREEN 17/17. A 1ª regressão completa expôs 17 erros novos em `SyncPull/PushControllerIT`
+  (`equipment_site_id_fkey` — equipment deixado pelo `SiteControllerIT`, antes mascarado);
+  corrigido com o `@AfterEach`.
+- Regressão: `./mvnw verify` completo **BUILD SUCCESS — unit 50/50, IT 263/263**, primeira
+  execução completa sem falhas registrada. ECC java-reviewer: aprovado, 0 CRITICAL/HIGH;
+  MEDIUM (TRUNCATE em `@BeforeEach` arriscado com execução paralela) registrado em
+  `decisions.md` ITORDER-001 — failsafe roda em série.
+- Ambiente: Docker Desktop precisou ser iniciado nesta sessão (daemon não estava rodando).
+
+---
+
+### PATHVAR-SIZE — `@Size` no `@PathVariable qrCode` — 2026-09-29 — commitado em `4138064` (`fix/error-handler-400-404`) (antes registrado como "não commitado" — corrigido 2026-09-30)
+
+Candidato 3 (decisão deferida PEND-04 H-03). O escopo real era 1 endpoint:
+`qrCode` é o único `@PathVariable String` (os demais são `UUID`, já 400 desde o
+ERR-HANDLER). `GET /equipment/by-qr/{qrCode}` com `@Size(max = 100)` (=
+`equipment.qr_code VARCHAR(100)`); >100 → 400 `VALIDATION_ERROR` com
+`fieldErrors[qrCode]` via novo handler de `HandlerMethodValidationException`
+(Spring 7 — não `ConstraintViolationException`, como previa a decisão original).
+Testes: `EquipmentControllerIT` 17/17 (+2: 101 → 400, 100 → 404), `GlobalExceptionHandlerIT`
+5/5; regressão completa 263 ITs, só as pré-existentes (Mobile 2, Site 17). HTTP real:
+101 → 400, 100 existente → 200, sem token → 401. `openapi.yaml`: `maxLength: 100` + 400.
+
+---
+
+### ERR-HANDLER — 400/404 em vez de 500 — 2026-09-29 — commitado em `c0cfd2a` (`fix/error-handler-400-404`)
+
+Candidato 2 da lista de próximos ciclos. `GlobalExceptionHandler`: JSON malformado/corpo
+ausente → 400 `MALFORMED_REQUEST`; parâmetro com tipo inválido (ex. UUID) → 400
+`INVALID_PARAMETER`; rota inexistente → 404 `ROUTE_NOT_FOUND` (anônimo continua 401).
+Conforme `api-rest.md` §12.3. `GlobalExceptionHandlerIT` 5/5; regressão completa sem
+falhas novas (261 ITs, só as pré-existentes Mobile 2 + Site 17); HTTP real validado;
+ECC security-reviewer sem CRITICAL/HIGH. Follow-ups (405/415/param ausente, Swagger
+público) em `pending-features.md` "ERR-HANDLER".
+
+Nota de ambiente: uma execução do IT levou 1616 s (contexto Spring lento, provável
+contenção de CPU com o language server Java do VS Code); as execuções seguintes, 35 s.
+
+Nota de histórico: a BF-005 foi commitada junto com a BF-007 em `c1d4733`
+(branch `fix/BF-007`), não em commit próprio.
+
+---
+
+### BF-007 — validação e correção de dependências — 2026-09-29 — commitado em `c1d4733` (`fix/BF-007`)
+
+Candidato 1 da lista de próximos ciclos. A validação revelou que a BF-007 não
+instalava em máquina limpa: `expo-sqlite ~15.0.0`/`expo-network ~7.0.0` (versões de
+SDK antigo) sem entrada no `package-lock.json` → `npm ci` falhava. Corrigido para
+`~57.0.1` (o que o SDK 57 exige) e lock regenerado — só `mobile/package.json` e
+`mobile/package-lock.json` alterados; nenhum código-fonte.
+
+Resultados: `npm ci --dry-run` OK; typecheck OK; lint OK; `npm test` 291/291
+(suítes da BF-007 26/26). Uma suíte pré-existente não carrega
+(`inspections-screen.test.tsx`, lucide ESM, quebrada desde `cdb7c5b` 2026-09-15) —
+follow-up, junto com a falta de testes unitários diretos de `local-db`/`sync-service`.
+Contagem histórica "302 testes" (ESTADO-DO-PROJETO 2026-08-18) não é comparável: a
+suíte que não carrega não entra no total.
+
+---
+
+### BF-005 (builder) — Section/Item Builder via DRAFT version — 2026-09-29 — commitado em `c1d4733` (`fix/BF-007`)
+
+Completa a BF-005 (antes PARTIAL). Decisão de produto do usuário: opção (b),
+rascunho como `TemplateVersion` em status `DRAFT` (`decisions.md` 2026-09-29).
+Branch `main`, working tree com as alterações desta BF (sem commit/push — manual).
+
+- V14 (`status` DRAFT/PUBLISHED; 1 draft por template; draft nunca ativo).
+- Rotas `GET/POST .../sections`, `PUT .../sections/{id}`, `POST .../sections/{id}/items`,
+  `PUT .../items/{id}`; publish sem corpo promove o draft; publish legado com corpo
+  mantido (409 se houver draft aberto).
+- Draft de template ACTIVE nasce como cópia da versão ativa (RN-020); estrutura publicada
+  → 409 (RN-019); template INACTIVE → 409; draft invisível como versão e não agendável (422).
+- `openapi.yaml` + `docs/api-rest.md` §12.9: adicionado `GET .../sections` (já consumido pelo web).
+
+Testes: `TemplateBuilderControllerIT` 23/23 (novo), `InspectionSchedulingControllerIT` 20/20
+(+1), `FlywayMigrationIT` 2/2 (v14), template ITs 17/17 + 7/7, unit 50/50. `./mvnw verify`
+completo: falhas só em `MobileInspectionControllerIT` (2 — idênticas no `main` intocado,
+confirmado via worktree do HEAD `7beb028`) e `SiteControllerIT` (ITORDER-001; 17/17 isolado).
+HTTP real: backend em Postgres descartável (:5499/:8099), fluxo de 16 passos OK.
+ECC java-reviewer + database-reviewer executados; HIGHs corrigidos com testes RED→GREEN.
+
+Não implementado (follow-ups em `pending-features.md` BF-005): lock pessimista, handler
+404/400 para rota inexistente/JSON malformado, delete de seção/item, update de metadados
+de template ACTIVE. Web não alterado (já chamava as rotas).
+
+---
 
 ### NESTED-NAV — Nested Navigation Endpoints — não commitado ainda
 
@@ -235,7 +422,8 @@ Desde o audit, os seguintes itens 🔴 foram resolvidos:
 Ver `project-state/pending-features.md` para detalhe de cada item.
 
 Itens ainda pendentes:
-- **BF-005** (PARTIAL/BLOCKED) — section/item builder endpoints aguardam decisão de produto
+- ~~BF-005 (PARTIAL/BLOCKED)~~ — **CONCLUÍDA** em 2026-09-29 (builder via versão DRAFT, ver acima)
+- ~~BF-007 validação~~ — **VALIDADA** em 2026-09-29 (ver "BF-007 — validação" abaixo)
 - ~~BF-007 (mobile sync)~~ — **CONCLUÍDA** em 2026-09-28 (ver BF-007 abaixo)
 - ~~PEND-04 (QR scope)~~ — **RESOLVIDA** em 2026-09-28 (ver PEND-04 acima)
 - ~~PEND-05 (evidence ownership)~~ — **RESOLVIDA** em 2026-09-28 (ver PEND-05 acima)
@@ -272,6 +460,11 @@ manualmente. Mock design verificado contra strings SQL de `local-db.ts`.
 ---
 
 ## Recommended Next Task
+
+> Atualização 2026-09-29: a opção 2 abaixo (decisão BF-005) foi resolvida e a BF-005
+> concluída. Todas as BFs do audit (BF-001..007) estão DONE. Próximos candidatos:
+> validar BF-007 no mobile (`npm install` + `npm test` + typecheck) e o hardening do
+> `GlobalExceptionHandler` (404/400 em vez de 500). Lista original mantida como histórico:
 
 Todos os backend BFs do audit estão concluídos ou formalmente bloqueados. Opções:
 

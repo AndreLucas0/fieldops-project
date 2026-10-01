@@ -4,6 +4,8 @@ import com.codemind.fieldops.user.domain.User;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -47,11 +49,16 @@ public class TemplateVersion {
     @Column(name = "description_snapshot", length = 1000)
     private String descriptionSnapshot;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "published_by", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private TemplateVersionStatus status;
+
+    // Null while the version is a DRAFT (BF-005); set when it is published.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "published_by")
     private User publishedBy;
 
-    @Column(name = "published_at", nullable = false)
+    @Column(name = "published_at")
     private Instant publishedAt;
 
     @Column(name = "active_for_new_inspections", nullable = false)
@@ -71,12 +78,20 @@ public class TemplateVersion {
             id = UUID.randomUUID();
         }
         createdAt = Instant.now();
-        if (publishedAt == null) {
+        if (status == null) {
+            status = TemplateVersionStatus.PUBLISHED;
+        }
+        boolean published = status == TemplateVersionStatus.PUBLISHED;
+        if (published && publishedAt == null) {
             publishedAt = createdAt;
         }
         if (activeForNewInspections == null) {
-            activeForNewInspections = true;
+            activeForNewInspections = published;
         }
+    }
+
+    public boolean isDraft() {
+        return status == TemplateVersionStatus.DRAFT;
     }
 
 }

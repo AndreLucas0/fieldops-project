@@ -8,11 +8,16 @@ import com.codemind.fieldops.template.domain.TemplateStatus;
 import com.codemind.fieldops.template.domain.TemplateVersion;
 import com.codemind.fieldops.template.dto.PublishTemplateRequest;
 import com.codemind.fieldops.template.dto.TemplateCreateRequest;
+import com.codemind.fieldops.template.dto.TemplateItemRequest;
+import com.codemind.fieldops.template.dto.TemplateItemResponse;
 import com.codemind.fieldops.template.dto.TemplateResponse;
+import com.codemind.fieldops.template.dto.TemplateSectionCreateRequest;
+import com.codemind.fieldops.template.dto.TemplateSectionResponse;
 import com.codemind.fieldops.template.dto.TemplateUpdateRequest;
 import com.codemind.fieldops.template.dto.TemplateVersionResponse;
 import com.codemind.fieldops.template.mapper.TemplateMapper;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -84,11 +89,56 @@ public class TemplateController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public TemplateVersionResponse publish(@PathVariable UUID id,
-                                           @Valid @RequestBody PublishTemplateRequest request,
+                                           @Valid @RequestBody(required = false) PublishTemplateRequest request,
                                            @AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
-        TemplateVersion version = templateService.publish(id, userId, request.sections());
+        // Without body (openapi contract) the DRAFT built incrementally is published;
+        // the legacy body with the full section list is still accepted.
+        TemplateVersion version = request == null
+            ? templateService.publishDraft(id, userId)
+            : templateService.publish(id, userId, request.sections());
         return templateMapper.toVersionResponse(version);
+    }
+
+    @GetMapping("/{id}/sections")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public List<TemplateSectionResponse> listDraftSections(@PathVariable UUID id) {
+        return templateService.listDraftSections(id).stream()
+            .map(templateMapper::toSectionResponse)
+            .toList();
+    }
+
+    @PostMapping("/{id}/sections")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public TemplateSectionResponse createSection(@PathVariable UUID id,
+                                                 @Valid @RequestBody TemplateSectionCreateRequest request) {
+        return templateMapper.toSectionResponse(templateService.createSection(id, request));
+    }
+
+    @PutMapping("/{id}/sections/{sectionId}")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public TemplateSectionResponse updateSection(@PathVariable UUID id,
+                                                 @PathVariable UUID sectionId,
+                                                 @Valid @RequestBody TemplateSectionCreateRequest request) {
+        return templateMapper.toSectionResponse(templateService.updateSection(id, sectionId, request));
+    }
+
+    @PostMapping("/{id}/sections/{sectionId}/items")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public TemplateItemResponse createItem(@PathVariable UUID id,
+                                           @PathVariable UUID sectionId,
+                                           @Valid @RequestBody TemplateItemRequest request) {
+        return templateMapper.toItemResponse(templateService.createItem(id, sectionId, request));
+    }
+
+    @PutMapping("/{id}/items/{itemId}")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public TemplateItemResponse updateItem(@PathVariable UUID id,
+                                           @PathVariable UUID itemId,
+                                           @Valid @RequestBody TemplateItemRequest request) {
+        return templateMapper.toItemResponse(templateService.updateItem(id, itemId, request));
     }
 
     @GetMapping("/{id}/active-version")

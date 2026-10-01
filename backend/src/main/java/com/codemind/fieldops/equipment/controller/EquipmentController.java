@@ -12,6 +12,7 @@ import com.codemind.fieldops.shared.pagination.PageResponse;
 import com.codemind.fieldops.shared.pagination.SortFieldValidator;
 import com.codemind.fieldops.shared.security.JwtClaims;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -85,7 +86,7 @@ public class EquipmentController {
 
     @GetMapping("/by-qr/{qrCode}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','TECHNICIAN')")
-    public EquipmentResponse getByQrCode(@PathVariable String qrCode, @AuthenticationPrincipal Jwt jwt) {
+    public EquipmentResponse getByQrCode(@PathVariable @Size(max = 100) String qrCode, @AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
         boolean isTechnician = "TECHNICIAN".equals(jwt.getClaimAsString(JwtClaims.ROLE));
         return equipmentMapper.toResponse(equipmentService.getByQrCode(qrCode, userId, isTechnician));

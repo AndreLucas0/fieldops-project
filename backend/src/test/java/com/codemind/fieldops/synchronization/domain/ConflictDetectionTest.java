@@ -58,9 +58,15 @@ class ConflictDetectionTest {
         nonConformityRepository = mock(NonConformityRepository.class);
         inspectionExecutionService = mock(InspectionExecutionService.class);
         nonConformityService = mock(NonConformityService.class);
+        SynchronizationService self = mock(SynchronizationService.class);
         service = new SynchronizationService(syncOperationRepository, inspectionRepository,
             inspectionResponseRepository, nonConformityRepository, inspectionExecutionService, nonConformityService,
-            null);
+            self);
+        // Stands in for the Spring proxy: the per-operation transactions are invoked through self (RN-070).
+        when(self.applyAndRecord(any(), any(), any())).thenAnswer(invocation -> service.applyAndRecord(
+            invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2)));
+        when(self.recordOutcome(any(), any(), any(), any())).thenAnswer(invocation -> service.recordOutcome(
+            invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2), invocation.getArgument(3)));
         when(syncOperationRepository.findById(any())).thenReturn(Optional.empty());
     }
 
@@ -111,7 +117,12 @@ class ConflictDetectionTest {
     void nonConformityWithStaleBaseVersionIsReportedAsConflict() {
         UUID inspectionId = UUID.randomUUID();
         UUID nonConformityId = UUID.randomUUID();
-        Inspection inspection = Inspection.builder().id(inspectionId).version(1).build();
+        Inspection inspection = Inspection.builder()
+            .id(inspectionId)
+            .technician(User.builder().id(userId).build())
+            .version(1)
+            .build();
+        when(inspectionRepository.findById(inspectionId)).thenReturn(Optional.of(inspection));
         NonConformity existing = NonConformity.builder()
             .id(nonConformityId)
             .inspection(inspection)

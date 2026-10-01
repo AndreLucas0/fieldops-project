@@ -48,7 +48,20 @@ Pre-req fixes: `FlywayMigrationIT` version assertion + `TemplateItemRequest` boo
 7/7 IT tests GREEN. Section/item builder ainda **BLOQUEADO** — decisão de produto pendente
 sobre armazenamento de seções draft (ver `decisions.md` 2026-09-27).
 
-### MOBILE-TEST-1 — suíte `inspections-screen.test.tsx` volta a rodar — 2026-09-30, branch `fix/mobile-inspection-it`, não commitado
+### MOBILE-TEST-2 — testes unitários do outbox/sync (BF-007) — 2026-09-30, branch `fix/mobile-inspection-it`, não commitado
+
+Candidato F (parte 2). Nova suíte `mobile/__tests__/sync-service.test.ts` (14 testes) cobrindo
+`sync-service.ts` + `local-db.ts` sobre os mocks do `jest.setup.js`. Sem alteração de código de
+produção: os testes são de caracterização (passaram de primeira); sensibilidade validada por 4
+mutações temporárias no `sync-service.ts` (lote 51, sem ALREADY_APPLIED, sem `incrementErrorCount`,
+`isConnected` no lugar de `isInternetReachable`) — todas detectadas; arquivo restaurado (git diff
+vazio). Mobile: 25/25 suítes, **316/316**; typecheck e lint OK. ECC typescript-reviewer: sem CRITICAL/HIGH; ajustes de teste aplicados. Achado registrado (não
+implementado): provável CONFLICT na 3ª edição do mesmo item por `baseVersion` desatualizado em
+`use-checklist.ts` — ver `pending-features.md` BF-007.
+
+---
+
+### MOBILE-TEST-1 — suíte `inspections-screen.test.tsx` volta a rodar — 2026-09-30 — commitado em `2805ca7`
 
 Candidato F (parte 1). A suíte não carregava desde `cdb7c5b` (lucide-react-native ESM no Jest).
 Correção só de teste/config: `moduleNameMapper` do Jest aponta para a build CJS do lucide; os 6
@@ -60,7 +73,7 @@ unitários de `local-db`/`sync-service`) é o próximo executável.
 
 ---
 
-### AUTHZ-BOUNDARY — posse do técnico em evidências e não conformidades (RN-004) — 2026-09-30, branch `fix/mobile-inspection-it`, não commitado
+### AUTHZ-BOUNDARY — posse do técnico em evidências e não conformidades (RN-004) — 2026-09-30 — commitado em `2805ca7`
 
 Candidato D (cobertura ⚪ do audit + `AuthorizationBoundaryIT` do test-plan §5.8). O teste
 revelou **vulnerabilidade real**: técnico B lia/alterava evidências e não conformidades da
@@ -80,7 +93,7 @@ Follow-ups em `pending-features.md` "AUTHZ-BOUNDARY"; decisão 403 vs 404 em `de
 
 ---
 
-### ERR-HANDLER-2 — 400/415 para parâmetro ausente e Content-Type não suportado — 2026-09-30, branch `fix/mobile-inspection-it`, não commitado
+### ERR-HANDLER-2 — 400/415 para parâmetro ausente e Content-Type não suportado — 2026-09-30 — commitado em `2805ca7`
 
 Candidato A (follow-up do ERR-HANDLER; nenhuma BF formal pendente). `GlobalExceptionHandler`:
 parâmetro/parte obrigatória ausente → 400 `MISSING_PARAMETER` + `fieldErrors[nome]`;

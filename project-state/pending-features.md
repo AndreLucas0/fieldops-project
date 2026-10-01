@@ -381,7 +381,7 @@ Validation (2026-09-29) — reopened and fixed, now actually validated:
 Follow-ups (not implemented — outside BF-007 validation scope):
 - ~~`inspections-screen.test.tsx` cannot load: Jest does not transform
   `lucide-react-native` ESM (needs `transformIgnorePatterns` or a mock). Broken since `cdb7c5b`.~~ —
-  **RESOLVIDO** 2026-09-30 (MOBILE-TEST-1, branch `fix/mobile-inspection-it`, não commitado):
+  **RESOLVIDO** 2026-09-30 (MOBILE-TEST-1, commitado em `2805ca7`):
   jest-only `moduleNameMapper` `^lucide-react-native$` → build CJS do próprio pacote
   (`dist/cjs/lucide-react-native.js`; o `jest-expo` resolvia pela condição `react-native` para o
   `.mjs` ESM). Ao voltar a carregar, 6 testes de filtro falharam: `cdb7c5b` moveu os chips para um
@@ -389,8 +389,29 @@ Follow-ups (not implemented — outside BF-007 validation scope):
   bug (`telas-frontend.md` §10.8 não fixa o posicionamento). Testes passam a abrir o painel
   (`openFilters()`), asserções de comportamento inalteradas. Suíte 11/11; mobile completo
   24/24 suítes, 302/302 testes; typecheck OK; lint OK. Metro/app não afetados.
-- `local-db.ts`, `sync-service.ts`, `use-sync.ts` have no direct unit tests — only
-  exercised through screen tests with mocks (batching, REJECTED/CONFLICT handling untested).
+- ~~`local-db.ts`, `sync-service.ts`, `use-sync.ts` have no direct unit tests — only
+  exercised through screen tests with mocks (batching, REJECTED/CONFLICT handling untested).~~ —
+  `local-db.ts` + `sync-service.ts` **RESOLVIDO** 2026-09-30 (MOBILE-TEST-2, não commitado):
+  `mobile/__tests__/sync-service.test.ts` (14 testes: offline, APPLIED/ALREADY_APPLIED, lote misto,
+  REJECTED/CONFLICT/DEPENDENCY_FAILED, falha de rede, lotes 50/50/20, lote falho não bloqueia os
+  seguintes, deviceId estável, filtro por inspeção, isOnline). Testes de caracterização (passaram de
+  primeira — sem mudança de comportamento); sensibilidade comprovada por mutação (4/4 mutantes
+  detectados). Mobile 25/25 suítes, 316/316; typecheck/lint OK. Limite: o mock SQLite reproduz o SQL por regex, então a SQL real de `local-db.ts` (WHERE/ORDER BY) não é verificada. `use-sync.ts` (hook AppState) segue
+  sem teste direto.
+- `sync-service.ts` (achados do ECC typescript-reviewer, MOBILE-TEST-2 — não implementados):
+  (a) operação omitida pelo servidor em `results` fica pendente sem `error_count` nem contagem em
+  `failed`; resultado com `operationId` desconhecido é aplicado mesmo assim; (b) `JSON.parse` de um
+  payload corrompido ou `results` ausente rejeitam `syncPending` inteiro fora do `try` — uma entrada
+  "envenenada" bloqueia todas as sincronizações seguintes.
+- **SUSPEITA (confirmada por leitura, não reproduzida ponta a ponta)** — `use-checklist.ts` envia
+  `baseVersion: known?.version ?? 0`, mas `responses`/`versionsRef` só são preenchidos a partir do
+  detalhe da inspeção (nunca atualizados após um sync). O backend devolve CONFLICT quando
+  `baseVersion != existing.version` (`SynchronizationService.applyInspectionResponse`). Assim, a
+  3ª edição do mesmo item na mesma sessão (versões 0 → 1 no servidor, cliente ainda envia 0) deve
+  ficar presa no outbox como CONFLICT, contando `error_count` a cada tentativa — perda silenciosa da
+  edição. Precisa de teste de reprodução (mobile + backend) e decisão de correção (atualizar a versão
+  conhecida a partir do resultado do push, ou enviar `baseVersion` null para respostas
+  last-write-wins). Não implementado.
 - `npx expo install --check` still flags patch updates unrelated to BF-007:
   `expo-splash-screen ~57.0.9`, `react-native 0.86.3`, `eslint-config-expo ~57.0.2`, `jest-expo ~57.0.5`.
 
@@ -435,7 +456,7 @@ Follow-ups (not implemented — out of scope):
 
 ## ERR-HANDLER-2 — 400/415 for missing parameters and unsupported Content-Type
 
-Status: DONE (2026-09-30, branch `fix/mobile-inspection-it`, não commitado)
+Status: DONE (2026-09-30, commitado em `2805ca7`)
 
 Origin: ERR-HANDLER follow-up. Requirement: `api-rest.md` §12.3 (400 = requisição malformada,
 415 = formato não suportado, 500 only for unforeseen failures), §12.2 body; RN-090.
@@ -488,7 +509,7 @@ Follow-ups (not implemented — out of scope):
 
 ## AUTHZ-BOUNDARY — Technician ownership on evidence and non-conformities (RN-004, AC-SECURITY)
 
-Status: DONE (2026-09-30, branch `fix/mobile-inspection-it`, não commitado)
+Status: DONE (2026-09-30, commitado em `2805ca7`)
 
 Origin: candidate D ("⚪ cross-cutting ownership authorization not confirmed for
 `NonConformityController`/`EvidenceController`", backend audit 2026-09-22) + `test-plan.md` §5.8

@@ -9,8 +9,11 @@ import com.codemind.fieldops.auth.dto.RefreshTokenRequest;
 import com.codemind.fieldops.auth.dto.RefreshTokenResponse;
 import com.codemind.fieldops.auth.dto.UserSummary;
 import com.codemind.fieldops.user.domain.User;
+
 import jakarta.validation.Valid;
+
 import java.util.UUID;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -25,41 +28,69 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/auth")
 public class AuthController {
 
-	private final AuthenticationService authenticationService;
+    private final AuthenticationService authenticationService;
 
-	public AuthController(AuthenticationService authenticationService) {
-		this.authenticationService = authenticationService;
-	}
+    public AuthController(AuthenticationService authenticationService) {
+        this.authenticationService = authenticationService;
+    }
 
-	@PostMapping("/login")
-	public LoginResponse login(@Valid @RequestBody LoginRequest request) {
-		AuthenticationResult result = authenticationService.login(request.email(), request.password());
-		return toLoginResponse(result);
-	}
+    @PostMapping("/login")
+    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
+        AuthenticationResult result =
+                authenticationService.login(request.email(), request.password());
 
-	@PostMapping("/refresh")
-	public RefreshTokenResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
-		AuthenticationResult result = authenticationService.refresh(request.refreshToken());
-		return new RefreshTokenResponse(result.accessToken(), result.refreshToken(), result.expiresInSeconds());
-	}
+        return toLoginResponse(result);
+    }
 
-	@PostMapping("/logout")
-	@ResponseStatus(HttpStatus.NO_CONTENT)
-	public void logout(@AuthenticationPrincipal Jwt jwt) {
-		authenticationService.logout(UUID.fromString(jwt.getSubject()));
-	}
+    @PostMapping("/refresh")
+    public RefreshTokenResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        AuthenticationResult result =
+                authenticationService.refresh(request.refreshToken());
 
-	@GetMapping("/me")
-	public CurrentUserResponse me(@AuthenticationPrincipal Jwt jwt) {
-		User user = authenticationService.getCurrentUser(UUID.fromString(jwt.getSubject()));
-		return new CurrentUserResponse(user.getId(), user.getName(), user.getEmail(), user.getRole(), user.getStatus(),
-			user.getPhone());
-	}
+        return new RefreshTokenResponse(
+                result.accessToken(),
+                result.refreshToken(),
+                result.expiresInSeconds()
+        );
+    }
 
-	private LoginResponse toLoginResponse(AuthenticationResult result) {
-		User user = result.user();
-		UserSummary summary = new UserSummary(user.getId(), user.getName(), user.getEmail(), user.getRole());
-		return new LoginResponse(result.accessToken(), result.refreshToken(), result.expiresInSeconds(), summary);
-	}
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@AuthenticationPrincipal Jwt jwt) {
+        authenticationService.logout(UUID.fromString(jwt.getSubject()));
+    }
 
+    @GetMapping("/me")
+    public CurrentUserResponse me(@AuthenticationPrincipal Jwt jwt) {
+        User user = authenticationService.getCurrentUser(
+                UUID.fromString(jwt.getSubject())
+        );
+
+        return new CurrentUserResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getRole(),
+                user.getStatus(),
+                user.getPhone()
+        );
+    }
+
+    private LoginResponse toLoginResponse(AuthenticationResult result) {
+        User user = result.user();
+
+        UserSummary summary = new UserSummary(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getRole()
+        );
+
+        return new LoginResponse(
+                result.accessToken(),
+                result.refreshToken(),
+                result.expiresInSeconds(),
+                summary
+        );
+    }
 }

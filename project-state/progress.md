@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-09-29 (BF-005 builder)
+Last updated: 2026-10-01 (BASEVERSION-STALENESS)
 
 ## Current State
 
@@ -95,6 +95,29 @@ lateral) passam a abrir o painel antes de tocar nos chips. Resultado: suíte 11/
 24/24 suítes, **302/302** (volta a bater com a contagem histórica do ESTADO-DO-PROJETO);
 typecheck e lint OK. Candidato E continua bloqueado por decisão de contrato; F-2 (testes
 unitários de `local-db`/`sync-service`) é o próximo executável.
+
+---
+
+### BASEVERSION-STALENESS — base_version obsoleto na 2ª edição do mesmo item (RN-075) — 2026-10-01 — não commitado
+
+Achado registrado em MOBILE-TEST-2: `versionsRef` em `use-checklist.ts` armazenava respostas
+completas mas nunca era atualizado após `upsertOutboxEntry` bem-sucedido. A 2ª edição do mesmo
+item na mesma sessão reenviava o `baseVersion` original → servidor retornava CONFLICT → dado perdido.
+
+**Fix aplicado** em `mobile/src/features/checklist/use-checklist.ts`:
+1. Tipo de `versionsRef` simplificado: armazena apenas `Map<Uuid, number>` (números de versão),
+   não mais objetos `InspectionResponse` completos.
+2. Cache rebuild monta `new Map(responses.map(r => [r.inspectionItemId, r.version]))`.
+3. Após `upsertOutboxEntry` bem-sucedido: re-leitura atômica do ref — `(ref.get(id) ?? 0) + 1` —
+   em vez de `knownVersion + 1` (closure stale). Corrige também a corrida de edições concorrentes.
+
+**Testes**: 4 novos em `mobile/__tests__/use-checklist.test.ts`:
+- 2 testes RED→GREEN (serial: sem resposta pré-existente e com version=2)
+- 1 teste de edição concorrente (v1 bloqueado, v2 completa, v1 escrita reflete ref atualizado)
+- 1 teste de falha no `upsertOutboxEntry` (versão não incrementada em caso de erro)
+
+Typecheck, lint e regressão completa: **323/323** GREEN.
+ECC typescript-reviewer: sem CRITICAL/HIGH; 1 MEDIUM de closure stale → corrigido (re-leitura atômica); 2 MEDIUMs de testes faltantes → cobertos; 2 LOWs (mock excessivo + eslint-disable) → limpos.
 
 ---
 
@@ -433,6 +456,32 @@ Itens ainda pendentes:
 
 ---
 
+### SYNC-RESILIENCE — Mobile sync resilience (RN-070) — não commitado
+
+BF-007 follow-up items (a) e (b); implementado em `mobile/src/services/sync-service.ts`.
+
+**Bugs corrigidos:**
+1. `JSON.parse(row.payload)` estava fora do bloco `try` (linha 70 vs. try linha 74).
+   Substituído `batch.map()` por `for` loop com try-catch individual. Payload corrompido:
+   `incrementErrorCount`, `failed += 1`, `continue` — não bloqueia entradas válidas do lote.
+2. Guard `if (!Array.isArray(response.results))` antes do loop de resultados.
+   Resposta 200 sem `results` agora trata o lote todo como falha de rede.
+3. `respondedIds = new Set(results.map(r => r.operationId))` após o loop de resultados.
+   Operações enviadas mas omitidas na resposta do servidor agora recebem `error_count + 1`.
+
+**Testes adicionados** (`mobile/__tests__/sync-service.test.ts`, 3 novos):
+- `entrada com payload corrompido incrementa error_count e não bloqueia entradas válidas`
+- `resposta do servidor sem campo results trata o lote todo como falha`
+- `operação omitida pelo servidor incrementa error_count e conta como falha`
+
+**Validação:**
+- RED confirmado para cada test antes da implementação.
+- GREEN: sync-service 17/17; full suite 319/319, 25 suites; `tsc --noEmit` clean.
+- ECC typescript-reviewer: sem CRITICAL; HIGH de `response.results` unsafe cast resolvido inline.
+  HIGH de `incrementErrorCount` sequencial registrado em `pending-features.md` (deferred).
+
+---
+
 ### BF-007 — Mobile Sync Integration — não commitado ainda
 
 Offline-first sync implementada no mobile (Expo SDK 57 / React Native):
@@ -461,10 +510,8 @@ manualmente. Mock design verificado contra strings SQL de `local-db.ts`.
 
 ## Recommended Next Task
 
-> Atualização 2026-09-29: a opção 2 abaixo (decisão BF-005) foi resolvida e a BF-005
-> concluída. Todas as BFs do audit (BF-001..007) estão DONE. Próximos candidatos:
-> validar BF-007 no mobile (`npm install` + `npm test` + typecheck) e o hardening do
-> `GlobalExceptionHandler` (404/400 em vez de 500). Lista original mantida como histórico:
+> Atualização 2026-10-01: SYNC-RESILIENCE concluído. BF-007 follow-ups (a) e (b)
+> resolvidos. Mobile suite: 319/319. Próximos candidatos:
 
 Todos os backend BFs do audit estão concluídos ou formalmente bloqueados. Opções:
 

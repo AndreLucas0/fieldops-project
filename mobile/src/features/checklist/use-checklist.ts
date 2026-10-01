@@ -82,12 +82,13 @@ export function useChecklist(
   );
 
   /**
-   * `id` e `version` de cada resposta conhecida pelo servidor, para o envio ler
-   * o valor mais recente — e não o capturado quando o temporizador foi
-   * agendado. Guardado com a assinatura da inspeção para se reconstruir sozinho
-   * quando o detalhe é recarregado, sem tocar na `ref` durante a renderização.
+   * Versão de cada resposta conhecida pelo servidor, para o envio ler o valor
+   * mais recente e não o capturado quando o temporizador foi agendado. Só
+   * armazena o número de versão (não a resposta inteira) e é incrementado
+   * localmente após cada upsertOutboxEntry bem-sucedido, evitando que a 2ª
+   * edição do mesmo item na mesma sessão envie baseVersion obsoleto (RN-075).
    */
-  const versionsRef = useRef<{ signature: string; responses: Map<Uuid, InspectionResponse> } | null>(
+  const versionsRef = useRef<{ signature: string; versions: Map<Uuid, number> } | null>(
     null,
   );
 
@@ -127,10 +128,12 @@ export function useChecklist(
       if (versionsRef.current?.signature !== detailSignature) {
         versionsRef.current = {
           signature: detailSignature,
-          responses: indexResponses(inspection.responses ?? []),
+          versions: new Map(
+            (inspection.responses ?? []).map((r) => [r.inspectionItemId, r.version]),
+          ),
         };
       }
-      const known = versionsRef.current.responses.get(item.id);
+      const knownVersion = versionsRef.current.versions.get(item.id) ?? 0;
 
       // SINGLE_CHOICE usa valueChoice no contrato de sync; os outros tipos usam valueText.
       const isSingleChoice = item.responseType === 'SINGLE_CHOICE';
@@ -152,10 +155,14 @@ export function useChecklist(
           entityType: 'INSPECTION_RESPONSE',
           entityId: item.id,
           operationType: 'UPSERT',
-          baseVersion: known?.version ?? 0,
+          baseVersion: knownVersion,
           payload: JSON.stringify(syncPayload),
         });
 
+        versionsRef.current.versions.set(
+          item.id,
+          (versionsRef.current.versions.get(item.id) ?? 0) + 1,
+        );
         setSaveState(item.id, { status: 'saved' });
         void syncPendingIfOnline(client, inspection.id);
       } catch {

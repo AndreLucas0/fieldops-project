@@ -3,6 +3,7 @@ package com.codemind.fieldops.nonconformity.application;
 import com.codemind.fieldops.evidence.repository.EvidenceRepository;
 import com.codemind.fieldops.inspection.domain.Inspection;
 import com.codemind.fieldops.inspection.domain.InspectionResponse;
+import com.codemind.fieldops.inspection.domain.InspectionStatus;
 import com.codemind.fieldops.inspection.domain.ItemSnapshot;
 import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
@@ -15,6 +16,7 @@ import com.codemind.fieldops.nonconformity.dto.NonConformityCreateRequest;
 import com.codemind.fieldops.nonconformity.dto.NonConformityStatusUpdateRequest;
 import com.codemind.fieldops.nonconformity.dto.NonConformityUpdateRequest;
 import com.codemind.fieldops.nonconformity.repository.NonConformityRepository;
+import com.codemind.fieldops.shared.error.ResourceConflictException;
 import com.codemind.fieldops.shared.error.ResourceNotFoundException;
 import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.repository.UserRepository;
@@ -35,6 +37,7 @@ public class NonConformityService {
     private static final String RESPONSE_NOT_FOUND_CODE = "RESPONSE_NOT_FOUND";
     private static final String USER_NOT_FOUND_CODE = "USER_NOT_FOUND";
     private static final String NC_NOT_FOUND_CODE = "NON_CONFORMITY_NOT_FOUND";
+    private static final String NC_READ_ONLY_CODE = "NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION";
 
     private final NonConformityRepository nonConformityRepository;
     private final InspectionRepository inspectionRepository;
@@ -69,10 +72,13 @@ public class NonConformityService {
      * to match the client-generated {@code entityId} so a later pull
      * recognizes the record as the one it created offline.
      */
-    @Transactional
+    // noRollbackFor: sync (processOne, REQUIRES_NEW) joins this transaction and turns the RN-082
+    // conflict into a REJECTED result; it must not mark the caller rollback-only (same as BF-002).
+    @Transactional(noRollbackFor = ResourceConflictException.class)
     public NonConformity create(UUID id, UUID inspectionId, UUID reportedByUserId, NonConformityCreateRequest request) {
         Inspection inspection = inspectionRepository.findById(inspectionId)
             .orElseThrow(() -> new ResourceNotFoundException(INSPECTION_NOT_FOUND_CODE, "Inspection not found"));
+        checkWritable(inspection);
 
         User reportedBy = userRepository.findById(reportedByUserId)
             .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND_CODE, "User not found"));
@@ -131,6 +137,7 @@ public class NonConformityService {
     public NonConformity updateStatus(UUID id, NonConformityStatusUpdateRequest request, UUID userId,
             boolean isTechnician) {
         NonConformity nc = getById(id, userId, isTechnician);
+        checkWritable(nc.getInspection());
         nc.setStatus(request.status());
         return nonConformityRepository.save(nc);
     }
@@ -154,9 +161,10 @@ public class NonConformityService {
     /**
      * Also used by the synchronization push handler, which enforces inspection ownership itself.
      */
-    @Transactional
+    @Transactional(noRollbackFor = ResourceConflictException.class)
     public NonConformity update(UUID id, NonConformityUpdateRequest request) {
         NonConformity nc = findOrThrow(id);
+        checkWritable(nc.getInspection());
         boolean hasEvidence = evidenceRepository.existsByNonConformityId(id);
         NonConformityEvidenceValidator.validate(request.severity(), hasEvidence);
 
@@ -169,6 +177,16 @@ public class NonConformityService {
     private Inspection findInspection(UUID inspectionId) {
         return inspectionRepository.findById(inspectionId)
             .orElseThrow(() -> new ResourceNotFoundException(INSPECTION_NOT_FOUND_CODE, "Inspection not found"));
+    }
+
+    // RN-082 / RN-076: an approved inspection is locked for common editing (mirrors evidence, RN-049).
+    // Must run before any write: the sync-called methods use noRollbackFor, so a conflict raised after
+    // a mutation would be committed.
+    private static void checkWritable(Inspection inspection) {
+        if (inspection.getStatus() == InspectionStatus.APPROVED) {
+            throw new ResourceConflictException(NC_READ_ONLY_CODE,
+                "Non-conformities of an approved inspection are read-only");
+        }
     }
 
     // RN-004: a technician only reaches non-conformities of inspections assigned to them

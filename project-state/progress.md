@@ -48,7 +48,20 @@ Pre-req fixes: `FlywayMigrationIT` version assertion + `TemplateItemRequest` boo
 7/7 IT tests GREEN. Section/item builder ainda **BLOQUEADO** — decisão de produto pendente
 sobre armazenamento de seções draft (ver `decisions.md` 2026-09-27).
 
-### MOBILE-TEST-2 — testes unitários do outbox/sync (BF-007) — 2026-09-30, branch `fix/mobile-inspection-it`, não commitado
+### NC-APPROVED-LOCK — não conformidade somente leitura em inspeção aprovada (RN-082) — 2026-09-30, branch `fix/mobile-inspection-it`, não commitado
+
+Lista A–F esgotada (E bloqueado); análise apresentada e o usuário escolheu este item. Criar,
+alterar e mudar status de NC em inspeção APPROVED → 409 `NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION`
+(HTTP) / `REJECTED` (sync); leitura mantida; mesmo recorte da evidência (RN-049). `noRollbackFor`
+nos métodos chamados pelo sync (padrão BF-002). RED 4 → GREEN; `NonConformityControllerIT` 18/18,
+`SyncPushControllerIT` 14/14, `AuthorizationBoundaryIT` 11/11. Regressão completa revelou 62 erros
+de ordem (sync_operations deixadas pelo `SyncPushControllerIT`) → `@AfterEach` adicionado.
+Regressão final `./mvnw verify`: 50/50 + 290/290, BUILD SUCCESS. HTTP real (inspeção aprovada via SQL no banco descartável): POST/PUT de técnico e PATCH de supervisor → 409; sync → REJECTED; leitura 200; NC intacta; 0 ERROR no log. Follow-up importante (pré-existente): outras
+exceções no sync de NC ainda viram 500 para o push inteiro — ver `pending-features.md`.
+
+---
+
+### MOBILE-TEST-2 — testes unitários do outbox/sync (BF-007) — 2026-09-30 — commitado em `1a92e14`
 
 Candidato F (parte 2). Nova suíte `mobile/__tests__/sync-service.test.ts` (14 testes) cobrindo
 `sync-service.ts` + `local-db.ts` sobre os mocks do `jest.setup.js`. Sem alteração de código de

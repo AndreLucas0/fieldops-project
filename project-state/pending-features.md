@@ -544,14 +544,53 @@ Validation:
 Follow-ups (not implemented — out of scope):
 - `NonConformityService.create` accepts a `responseId` from another inspection (snapshotId is
   validated, responseId is not; evidence upload validates both). Pre-existing integrity gap.
-- NC create/update/status have no read-only guard for APPROVED/CANCELED inspections (evidence has
-  RN-049); `updateStatus` has no transition rules (single `OPEN` value today, RN-057).
+- ~~NC create/update/status have no read-only guard for APPROVED/CANCELED inspections (evidence has
+  RN-049); `updateStatus` has no transition rules (single `OPEN` value today, RN-057).~~ — APPROVED
+  **RESOLVIDO** 2026-09-30 (NC-APPROVED-LOCK). Correção: o status de NC aceita mais valores que `OPEN`
+  (os testes usam `IN_PROGRESS`); `updateStatus` segue sem regras de transição.
 - Supervisor scope (RN-005) not implemented — supervisors see everything.
 - `isTechnician` is a deny-list (fails open for a future 4th role); consider a positive
   ADMIN/SUPERVISOR check or a shared helper (duplicated in 2 services + several controllers).
 - 403 (other technician's id) vs 404 (non-existent id) is an existence oracle for UUIDs —
   consistent with the existing pattern; recorded in `decisions.md`.
 - `SynchronizationService.pull` does a full scan + in-memory filter (performance).
+
+---
+
+## NC-APPROVED-LOCK — Non-conformities read-only on approved inspections (RN-082)
+
+Status: DONE (2026-09-30, branch `fix/mobile-inspection-it`, não commitado). Item escolhido pelo
+usuário entre os follow-ups do AUTHZ-BOUNDARY.
+
+Requirement: RN-082 ("inspeção aprovada ficará bloqueada para edição comum"), RN-076. Scope mirrors
+evidence (RN-049 / BF-006): only APPROVED, all roles, 409.
+
+Implementation — `NonConformityService.checkWritable()` → 409
+`NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION` in `create(id, …)`, `update(id, req)` and
+`updateStatus` (HTTP + sync paths); reads unchanged; ownership 403 still first. The two sync-called
+methods use `@Transactional(noRollbackFor = ResourceConflictException.class)` (same as BF-002): the
+first GREEN attempt without it made sync push return 500 (rollback-only on `processOne`).
+
+Validation:
+- RED: 3 HTTP writes + 1 sync create accepted on APPROVED (201/200/APPLIED).
+- GREEN: `NonConformityControllerIT` 18/18 (+4), `SyncPushControllerIT` 14/14 (+2 incl. update path,
+  REJECTED recorded in `sync_operations`), `AuthorizationBoundaryIT` 11/11.
+- Full-suite side effect fixed: the new sync tests changed JUnit method order and the last
+  `SyncPushControllerIT` test left `sync_operations` rows → 62 errors in template/user ITs
+  (FK `sync_operations_user_id_fkey`). `SyncPushControllerIT` now cleans in `@AfterEach` too (ITORDER-001).
+- ECC java-reviewer: approve, 0 CRITICAL/HIGH; comment guarding `checkWritable` order + sync update
+  test added.
+
+Follow-ups (not implemented):
+- **Pre-existing (MEDIUM/HIGH, java-reviewer):** other exceptions inside the sync-called NC methods
+  (`ResourceNotFoundException` for snapshot/response/user, `BusinessRuleViolationException` from
+  RN-055 validator, possibly `OptimisticLockingFailureException`) still mark `processOne`
+  rollback-only → one bad NC operation turns the whole `/mobile/sync/push` into 500. Needs RED tests
+  (CRITICAL NC without evidence; unknown snapshotId) and a robust fix (`noRollbackFor` for all
+  domain exceptions or programmatic transaction in `processOne`).
+- SUBMITTED/UNDER_REVIEW/CANCELED keep NCs editable (consistent with evidence) — product decision
+  if they should lock too (BF-002 locked responses in SUBMITTED/UNDER_REVIEW per RN-043).
+- 403-before-409 ordering for a non-owner technician on an approved inspection is not asserted.
 
 ---
 

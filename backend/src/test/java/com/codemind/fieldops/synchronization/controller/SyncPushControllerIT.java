@@ -39,6 +39,7 @@ import com.codemind.fieldops.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -95,17 +96,7 @@ class SyncPushControllerIT {
 
     @BeforeEach
     void setUp() {
-        syncOperationRepository.deleteAll();
-        auditEventRepository.deleteAll();
-        nonConformityRepository.deleteAll();
-        inspectionResponseRepository.deleteAll();
-        itemSnapshotRepository.deleteAll();
-        inspectionRepository.deleteAll();
-        templateVersionRepository.deleteAll();
-        templateRepository.deleteAll();
-        siteRepository.deleteAll();
-        clientRepository.deleteAll();
-        userRepository.deleteAll();
+        cleanDatabase();
 
         User adminUser = userRepository.save(newUser("Admin", "admin.sync@fieldops.local", UserRole.ADMIN));
         technicianUser = userRepository.save(newUser("Technician", "tech.sync@fieldops.local", UserRole.TECHNICIAN));
@@ -184,6 +175,27 @@ class SyncPushControllerIT {
             .role(role)
             .status(UserStatus.ACTIVE)
             .build();
+    }
+
+    // sync_operations rows reference users: leaving them behind breaks the user cleanup of the
+    // IT classes that run next (ITORDER-001).
+    @AfterEach
+    void tearDown() {
+        cleanDatabase();
+    }
+
+    private void cleanDatabase() {
+        syncOperationRepository.deleteAll();
+        auditEventRepository.deleteAll();
+        nonConformityRepository.deleteAll();
+        inspectionResponseRepository.deleteAll();
+        itemSnapshotRepository.deleteAll();
+        inspectionRepository.deleteAll();
+        templateVersionRepository.deleteAll();
+        templateRepository.deleteAll();
+        siteRepository.deleteAll();
+        clientRepository.deleteAll();
+        userRepository.deleteAll();
     }
 
     private String mintAccessToken(User user) {
@@ -491,6 +503,81 @@ class SyncPushControllerIT {
             .hasStatusOk()
             .bodyJson()
             .extractingPath("$.results[0].status").asString().isEqualTo("REJECTED");
+    }
+
+    @Test
+    @DisplayName("RN-082 - sync não registra não conformidade em inspeção aprovada")
+    void syncNonConformityOnApprovedInspectionIsRejected() {
+        Inspection approvedInspection = inspectionRepository.save(Inspection.builder()
+            .templateVersion(activeTemplateVersion)
+            .client(testClient)
+            .site(testSite)
+            .technician(technicianUser)
+            .createdBy(technicianUser)
+            .priority(InspectionPriority.MEDIUM)
+            .status(InspectionStatus.APPROVED)
+            .scheduledFor(Instant.now().plusSeconds(3600))
+            .startedAtServer(Instant.now())
+            .build());
+        String payload = pushPayload(UUID.randomUUID().toString(), "NON_CONFORMITY", UUID.randomUUID().toString(),
+            "UPSERT", "null", """
+            {"inspectionId": "%s", "title": "Late NC", "description": "x", "severity": "LOW"}"""
+                .formatted(approvedInspection.getId()));
+
+        assertThat(mvc.post().uri("/mobile/sync/push")
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .satisfies(json -> {
+                assertThat(json).extractingPath("$.results[0].status").asString().isEqualTo("REJECTED");
+                assertThat(json).extractingPath("$.results[0].error.code").asString()
+                    .isEqualTo("NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION");
+            });
+        assertThat(nonConformityRepository.findByInspectionId(approvedInspection.getId())).isEmpty();
+        // The rejection itself is recorded: the conflict did not mark the operation's transaction rollback-only.
+        assertThat(syncOperationRepository.findAll())
+            .anySatisfy(op -> assertThat(op.getErrorCode()).isEqualTo("NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION"));
+    }
+
+    @Test
+    @DisplayName("RN-082 - sync não altera não conformidade de inspeção aprovada")
+    void syncNonConformityUpdateOnApprovedInspectionIsRejected() {
+        Inspection approvedInspection = inspectionRepository.save(Inspection.builder()
+            .templateVersion(activeTemplateVersion)
+            .client(testClient)
+            .site(testSite)
+            .technician(technicianUser)
+            .createdBy(technicianUser)
+            .priority(InspectionPriority.MEDIUM)
+            .status(InspectionStatus.APPROVED)
+            .scheduledFor(Instant.now().plusSeconds(3600))
+            .startedAtServer(Instant.now())
+            .build());
+        NonConformity existing = nonConformityRepository.save(NonConformity.builder()
+            .id(UUID.randomUUID())
+            .inspection(approvedInspection)
+            .reportedBy(technicianUser)
+            .title("Approved NC")
+            .description("Registered before approval")
+            .severity(NonConformitySeverity.LOW)
+            .status(NonConformityStatus.OPEN)
+            .build());
+        String payload = pushPayload(UUID.randomUUID().toString(), "NON_CONFORMITY", existing.getId().toString(),
+            "UPSERT", "null", """
+            {"inspectionId": "%s", "title": "Edited late", "description": "x", "severity": "LOW"}"""
+                .formatted(approvedInspection.getId()));
+
+        assertThat(mvc.post().uri("/mobile/sync/push")
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(payload))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.results[0].error.code").asString()
+            .isEqualTo("NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION");
+        assertThat(nonConformityRepository.findById(existing.getId()).orElseThrow().getTitle()).isEqualTo("Approved NC");
     }
 
     // ---- Persist conformity via sync (BF-003, modelo-de-dados.md §10.8.4) ----

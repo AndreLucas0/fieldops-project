@@ -557,6 +557,48 @@ Follow-ups (not implemented — out of scope):
 
 ---
 
+## SYNC-ROBUST — one failing sync operation no longer fails the whole push (RN-070)
+
+Status: DONE (2026-09-30, branch `fix/mobile-inspection-it`, não commitado). Item escolhido pelo
+usuário (follow-up pré-existente do NC-APPROVED-LOCK).
+
+Requirement: RN-070 ("falha em uma operação não deverá apagar outras operações pendentes"),
+RN-067/068 (idempotência por operação).
+
+Root cause: `processOne` (REQUIRES_NEW) called domain services that join its transaction; any domain
+exception crossing their `@Transactional` proxy marked it rollback-only, so after `apply()` mapped the
+exception to REJECTED the commit threw `UnexpectedRollbackException` → HTTP 500 for the whole push and
+the rejection was never recorded (client retried forever).
+
+Fix (`SynchronizationService`):
+- `processOne` is no longer transactional: idempotency lookup, then `self.applyAndRecord(...)`
+  (REQUIRES_NEW — domain change **and** `sync_operations` record commit atomically).
+- Domain exception → that transaction rolls back entirely (no partial writes) and
+  `self.recordOutcome(...)` (REQUIRES_NEW) persists REJECTED/CONFLICT.
+- `DataIntegrityViolationException` (e.g. same operation pushed concurrently) → returns the existing
+  record when present, otherwise REJECTED `SYNC_DATA_INTEGRITY_VIOLATION`.
+- `push()` no longer opens a read-only transaction → at most one pooled connection per push at a time
+  (before: 2, and 3 with the first draft of this fix — pool-exhaustion risk flagged by review).
+- `Outcome` record made public (it is in the public, proxied method signatures).
+- Removed the now-redundant `noRollbackFor` added to `NonConformityService` in NC-APPROVED-LOCK.
+- Unit tests `ConflictDetectionTest`/`IdempotencyTest`: `self` was `null`; now a mock delegating the
+  per-operation methods to the real instance (stand-in for the Spring proxy).
+
+Validation:
+- RED: 2 new `SyncPushControllerIT` tests → 500 `UnexpectedRollbackException` (batch [valid start +
+  NC with unknown snapshot]; NC update to CRITICAL without evidence (RN-055) + idempotent replay).
+- GREEN: `SyncPushControllerIT` 16/16 (both REJECTED with code, valid op APPLIED, rejection recorded,
+  replay returns the same REJECTED), `SyncPullControllerIT` 7/7, unit 50/50.
+- ECC java-reviewer: first draft had a HIGH (apply and record no longer atomic) + MEDIUM (3 connections
+  per push) — both fixed by the restructure above.
+
+Follow-ups (not implemented):
+- `InspectionExecutionService.upsertResponse` keeps `noRollbackFor = ResourceConflictException`
+  (BF-002) and a comment saying sync joins its transaction — now redundant/misleading; harmless.
+- No IT for concurrent pushes of the same operationId, nor for OptimisticLock → CONFLICT at commit.
+
+---
+
 ## NC-APPROVED-LOCK — Non-conformities read-only on approved inspections (RN-082)
 
 Status: DONE (2026-09-30, branch `fix/mobile-inspection-it`, não commitado). Item escolhido pelo
@@ -567,9 +609,9 @@ evidence (RN-049 / BF-006): only APPROVED, all roles, 409.
 
 Implementation — `NonConformityService.checkWritable()` → 409
 `NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION` in `create(id, …)`, `update(id, req)` and
-`updateStatus` (HTTP + sync paths); reads unchanged; ownership 403 still first. The two sync-called
+`updateStatus` (HTTP + sync paths); reads unchanged; ownership 403 still first. ~~The two sync-called
 methods use `@Transactional(noRollbackFor = ResourceConflictException.class)` (same as BF-002): the
-first GREEN attempt without it made sync push return 500 (rollback-only on `processOne`).
+first GREEN attempt without it made sync push return 500 (rollback-only on `processOne`).~~ SUPERSEDED by SYNC-ROBUST (noRollbackFor removed; sync owns its transactions).
 
 Validation:
 - RED: 3 HTTP writes + 1 sync create accepted on APPROVED (201/200/APPLIED).
@@ -582,7 +624,7 @@ Validation:
   test added.
 
 Follow-ups (not implemented):
-- **Pre-existing (MEDIUM/HIGH, java-reviewer):** other exceptions inside the sync-called NC methods
+- **RESOLVIDO 2026-09-30 (SYNC-ROBUST, ver acima)** — ~~Pre-existing (MEDIUM/HIGH, java-reviewer):~~ other exceptions inside the sync-called NC methods
   (`ResourceNotFoundException` for snapshot/response/user, `BusinessRuleViolationException` from
   RN-055 validator, possibly `OptimisticLockingFailureException`) still mark `processOne`
   rollback-only → one bad NC operation turns the whole `/mobile/sync/push` into 500. Needs RED tests

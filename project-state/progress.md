@@ -48,7 +48,19 @@ Pre-req fixes: `FlywayMigrationIT` version assertion + `TemplateItemRequest` boo
 7/7 IT tests GREEN. Section/item builder ainda **BLOQUEADO** — decisão de produto pendente
 sobre armazenamento de seções draft (ver `decisions.md` 2026-09-27).
 
-### NC-APPROVED-LOCK — não conformidade somente leitura em inspeção aprovada (RN-082) — 2026-09-30, branch `fix/mobile-inspection-it`, não commitado
+### SYNC-ROBUST — uma operação ruim não derruba mais o sync push (RN-070) — 2026-09-30, branch `fix/mobile-inspection-it`, não commitado
+
+Escolhido pelo usuário. Exceções de domínio dentro do processamento de uma operação marcavam a
+transação como rollback-only e o push inteiro virava 500, sem registrar a rejeição. Reestruturado
+em `SynchronizationService`: aplicação + registro atômicos numa transação própria; falha → rollback
+total + registro do REJECTED/CONFLICT em outra transação; `push()` sem transação (1 conexão por vez).
+RED 2 (500) → GREEN; SyncPush 16/16, SyncPull 7/7, unit 50/50. Review Java pegou um HIGH no primeiro
+desenho (aplicação e registro não atômicos) — corrigido. Decisão em `decisions.md`. Regressão final: 50/50 + 292/292, BUILD SUCCESS. HTTP real: lote [início válido + NC com snapshot inexistente] → 200 APPLIED | REJECTED SNAPSHOT_NOT_FOUND (inspeção IN_PROGRESS); NC → CRITICAL sem evidência → REJECTED, reenvio idêntico; 3 registros em sync_operations; 0 ERROR no log. Regressão
+completa e HTTP real: ver relatório.
+
+---
+
+### NC-APPROVED-LOCK — não conformidade somente leitura em inspeção aprovada (RN-082) — 2026-09-30 — commitado em `1a6c450`
 
 Lista A–F esgotada (E bloqueado); análise apresentada e o usuário escolheu este item. Criar,
 alterar e mudar status de NC em inspeção APPROVED → 409 `NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION`

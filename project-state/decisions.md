@@ -165,6 +165,36 @@ reintroduce FK failures in `SiteControllerIT.setUp()`.
 
 ---
 
+### [2026-09-30] — Sync push: per-operation transactions owned by the sync service (RN-070)
+
+Context:
+Domain services called from `processOne` joined its transaction; any domain exception marked it
+rollback-only and the whole `/mobile/sync/push` returned 500 (`UnexpectedRollbackException`).
+BF-002 and NC-APPROVED-LOCK had patched individual service methods with `noRollbackFor`.
+
+Decision:
+The sync service owns the transaction boundaries: `processOne` is non-transactional;
+`applyAndRecord` (REQUIRES_NEW) commits the domain change together with its `sync_operations` record;
+on a domain exception that transaction rolls back fully and `recordOutcome` (REQUIRES_NEW) records
+the REJECTED/CONFLICT outcome. `push()` is non-transactional (one connection at a time).
+
+Reason:
+Atomicity of change + idempotency record (RN-067/068), no partial writes on failure, failure isolation
+per operation (RN-070), and no need for `noRollbackFor` on every domain method.
+
+Alternatives considered:
+`noRollbackFor` on every sync-called domain method — rejected (scattered, commits partial writes).
+Inner REQUIRES_NEW only for the domain change, record in `processOne`'s tx — rejected after review:
+change and record were no longer atomic, and a push held up to 3 connections.
+
+Impact:
+New domain services called by sync need no transaction tweaks. `Outcome` is a public nested record.
+
+Status:
+ACTIVE
+
+---
+
 ### [2026-09-30] — Mobile Jest: `lucide-react-native` mapped to its CJS build
 
 Context:

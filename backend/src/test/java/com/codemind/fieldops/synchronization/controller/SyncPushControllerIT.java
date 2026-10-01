@@ -18,6 +18,7 @@ import com.codemind.fieldops.nonconformity.domain.NonConformity;
 import com.codemind.fieldops.nonconformity.domain.NonConformitySeverity;
 import com.codemind.fieldops.nonconformity.domain.NonConformityStatus;
 import com.codemind.fieldops.nonconformity.repository.NonConformityRepository;
+import com.codemind.fieldops.synchronization.domain.SyncOperationStatus;
 import com.codemind.fieldops.shared.audit.AuditEventRepository;
 import com.codemind.fieldops.shared.security.JwtClaims;
 import com.codemind.fieldops.site.domain.InspectionSite;
@@ -578,6 +579,83 @@ class SyncPushControllerIT {
             .extractingPath("$.results[0].error.code").asString()
             .isEqualTo("NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION");
         assertThat(nonConformityRepository.findById(existing.getId()).orElseThrow().getTitle()).isEqualTo("Approved NC");
+    }
+
+    // ---- RN-070: a failing operation never breaks the batch ----
+
+    @Test
+    @DisplayName("RN-070 - operação rejeitada no domínio não derruba o lote e as demais são aplicadas")
+    void domainErrorInOneOperationDoesNotFailTheWholePush() {
+        String startOperation = UUID.randomUUID().toString();
+        String badNcOperation = UUID.randomUUID().toString();
+        String body = """
+            {
+              "deviceId": "%s",
+              "operations": [
+                {"operationId": "%s", "entityType": "INSPECTION", "entityId": "%s", "operationType": "UPSERT",
+                 "baseVersion": null, "payload": {"status": "IN_PROGRESS", "startedAtDevice": "2026-08-26T10:00:00Z"}},
+                {"operationId": "%s", "entityType": "NON_CONFORMITY", "entityId": "%s", "operationType": "UPSERT",
+                 "baseVersion": null,
+                 "payload": {"inspectionId": "%s", "title": "NC", "description": "x", "severity": "LOW",
+                             "snapshotId": "%s"}}
+              ]
+            }""".formatted(UUID.randomUUID(), startOperation, draftInspection.getId(), badNcOperation,
+            UUID.randomUUID(), draftInspection.getId(), UUID.randomUUID());
+
+        assertThat(mvc.post().uri("/mobile/sync/push")
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body))
+            .hasStatusOk()
+            .bodyJson()
+            .satisfies(json -> {
+                assertThat(json).extractingPath("$.results[0].status").asString().isEqualTo("APPLIED");
+                assertThat(json).extractingPath("$.results[1].status").asString().isEqualTo("REJECTED");
+                assertThat(json).extractingPath("$.results[1].error.code").asString().isEqualTo("SNAPSHOT_NOT_FOUND");
+            });
+        assertThat(inspectionRepository.findById(draftInspection.getId()).orElseThrow().getStatus())
+            .isEqualTo(InspectionStatus.IN_PROGRESS);
+        assertThat(nonConformityRepository.findByInspectionId(draftInspection.getId())).isEmpty();
+        assertThat(syncOperationRepository.findById(UUID.fromString(badNcOperation)).orElseThrow().getStatus())
+            .isEqualTo(SyncOperationStatus.REJECTED);
+        assertThat(syncOperationRepository.findById(UUID.fromString(startOperation)).orElseThrow().getStatus())
+            .isEqualTo(SyncOperationStatus.APPLIED);
+    }
+
+    @Test
+    @DisplayName("RN-070, RN-068 - rejeição de domínio é registrada e o reenvio devolve o mesmo resultado")
+    void domainRejectionIsRecordedAndReplayedIdempotently() {
+        NonConformity existing = nonConformityRepository.save(NonConformity.builder()
+            .id(UUID.randomUUID())
+            .inspection(draftInspection)
+            .reportedBy(technicianUser)
+            .title("Low NC")
+            .description("Registered without evidence")
+            .severity(NonConformitySeverity.LOW)
+            .status(NonConformityStatus.OPEN)
+            .build());
+        String operationId = UUID.randomUUID().toString();
+        // RN-055: escalating to CRITICAL without evidence is a business-rule violation
+        String payload = pushPayload(operationId, "NON_CONFORMITY", existing.getId().toString(), "UPSERT", "null",
+            """
+            {"inspectionId": "%s", "title": "Now critical", "description": "x", "severity": "CRITICAL"}"""
+                .formatted(draftInspection.getId()));
+
+        for (int attempt = 0; attempt < 2; attempt++) {
+            assertThat(mvc.post().uri("/mobile/sync/push")
+                .header("Authorization", bearer(technicianToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+                .hasStatusOk()
+                .bodyJson()
+                .satisfies(json -> {
+                    assertThat(json).extractingPath("$.results[0].status").asString().isEqualTo("REJECTED");
+                    assertThat(json).extractingPath("$.results[0].error.code").asString()
+                        .isEqualTo("NON_CONFORMITY_CRITICAL_REQUIRES_EVIDENCE");
+                });
+        }
+        assertThat(syncOperationRepository.findById(UUID.fromString(operationId))).isPresent();
+        assertThat(nonConformityRepository.findById(existing.getId()).orElseThrow().getTitle()).isEqualTo("Low NC");
     }
 
     // ---- Persist conformity via sync (BF-003, modelo-de-dados.md §10.8.4) ----

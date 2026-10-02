@@ -8,6 +8,18 @@
 
 Status: **ACTIVE** (not superseded)
 
+> **Related audit (2026-10-02):** `docs/auditoria-frontend-backend.md` re-inventoried the backend
+> against `main` @ `7a11db9` from the Frontend ↔ Backend contract angle (web + mobile screens).
+> Several items below have since landed (BF-001..007, PEND-04/05/15, NESTED-NAV; see
+> `progress.md`). That report records new findings not covered here. Highlights:
+> - authorization looser than the documented matrix (D1–D5);
+> - `PUT /inspections/{id}` has no state guard (D7);
+> - `POST /inspections` lacks site/client/equipment consistency checks (D9);
+> - mobile DTO gaps (`valueChoice`, RN-038/039 flags; F8/F9);
+> - the full catalogue of error `code` values.
+>
+> Use it for the current integration picture. This file stays the backend-only audit of record.
+
 ## Summary
 
 **44 features analyzed:**

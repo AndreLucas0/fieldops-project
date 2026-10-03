@@ -1,10 +1,47 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-01 (BASEVERSION-STALENESS)
+Last updated: 2026-10-02 (FE-BE-AUDIT — auditoria de contrato Frontend ↔ Backend)
 
 ## Current State
 
 Backend audit completed (2026-09-22, see `project-state/backend-audit.md`).
+Frontend ↔ Backend contract + screen audit completed (2026-10-02, see `docs/auditoria-frontend-backend.md`).
+
+### FE-BE-AUDIT — Auditoria de contrato Frontend ↔ Backend + mapa de telas — 2026-10-02, branch `task/audit-frontend-backend-contract`
+
+Auditoria somente leitura sobre `main` @ `7a11db9`. Relatório persistido em
+`docs/auditoria-frontend-backend.md` (status ATIVO), a pedido do usuário.
+
+- Implementado: só documentação — o relatório e estas entradas em `project-state/`.
+  Nenhum código, teste, migration ou `docs/` normativo foi alterado.
+- Método: backend lido diretamente (16 controllers, DTOs, enums, `GlobalExceptionHandler`,
+  segurança, serviços). Web auditado pelo `ecc:typescript-reviewer` e mobile pelo
+  `ecc:react-reviewer`, ambos em modo read-only. Os achados cruzados críticos foram
+  conferidos manualmente.
+- Principais resultados:
+  - Backend com 73 operações; o `openapi.yaml` tem 72 (`responses:batch` não existe;
+    `active-version` e `GET /inspections/{id}/non-conformities` não estão documentados).
+  - Web: 1 tela completa, 3 parciais e 19 faltantes de 23.
+  - Mobile: 1 tela completa, 11 parciais e 2 faltantes de 14 (FE-M04, FE-M14).
+  - 16 divergências Front↔Back (F1–F16) e 26 divergências doc↔código (D1–D26).
+- Achados de maior impacto (todos por leitura de código, nenhum executado contra o backend real):
+  - F1/F2: o construtor de modelos web envia payloads que o backend recusa com 400.
+  - F6: o código de erro do login quebra a mensagem no mobile.
+  - F7: o técnico recebe 403 em `/clients|sites|equipment/{id}`.
+  - F8/F9: `valueChoice` e as flags RN-038/039 não chegam ao detalhe mobile.
+  - F10: o vínculo da NC com o item se perde.
+  - D2–D5: autorização mais permissiva que a matriz documentada.
+  - D7: `PUT /inspections/{id}` sem trava de estado.
+  - D9: `POST /inspections` não valida local/cliente/equipamento.
+- Não executado: testes, build, typecheck e HTTP real (auditoria só de leitura).
+  As contagens de testes web (~189) e mobile (~300) vêm de grep.
+- Limitações de ambiente: nenhuma nova. Sem proxy/CORS, a web não alcança o backend real em
+  `ng serve` (F16, NÃO CONFIRMADO em execução).
+- Próximo passo recomendado: as decisões listadas no §23.1 do relatório (matriz de roles,
+  contrato de sync, nomes para o técnico, NC CRITICAL, `itemsToCorrect`, prefixo
+  `/templates`), depois as correções baratas F1/F2, F6, F13, F14 e F15.
+
+---
 
 Todos os itens críticos do audit (BF-001 a BF-006) estão implementados e commitados.
 A branch `feat/BF-001` está 6 commits à frente de `main` (BF-002 a BF-005 + BF-001 —

@@ -61,14 +61,27 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
   for (let offset = 0; offset < pending.length; offset += SYNC_BATCH_SIZE) {
     const batch = pending.slice(offset, offset + SYNC_BATCH_SIZE);
 
-    const operations: SyncOperationRequest[] = batch.map((row) => ({
-      operationId: row.id,
-      entityType: row.entity_type,
-      entityId: row.entity_id,
-      operationType: row.operation_type,
-      baseVersion: row.base_version ?? null,
-      payload: JSON.parse(row.payload) as Record<string, unknown>,
-    }));
+    const operations: SyncOperationRequest[] = [];
+    for (const row of batch) {
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(row.payload) as Record<string, unknown>;
+      } catch {
+        await incrementErrorCount(row.id);
+        failed += 1;
+        continue;
+      }
+      operations.push({
+        operationId: row.id,
+        entityType: row.entity_type,
+        entityId: row.entity_id,
+        operationType: row.operation_type,
+        baseVersion: row.base_version ?? null,
+        payload: parsed,
+      });
+    }
+
+    if (operations.length === 0) continue;
 
     let response: SyncPushResponse;
     try {
@@ -78,10 +91,18 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
         operations,
       });
     } catch {
-      for (const row of batch) {
-        await incrementErrorCount(row.id);
+      for (const op of operations) {
+        await incrementErrorCount(op.operationId);
       }
-      failed += batch.length;
+      failed += operations.length;
+      continue;
+    }
+
+    if (!Array.isArray(response.results)) {
+      for (const op of operations) {
+        await incrementErrorCount(op.operationId);
+      }
+      failed += operations.length;
       continue;
     }
 
@@ -91,6 +112,14 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
         syncedIds.push(result.operationId);
       } else {
         await incrementErrorCount(result.operationId);
+        failed += 1;
+      }
+    }
+
+    const respondedIds = new Set(response.results.map((r) => r.operationId));
+    for (const op of operations) {
+      if (!respondedIds.has(op.operationId)) {
+        await incrementErrorCount(op.operationId);
         failed += 1;
       }
     }

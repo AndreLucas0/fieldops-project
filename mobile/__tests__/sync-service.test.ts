@@ -214,6 +214,56 @@ describe('BF-007 — sync-service + outbox', () => {
     expect(post).not.toHaveBeenCalled();
   });
 
+  describe('SYNC-RESILIENCE — RN-070: isolamento de falhas por entrada', () => {
+    it('entrada com payload corrompido incrementa error_count e não bloqueia entradas válidas', async () => {
+      await upsertOutboxEntry({
+        id: 'op-corrupt',
+        inspectionId: INSPECTION_A,
+        entityType: 'INSPECTION_RESPONSE',
+        entityId: 'item-op-corrupt',
+        operationType: 'UPSERT',
+        baseVersion: 0,
+        payload: '{not valid json',
+      });
+      await addEntry('op-valid-1');
+      await addEntry('op-valid-2');
+      const { client } = fakeClient(allWith('APPLIED'));
+
+      const result = await syncPending(client);
+
+      expect(outboxRow('op-corrupt')).toMatchObject({ synced: 0, error_count: 1 });
+      expect(outboxRow('op-valid-1')).toMatchObject({ synced: 1, error_count: 0 });
+      expect(outboxRow('op-valid-2')).toMatchObject({ synced: 1, error_count: 0 });
+      expect(result).toEqual({ synced: 2, failed: 1 });
+    });
+
+    it('resposta do servidor sem campo results trata o lote todo como falha', async () => {
+      await addEntry('op-a');
+      await addEntry('op-b');
+      const { client } = fakeClient(() => ({}));
+
+      const result = await syncPending(client);
+
+      expect(outboxRow('op-a')).toMatchObject({ synced: 0, error_count: 1 });
+      expect(outboxRow('op-b')).toMatchObject({ synced: 0, error_count: 1 });
+      expect(result).toEqual({ synced: 0, failed: 2 });
+    });
+
+    it('operação omitida pelo servidor incrementa error_count e conta como falha', async () => {
+      await addEntry('op-present');
+      await addEntry('op-missing');
+      const { client } = fakeClient(() => ({
+        results: [{ operationId: 'op-present', status: 'APPLIED' }],
+      }));
+
+      const result = await syncPending(client);
+
+      expect(outboxRow('op-present')).toMatchObject({ synced: 1, error_count: 0 });
+      expect(outboxRow('op-missing')).toMatchObject({ synced: 0, error_count: 1 });
+      expect(result).toEqual({ synced: 1, failed: 1 });
+    });
+  });
+
   describe('isOnline', () => {
     it('só considera online quando a internet está alcançável', async () => {
       jest.mocked(Network.getNetworkStateAsync).mockResolvedValueOnce({

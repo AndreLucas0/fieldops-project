@@ -398,20 +398,21 @@ Follow-ups (not implemented — outside BF-007 validation scope):
   primeira — sem mudança de comportamento); sensibilidade comprovada por mutação (4/4 mutantes
   detectados). Mobile 25/25 suítes, 316/316; typecheck/lint OK. Limite: o mock SQLite reproduz o SQL por regex, então a SQL real de `local-db.ts` (WHERE/ORDER BY) não é verificada. `use-sync.ts` (hook AppState) segue
   sem teste direto.
-- `sync-service.ts` (achados do ECC typescript-reviewer, MOBILE-TEST-2 — não implementados):
+- ~~`sync-service.ts` (achados do ECC typescript-reviewer, MOBILE-TEST-2 — não implementados):
   (a) operação omitida pelo servidor em `results` fica pendente sem `error_count` nem contagem em
   `failed`; resultado com `operationId` desconhecido é aplicado mesmo assim; (b) `JSON.parse` de um
   payload corrompido ou `results` ausente rejeitam `syncPending` inteiro fora do `try` — uma entrada
-  "envenenada" bloqueia todas as sincronizações seguintes.
-- **SUSPEITA (confirmada por leitura, não reproduzida ponta a ponta)** — `use-checklist.ts` envia
-  `baseVersion: known?.version ?? 0`, mas `responses`/`versionsRef` só são preenchidos a partir do
-  detalhe da inspeção (nunca atualizados após um sync). O backend devolve CONFLICT quando
-  `baseVersion != existing.version` (`SynchronizationService.applyInspectionResponse`). Assim, a
-  3ª edição do mesmo item na mesma sessão (versões 0 → 1 no servidor, cliente ainda envia 0) deve
-  ficar presa no outbox como CONFLICT, contando `error_count` a cada tentativa — perda silenciosa da
-  edição. Precisa de teste de reprodução (mobile + backend) e decisão de correção (atualizar a versão
-  conhecida a partir do resultado do push, ou enviar `baseVersion` null para respostas
-  last-write-wins). Não implementado.
+  "envenenada" bloqueia todas as sincronizações seguintes.~~ **RESOLVIDO 2026-10-01 (SYNC-RESILIENCE,
+  ver abaixo).**
+- `incrementErrorCount` chamado individualmente por entrada (await sequencial) em vez de batch
+  atômico — pré-existente, identificado pelo ECC typescript-reviewer durante SYNC-RESILIENCE.
+  Requer `bulkIncrementErrorCount(ids: string[])` em `local-db.ts`. Gap de observabilidade (não
+  de dados): entradas ficam `synced = 0` independentemente do partial-increment. Deferred.
+- ~~**SUSPEITA — `use-checklist.ts` enviava `baseVersion` obsoleto na 2ª edição do mesmo item.**~~
+  **RESOLVIDO** 2026-10-01 (BASEVERSION-STALENESS, não commitado): `versionsRef` agora armazena
+  apenas `Map<Uuid, number>` (versões) e é incrementado via re-leitura atômica após cada
+  `upsertOutboxEntry` bem-sucedido; corrida de escritas concorrentes também corrigida.
+  4 novos testes em `mobile/__tests__/use-checklist.test.ts`; 323/323 GREEN.
 - `npx expo install --check` still flags patch updates unrelated to BF-007:
   `expo-splash-screen ~57.0.9`, `react-native 0.86.3`, `eslint-config-expo ~57.0.2`, `jest-expo ~57.0.5`.
 
@@ -633,6 +634,52 @@ Follow-ups (not implemented):
 - SUBMITTED/UNDER_REVIEW/CANCELED keep NCs editable (consistent with evidence) — product decision
   if they should lock too (BF-002 locked responses in SUBMITTED/UNDER_REVIEW per RN-043).
 - 403-before-409 ordering for a non-owner technician on an approved inspection is not asserted.
+
+---
+
+## SYNC-RESILIENCE — Mobile sync resilience (RN-070)
+
+Status: DONE (2026-10-01, não commitado)
+
+Requirement: RN-070 (failure isolation — one bad operation must not fail the whole push).
+Source: BF-007 follow-up items (a) and (b) recorded in MOBILE-TEST-2 section above.
+
+Implementation (`mobile/src/services/sync-service.ts`):
+- **Bug (b) — poisoned entry:** `JSON.parse(row.payload)` was outside the `try` block
+  (line 70 vs try at line 74). Replaced `batch.map()` with a `for` loop; each entry's
+  parse is individually wrapped in try-catch. On SyntaxError: `incrementErrorCount`,
+  `failed += 1`, `continue`. The entry is isolated; valid entries in the same batch proceed.
+- **Guard — `response.results` shape:** Added `if (!Array.isArray(response.results))` guard
+  before iterating the response. If the server returns 200 with a malformed body (no `results`),
+  the whole batch is treated as a network failure (all ops get `error_count + 1`).
+- **Bug (a) — missing operation in results:** After iterating `response.results`, build
+  `respondedIds = new Set(results.map(r => r.operationId))`. For each sent `op` not in
+  `respondedIds`: `incrementErrorCount`, `failed += 1`.
+- Network failure handler: previously iterated `batch` (raw SQLite rows), now iterates
+  `operations` (entries that passed parse). Entries with corrupted payload are already
+  counted before reaching this path.
+
+Tests (`mobile/__tests__/sync-service.test.ts`):
+- 3 new tests in `describe('SYNC-RESILIENCE — RN-070: isolamento de falhas por entrada')`:
+  1. `entrada com payload corrompido incrementa error_count e não bloqueia entradas válidas`
+  2. `resposta do servidor sem campo results trata o lote todo como falha`
+  3. `operação omitida pelo servidor incrementa error_count e conta como falha`
+- All 3: RED confirmed before implementation, GREEN after.
+
+Validation (2026-10-01):
+- `npm test` (sync-service): 17/17 GREEN (14 pre-existing + 3 new)
+- Full mobile suite: 319/319 GREEN, 25 suites (was 318; +1 new test)
+- `tsc --noEmit`: clean
+- ECC typescript-reviewer: no CRITICAL; 2 HIGH surfaced:
+  (1) unsafe `as` cast → resolved inline (the `results` guard above);
+  (2) sequential `incrementErrorCount` → tracked as follow-up (deferred, `local-db.ts` scope).
+
+Follow-ups (not implemented):
+- `bulkIncrementErrorCount(ids: string[])` in `local-db.ts`: atomicity + perf for
+  multi-failure batches. Currently N sequential SQLite UPDATEs; partial-increment possible
+  if process killed mid-loop (gap in `error_count` observability, not in `synced` correctness).
+- ~~`use-checklist.ts` `baseVersion` staleness.~~ **RESOLVIDO** 2026-10-01 (BASEVERSION-STALENESS).
+  `versionsRef` agora incrementa com re-leitura atômica após cada escrita bem-sucedida.
 
 ---
 

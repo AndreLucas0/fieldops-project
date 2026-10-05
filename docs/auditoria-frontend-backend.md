@@ -408,7 +408,7 @@ Modelos: DRAFT → ACTIVE na 1ª publicação. Publicações seguintes criam uma
 
 | Tela | Rota | Status | Observação |
 |---|---|---|---|
-| FE-W01 Login | `/login` | PARCIAL | Sem redirecionamento por perfil. Em modo mock o login não funciona (sem mock de `/auth`). Mensagem de 401 inadequada |
+| FE-W01 Login | `/login` | PARCIAL → **COMPLETA contra a API real (INT-011, §27)** | ~~Sem redirecionamento por perfil~~; ~~Mensagem de 401 inadequada~~. Ainda: em modo mock o login não funciona (sem mock de `/auth`) |
 | FE-W02 Dashboard | `/dashboard` | COMPLETA (dados) | Atalhos para `/inspections` e `/inspections/new` caem no wildcard |
 | FE-W13 Modelos (lista) | `/inspection-templates` | PARCIAL | "Novo modelo" leva a rota inexistente. Sem publicar e sem versões. Filtro sem debounce |
 | FE-W15 Construtor | `/inspection-templates/:id/edit` | PARCIAL | Payloads inválidos para o backend real; `subscribe` sem tratamento de erro; reordenação com 2 PUTs não atômicos; sem publicar; "Ver prévia" é link quebrado |
@@ -553,7 +553,8 @@ Todas foram confirmadas por leitura cruzada de código. Nenhuma foi executada co
 | F13 | Mob | `baseVersion` não avança após push → CONFLICT a partir da 3ª edição do mesmo item (SUSPEITA já registrada em `pending-features` BF-007) | `use-checklist.ts:127-134` |
 | F14 | Mob | `idempotencyKey` regerada a cada retry anula RN-068 | `evidence-upload.ts` |
 | F15 | Mob mock | O mock (padrão ligado) não implementa `/mobile/sync/push`, então a conclusão fica bloqueada em mock | `mock-server.ts` |
-| F16 | Web | Sem proxy e sem CORS: em `ng serve` com `mockApi` o login vai para `/api/v1` no próprio dev server. NÃO CONFIRMADO em execução | `angular.json`, ausência de `CorsConfiguration` |
+| F16 | Web | Sem proxy e sem CORS: em `ng serve` com `mockApi` o login vai para `/api/v1` no próprio dev server. NÃO CONFIRMADO em execução. **→ RESOLVIDO (proxy) em INT-011, 2026-10-05 (§27)** | `angular.json`, ausência de `CorsConfiguration` |
+| F17 | Back → Web | *(achado em INT-011)* `POST /auth/refresh` não devolve `user`; após F5 o store web está vazio e o refresh encerrava a sessão. **→ RESOLVIDO em INT-011** (web busca `GET /auth/me`) | `RefreshTokenResponse` × `auth.service.ts` |
 
 ## 20. Divergências Documentação ↔ Implementação
 
@@ -656,7 +657,7 @@ Já existe `docs/contrato-backend-frontend.md`, que é normativo mas defasado. R
 
 | Tela | Plataforma | Requisito | Status | Endpoints | Principais gaps |
 |---|---|---|---|---|---|
-| FE-W01 Login | Web | UC-01 | PARCIAL | auth/login, refresh | Mock sem `/auth`; sem redirecionamento por perfil; sem proxy |
+| FE-W01 Login | Web | UC-01 | ~~PARCIAL~~ COMPLETA (API real, INT-011) | auth/login, refresh, me | Mock sem `/auth` (pendente) |
 | FE-W02 Dashboard | Web | §3.12 | COMPLETA | dashboard ×3 | Atalhos para rotas inexistentes |
 | FE-W03/04 Usuários | Web | RN-001..008 | FALTANTE | users ×6 | — |
 | FE-W05/06 Clientes | Web | RN-009 | FALTANTE | clients ×5 | — |
@@ -704,3 +705,43 @@ Já existe `docs/contrato-backend-frontend.md`, que é normativo mas defasado. R
 Auditoria de contrato Frontend ↔ Backend concluída.
 Mapeamento de telas concluído.
 Nenhuma alteração foi realizada no projeto durante a auditoria (`git status` limpo na branch `main`). Este arquivo foi criado depois, a pedido do usuário, para persistir o relatório.
+
+---
+
+## 27. Histórico de integração incremental (TDD)
+
+As seções 1–26 são o retrato de 2026-10-02 e ficam como estão. Cada etapa de integração registra aqui o status anterior, o atual e as evidências. Nas tabelas acima, os itens resolvidos estão marcados com a referência para cá.
+
+Diagnóstico de 2026-10-05, sobre `main` @ `3395823`: desde a auditoria só o mobile mudou em código. A F13 está **mitigada**: `use-checklist.ts` incrementa o `baseVersion` localmente após cada escrita, mas ainda não usa o `entityVersion` devolvido pelo push. O plano incremental aprovado é: 1 login web real → 2 shell (toasts + logout) → 3 construtor F1 → 4 construtor F2 → 5 novo modelo + publicar → 6 mobile F6 → 7 lista de inspeções W18 → …
+
+### INT-011: Login web contra a API real (Etapa 1), 2026-10-05
+
+Branch: `task/int-011-web-login-real-backend`.
+
+| Item | Antes | Depois |
+|---|---|---|
+| F16 (proxy/CORS) | Nenhuma tela web alcançava a API em dev | `npm run start:api`: configuração `api` (`environment.api.ts`, `mockApi: false`) + `proxy.conf.json` (`/api/v1` → `localhost:8090`). Sem CORS no backend (decisão em `project-state/decisions.md`). A configuração padrão (`npm start`, mock) não muda |
+| 401 no login | Exibia o `message` cru do backend, em inglês ("Invalid email or password", "User is inactive") | Mensagem única "E-mail ou senha inválidos." para 401/400 (telas-frontend §7.3); mensagem de rede para status 0; "Não foi possível entrar agora…" para os demais |
+| TECHNICIAN no web | Login aceito, `authGuard` negava `/dashboard`, botão preso em "Entrando…", toast invisível | Mensagem "Seu perfil não tem acesso à área administrativa…", sessão local descartada, botão liberado |
+| `guestGuard` + TECHNICIAN | Redirecionava `/login` → `/login` (laço) | Libera a tela de login |
+| Navegação recusada após login | Botão preso | Botão liberado |
+| F17 (novo): F5 | Refresh real sem `user` → `forceLogout` em todo F5 | Quando o refresh não traz `user` e o store está vazio, o web busca `GET /auth/me` (com `skipAuth()` e o token novo explícito) |
+
+**TDD:** 9 testes novos (7 em `login.component.spec`, 1 em `auth.guard.spec`, 2 em `auth.service.spec`; o teste de rede passou de primeira, como caracterização). Todos falharam antes pelo motivo esperado. O teste de 401 existente foi ajustado para o corpo real do backend: antes usava `code: INVALID_CREDENTIALS`, que o backend não emite.
+
+**Validação:**
+- Web: `ng test` 201/201 (antes 192), `ng build` (production) e `ng build -c api` OK, `tsc` app e spec OK.
+- HTTP real (backend no `:8090` sobre Postgres descartável no `:5499`, usuários do `db/seed.sql`), pelo proxy do `ng serve -c api` no `:4200`:
+  - login 200 com `user.role`;
+  - `/dashboard/summary` 200 com token e 401 sem token;
+  - refresh 200 sem `user`;
+  - `/auth/me` com o token renovado 200;
+  - senha errada, conta inativa e e-mail inexistente: todos 401 `UNAUTHORIZED`.
+
+**Não validado:**
+- A UI no navegador: o MCP `chrome-devtools` não conectou nesta sessão. Fica no roteiro de teste manual do relatório da etapa.
+
+**Achados laterais (registrados, não corrigidos):**
+- `db/seed.sql` falha no schema atual (V14): usa `inspection_responses.inspection_item_id`, coluna que não existe mais. Como roda numa transação única, nada é inserido.
+- O refresh token antigo continua aceito após ser renovado (sem detecção de reuso, já citado no §7).
+- `provideMockSession()` existe, mas não é registrado, então o modo mock continua sem login.

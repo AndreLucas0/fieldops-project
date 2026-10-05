@@ -27,6 +27,80 @@ ACTIVE / SUPERSEDED
 
 ---
 
+### [2026-10-05] — INT-011: web em dev fala com a API real via proxy do `ng serve`, não via CORS
+
+Context:
+Sem proxy e sem CORS (F16), nenhuma tela web alcançava o backend em dev. Além disso, o padrão `mockApi: true` não tem mock de `/auth`, então nem o mock era utilizável.
+
+Decision:
+- Nova configuração `api` (build e serve) no `web/angular.json`: `environment.api.ts` com `mockApi: false` e `proxy.conf.json` (`/api/v1` → `http://localhost:8090`).
+- Script `npm run start:api`.
+- `npm start` (mock) não muda.
+
+Reason:
+Não toca o backend nem a segurança. A `apiBaseUrl` relativa já pressupunha um proxy. Quem usa o mock não é afetado.
+
+Alternatives considered:
+- CORS no backend: muda a segurança sem necessidade em dev.
+- Trocar o padrão de `development` para `mockApi: false`: quebraria quem depende do mock.
+
+Impact:
+Integrações web passam a ser validáveis de ponta a ponta com `start:api`. Para produção continua valendo a mesma origem ou um proxy reverso (fora de escopo).
+
+Status:
+ACTIVE
+
+---
+
+### [2026-10-05] — INT-011: login web com mensagem única para 401 e técnico sem área administrativa
+
+Context:
+O backend responde 401 `UNAUTHORIZED` com `message` em inglês e distinto para conta inativa ou bloqueada (D22). O web exibia esse texto cru. TECHNICIAN conseguia logar no web, mas ficava preso: o guard negava, o botão ficava em "Entrando…" e o `guestGuard` entrava em laço.
+
+Decision:
+1. 401 e 400 exibem sempre "E-mail ou senha inválidos." (telas-frontend §7.3; AC-AUTH: não revelar se o e-mail existe).
+2. Status 0 exibe a mensagem de rede, e os demais erros "Não foi possível entrar agora…".
+3. Perfil sem rota administrativa (`defaultRouteFor` → `/login`) recebe uma mensagem explicativa e tem a sessão **local** descartada (`AuthService.clearSession()`, agora público), sem chamar `/auth/logout`.
+4. O `guestGuard` libera `/login` para esse perfil.
+
+Reason:
+Atende FE-W01 ("redireciona por perfil", "mensagem única") sem mudar o backend.
+
+Alternatives considered:
+- Mapear o texto do backend para orientar "conta inativa" (AC-AUTH, cenário inativo): fica para a decisão D22, porque revelaria que o e-mail existe.
+- Chamar `/auth/logout` para o técnico: desnecessário, porque a sessão nunca chegou a ser usada no web e o token expira em 900 s.
+
+Impact:
+A orientação específica para conta inativa continua pendente (D22).
+
+Status:
+ACTIVE
+
+---
+
+### [2026-10-05] — INT-011: identidade após F5 vem de `GET /auth/me` quando o refresh não traz `user`
+
+Context:
+`RefreshTokenResponse` não tem `user`. O web guarda só o refresh token (`sessionStorage`), então após um F5 o store fica vazio e o `refreshToken()` encerrava a sessão. O teste existente mascarava o problema, porque mockava o refresh **com** `user`.
+
+Decision:
+Quando o refresh não traz `user` e o store não tem um, o web chama `GET /auth/me` com `skipAuth()` e `Authorization: Bearer <token novo>` explícito, e guarda só `{id, name, email, role}`.
+
+Reason:
+Usa um contrato que já existe e não amplia o que é persistido em storage (`arquitetura.md` §11.10). O `skipAuth()` evita que um 401 no `/auth/me` reentre na renovação em andamento, o que faria as duas esperarem uma pela outra.
+
+Alternatives considered:
+- Persistir o usuário em `sessionStorage`: mais dado exposto em storage.
+- Incluir `user` no refresh do backend: mudança de contrato sem necessidade.
+
+Impact:
+Uma chamada a mais por F5. Se o backend um dia devolver `user` no refresh, o código já usa esse valor.
+
+Status:
+ACTIVE
+
+---
+
 ### [2026-09-27] — Substituição de MinIO por adobe/s3mock no docker-compose
 
 Context:

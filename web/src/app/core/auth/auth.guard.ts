@@ -108,7 +108,10 @@ export const guestGuard: CanActivateFn = (_route, _state: RouterStateSnapshot) =
   if (!isSessionValid(store.snapshot.session)) {
     return true;
   }
-  return router.createUrlTree([defaultRouteFor(store.snapshot.role)]);
+  // Perfil sem área administrativa (ex.: TECHNICIAN) não tem para onde ir:
+  // redirecionar ao próprio login viraria laço.
+  const target = defaultRouteFor(store.snapshot.role);
+  return target === LOGIN_ROUTE ? true : router.createUrlTree([target]);
 };
 
 /** Primeira rota após o login. ADMIN e SUPERVISOR começam no dashboard. */

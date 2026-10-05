@@ -683,6 +683,19 @@ Follow-ups (not implemented):
 
 ---
 
+## INT-011 — Login web contra a API real (Etapa 1 da integração incremental)
+
+Status: DONE (2026-10-05, branch `task/int-011-web-login-real-backend`)
+
+Detalhes, testes e HTTP real em `progress.md` e em `docs/auditoria-frontend-backend.md` §27. Resolve a F16 (proxy dev) e a F17 (F5 deslogava, porque o refresh não traz `user`).
+
+Follow-ups abertos por esta etapa (não implementados):
+- **SEED-STALE (PENDING):** `db/seed.sql` falha no schema atual (V14). Usa `inspection_responses.inspection_item_id`, que não existe mais. Como roda em transação única, o rollback é total e nenhum usuário é criado. Impede o teste manual "do zero" com o seed completo. Contorno usado em INT-011: aplicar só o bloco de usuários (linhas 44–48 e 81–86).
+- **WEB-MOCK-AUTH (PENDING):** com `npm start` (mock), o login web não funciona. Não há mock de `/auth`, e o `provideMockSession()` existe, mas não é registrado.
+- **D22 (REQUER DECISÃO):** orientação específica para conta inativa no login (AC-AUTH, cenário "usuário inativo") × não revelar a existência do e-mail.
+
+---
+
 ## Other divergences worth tracking (not backend-pending, do not treat as BF items)
 
 These came out of the same audit but are **not** "feature not built" — see

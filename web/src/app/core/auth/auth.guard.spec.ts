@@ -160,4 +160,10 @@ describe('guestGuard', () => {
 
     expect(run()).toEqual(router.createUrlTree(['/dashboard']));
   });
+
+  it('libera o login para perfil sem área administrativa, em vez de redirecionar ao próprio login (laço)', () => {
+    store.setSession(buildSession('TECHNICIAN'));
+
+    expect(run()).toBe(true);
+  });
 });

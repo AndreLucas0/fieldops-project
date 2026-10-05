@@ -1,11 +1,46 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-02 (FE-BE-AUDIT — auditoria de contrato Frontend ↔ Backend)
+Last updated: 2026-10-05 (INT-011 — login web contra a API real, Etapa 1 da integração incremental)
 
 ## Current State
 
 Backend audit completed (2026-09-22, see `project-state/backend-audit.md`).
 Frontend ↔ Backend contract + screen audit completed (2026-10-02, see `docs/auditoria-frontend-backend.md`).
+Integração incremental Frontend ↔ Backend com TDD em andamento. Plano e histórico por etapa em `docs/auditoria-frontend-backend.md` §27.
+
+### INT-011 — Login web contra a API real (Etapa 1) — 2026-10-05, branch `task/int-011-web-login-real-backend`
+
+O plano incremental foi aprovado pelo usuário ("Pode seguir sua recomendações").
+
+- **Implementado:**
+  - `npm run start:api`: configuração `api` com `mockApi: false` e `proxy.conf.json` para `localhost:8090` (resolve a F16 sem CORS).
+  - Login com mensagem única para 401/400, mensagem de rede e mensagem genérica para os demais erros.
+  - TECHNICIAN recebe uma mensagem e tem a sessão local descartada, sem botão preso.
+  - `guestGuard` sem laço para TECHNICIAN.
+  - Botão liberado quando a navegação é recusada.
+  - **F17 (novo):** após F5, a identidade vem de `GET /auth/me`, porque o refresh real não traz `user` e antes todo F5 deslogava.
+- **Não implementado (intencional):**
+  - Orientação específica para conta inativa (D22).
+  - Mock de `/auth` / `provideMockSession` órfão.
+  - Correção do `db/seed.sql`.
+  - Shell, toasts e logout (Etapa 2).
+- **TDD:** 9 testes novos, todos vistos em RED antes. O teste de 401 existente foi ajustado ao corpo real do backend.
+- **Testes:**
+  - Web `ng test` 201/201 (antes 192).
+  - `ng build` production e `-c api` OK.
+  - `tsc` app e spec OK.
+  - Não existe script de lint no `web/package.json`.
+- **HTTP real** (Postgres descartável `:5499` + backend `:8090` + `ng serve -c api` `:4200`, só os usuários do seed):
+  - login, dashboard, 401 sem token, refresh sem `user` e `/auth/me` validados pelo proxy;
+  - 401 `UNAUTHORIZED` para senha errada, conta inativa e e-mail inexistente.
+- **Limitações de ambiente:**
+  - O MCP `chrome-devtools` não conectou, então a UI não foi exercitada no navegador nesta sessão (fica no roteiro manual).
+  - O primeiro `./mvnw package` falhou sem erro reproduzível e o segundo passou (intermitente, não investigado).
+- **Achados laterais:**
+  - `db/seed.sql` incompatível com o schema V14 (ver `pending-features.md` SEED-STALE).
+  - O banco de dev do docker-compose (`:5432`) está na V11, sem usuários.
+  - O refresh token antigo continua aceito após renovado (já registrado na auditoria §7).
+- **Próximo passo:** Etapa 2, shell web (exibição de toasts + logout).
 
 ### FE-BE-AUDIT — Auditoria de contrato Frontend ↔ Backend + mapa de telas — 2026-10-02, branch `task/audit-frontend-backend-contract`
 

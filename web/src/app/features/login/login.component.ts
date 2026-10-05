@@ -6,7 +6,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 
 import { isApiError } from '../../core/models/api-error.model';
-import { AuthService } from '../../core/auth/auth.service';
+import { defaultRouteFor } from '../../core/auth/auth.guard';
+import { AuthService, LOGIN_ROUTE } from '../../core/auth/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -141,17 +142,55 @@ export class LoginComponent {
     const { email, password } = this.form.getRawValue();
 
     this.authService.login({ email, password }).subscribe({
-      next: () => {
+      next: (session) => {
+        // Redirecionamento por perfil (telas-frontend.md FE-W01): quem não tem
+        // área administrativa não fica com sessão aberta numa tela sem destino.
+        const home = defaultRouteFor(session.user.role);
+        if (home === LOGIN_ROUTE) {
+          this.authService.clearSession();
+          this.loading.set(false);
+          this.error.set(NO_ADMIN_ACCESS_MESSAGE);
+          return;
+        }
+
         const returnUrl: string =
-          (this.route.snapshot.queryParams['returnUrl'] as string | undefined) ?? '/dashboard';
-        void this.router.navigate([returnUrl]);
+          (this.route.snapshot.queryParams['returnUrl'] as string | undefined) ?? home;
+        this.router.navigate([returnUrl]).then(
+          (navigated) => {
+            if (!navigated) this.loading.set(false);
+          },
+          () => this.loading.set(false),
+        );
       },
       error: (err: unknown) => {
         this.loading.set(false);
-        this.error.set(
-          isApiError(err) ? err.userMessage : 'E-mail ou senha inválidos.',
-        );
+        this.error.set(loginErrorMessage(err));
       },
     });
+  }
+}
+
+const CREDENTIALS_MESSAGE = 'E-mail ou senha inválidos.';
+const NO_ADMIN_ACCESS_MESSAGE =
+  'Seu perfil não tem acesso à área administrativa. Técnicos devem usar o aplicativo FieldOps.';
+const UNAVAILABLE_MESSAGE = 'Não foi possível entrar agora. Tente novamente em instantes.';
+
+/**
+ * Mensagem do login por tipo de falha. O `401` usa sempre a mesma frase
+ * (telas-frontend.md §7.3, "mensagem única"): a API distingue senha errada de
+ * conta inativa/bloqueada no `message`, em inglês, e uma mensagem distinta para
+ * conta inativa revelaria que o e-mail existe (AC-AUTH). Orientação específica
+ * para inativo depende da decisão D22 (docs/auditoria-frontend-backend.md §20).
+ */
+function loginErrorMessage(err: unknown): string {
+  if (!isApiError(err)) return CREDENTIALS_MESSAGE;
+  switch (err.kind) {
+    case 'UNAUTHORIZED':
+    case 'BAD_REQUEST':
+      return CREDENTIALS_MESSAGE;
+    case 'NETWORK':
+      return err.userMessage;
+    default:
+      return UNAVAILABLE_MESSAGE;
   }
 }

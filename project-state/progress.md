@@ -1,12 +1,52 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-05 (INT-011 — login web contra a API real, Etapa 1 da integração incremental)
+Last updated: 2026-10-13 (Auditoria completa do código + documentação de inventário de telas)
 
 ## Current State
 
-Backend audit completed (2026-09-22, see `project-state/backend-audit.md`).
+Backend audit (2026-09-22): superseded — ver re-auditoria 2026-10-13 em `project-state/backend-audit.md`.
 Frontend ↔ Backend contract + screen audit completed (2026-10-02, see `docs/auditoria-frontend-backend.md`).
-Integração incremental Frontend ↔ Backend com TDD em andamento. Plano e histórico por etapa em `docs/auditoria-frontend-backend.md` §27.
+Auditoria completa do código 2026-10-13 concluída; inventários de telas criados em `project-state/pending-web.md` e `project-state/pending-mobile.md`.
+Integração incremental Frontend ↔ Backend com TDD em andamento.
+
+### AUDITORIA-2026-10-13 — Auditoria completa do código e documentação de inventário de telas
+
+Data: 2026-10-13. Tipo: somente leitura — nenhum código alterado.
+
+Objetivo: garantir que toda a documentação reflita fielmente o estado atual do projeto.
+
+**Implementado:**
+- Instrução passo a passo para rodar o mobile contra a API real via variáveis de ambiente:
+  - `docker compose up -d` (porta 5433 para PostgreSQL conforme `.env`).
+  - Backend: `DB_URL=jdbc:postgresql://localhost:5433/fieldops DB_USER=fieldops DB_PASSWORD=fieldops ./mvnw spring-boot:run -Dspring-boot.run.profiles=local`.
+  - Mobile: `mobile/.env` com `EXPO_PUBLIC_API_MOCK=false` e `EXPO_PUBLIC_API_BASE_URL=http://<IP>:8090/api/v1` (IP da máquina para dispositivo físico; `10.0.2.2` para emulador Android).
+- `project-state/backend-audit.md` atualizado: status SUPERSEDED; seção de re-auditoria 2026-10-13 adicionada com contagem de 16 controllers, V1–V14, ~340 testes, gaps abertos.
+- `project-state/pending-features.md` atualizado: 10 novos itens adicionados (SEED-STALE, CORS-CONFIG, WEB-MOCK-AUTH, D22, D7, D9, SUPERVISOR-SCOPE, WEB-SHELL, WEB-DISPLAYORDER, MOBILE-AUTH-CODE, MOBILE-MOCK-SYNC).
+- `project-state/pending-web.md` criado: inventário de 23 telas web (1 COMPLETA, 3 PARCIAIS, 19 AUSENTES); mapa de 8 serviços HTTP; divergências de contrato F1/F2/F13/F14/F15.
+- `project-state/pending-mobile.md` criado: inventário de 14 telas mobile (1 COMPLETA, 11 PARCIAIS, 2 AUSENTES — FE-M04 e FE-M14); divergências F6/F7/F8/F9/F10/F11; estado dos itens de infra/outbox.
+- `project-state/progress.md` e `project-state/decisions.md` atualizados.
+
+**Não implementado (intencional):**
+- Nenhum código, teste ou migration alterado.
+- Nenhuma decisão de produto tomada (D7, D9, D22, CORS, SUPERVISOR-SCOPE registrados como PENDING).
+
+**Achados de maior impacto:**
+- Mobile: `UNAUTHORIZED` não mapeado em `toAuthFailureCode()` → senha errada mostra mensagem genérica (1 linha para corrigir).
+- Mobile: `POST /mobile/sync/push` ausente do mock → outbox nunca drena em modo mock.
+- Web: `displayOrder` ausente nos payloads do construtor → construtor inutilizável contra API real.
+- Web: shell completamente ausente → 20/23 telas inacessíveis ao usuário.
+- Backend: CORS ausente → web não funciona em produção sem proxy reverso.
+
+**Limitações de ambiente:**
+- Auditoria por leitura de código; nenhuma execução HTTP real feita nesta sessão.
+- Bug DB_PORT=5433 descoberto e documentado (`.env` define `DB_PORT=5433`; docker-compose expõe PostgreSQL na porta 5433 do host, não 5432).
+
+**Próximos passos recomendados:**
+1. `MOBILE-AUTH-CODE` — mapear `UNAUTHORIZED` em `toAuthFailureCode()`: 1 linha, alto impacto.
+2. `MOBILE-MOCK-SYNC` — mock de `POST /mobile/sync/push`: baixo esforço.
+3. `WEB-SHELL` — desbloqueia navegação entre todas as telas web.
+4. `WEB-DISPLAYORDER` — desbloqueia o construtor de modelos contra API real.
+5. `SEED-STALE` — corrigir seed para setup limpo de ambiente.
 
 ### INT-011 — Login web contra a API real (Etapa 1) — 2026-10-05, branch `task/int-011-web-login-real-backend`
 

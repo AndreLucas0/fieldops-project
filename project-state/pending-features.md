@@ -696,6 +696,193 @@ Follow-ups abertos por esta etapa (não implementados):
 
 ---
 
+## SEED-STALE — db/seed.sql incompatível com o schema atual
+
+Status: PENDING
+
+Description:
+`db/seed.sql` usa `inspection_responses.inspection_item_id` (coluna removida na migração V9).
+Como o seed roda em transação única, qualquer falha causa rollback total — nenhum usuário é
+criado. Impede o teste manual "do zero" com o seed completo.
+
+Contorno documentado (INT-011): aplicar só o bloco de usuários (linhas 44–48 e 81–86 do seed).
+
+Source:
+Detectado durante INT-011 (2026-10-05). Registrado como follow-up.
+Requirements: nenhum RN formal — consistência de dados de desenvolvimento.
+
+Scope: corrigir `db/seed.sql` substituindo as 8 referências a `inspection_item_id`
+pelo campo correto conforme schema V14 (`inspection_item_snapshot_id` ou equivalente).
+
+---
+
+## CORS-CONFIG — Backend não tem configuração CORS
+
+Status: PENDING
+
+Description:
+Nenhuma configuração CORS existe em `SecurityConfig.java`. Em produção ou em qualquer ambiente onde
+web e backend estão em origens diferentes, todas as requisições cross-origin serão bloqueadas pelo
+browser antes de chegarem ao backend.
+
+Para desenvolvimento, o problema foi mitigado via proxy do `ng serve` (INT-011 — `npm run start:api`),
+mas esse workaround não serve para produção.
+
+Source:
+`docs/auditoria-frontend-backend.md` §2 (2026-10-02). Confirmado na re-auditoria 2026-10-13.
+Requirements: `arquitetura.md` descreve web e backend como serviços separados.
+
+Note: se a solução de produção for proxy reverso (nginx/API gateway), CORS pode não ser necessário
+no backend. Registrado aqui para que a decisão seja explícita antes do deploy.
+
+---
+
+## WEB-MOCK-AUTH — Login web não funciona em modo mock
+
+Status: PENDING
+
+Description:
+Com `npm start` (configuração `development`, `mockApi: true`), o login web não funciona:
+- Não há mock de `/auth/login` nem de `/auth/refresh`.
+- `provideMockSession()` existe mas não está registrado em nenhum ponto de entrada.
+
+Source:
+Detectado durante INT-011 (2026-10-05). Registrado como follow-up.
+
+Scope: (a) adicionar mock de `/auth` ao servidor mock e registrar `provideMockSession()`, ou
+(b) documentar que `npm run start:api` é o único modo funcional para desenvolvimento.
+
+---
+
+## D22 — Orientação para conta inativa no login
+
+Status: PENDING (requer decisão de produto)
+
+Description:
+O backend responde 401 com mensagens distintas para "conta inativa" vs. "credenciais inválidas".
+A prática atual (web INT-011 e mobile) é mostrar mensagem única para não revelar se o e-mail existe.
+Decisão de produto pendente: melhor UX (revelar estado) × melhor segurança (não revelar).
+`criterios-de-aceitacao.md` (AC-AUTH, cenário "usuário inativo") não é conclusivo.
+
+Source:
+`docs/auditoria-frontend-backend.md` §19 (D22). Follow-up de INT-011.
+
+---
+
+## D7 — `PUT /inspections/{id}` sem trava de estado
+
+Status: PENDING
+
+Description:
+`InspectionService.update()` não verifica o status atual da inspeção antes de aplicar alterações.
+Uma inspeção em `IN_PROGRESS`, `SUBMITTED` ou `APPROVED` pode ter metadados (`title`, `instructions`,
+`priority`, `scheduledFor`) alterados por ADMIN/SUPERVISOR.
+
+Source:
+`docs/auditoria-frontend-backend.md` §20 (D7). Confirmado na re-auditoria 2026-10-13.
+
+Scope: decidir quais estados bloqueiam edição de metadados; adicionar guard clause em `InspectionService.update()`.
+
+---
+
+## D9 — `POST /inspections` não valida coerência local/cliente/equipamento
+
+Status: PENDING
+
+Description:
+`InspectionService.create()` não verifica se `siteId` pertence ao `clientId` informado, nem se
+`equipmentId` pertence ao `siteId`. Uma inspeção pode ser criada com combinações incoerentes.
+
+Source:
+`docs/auditoria-frontend-backend.md` §20 (D9). Confirmado na re-auditoria 2026-10-13.
+Requirements: RN-014; `regras-de-negocio.md` §9.2.
+
+---
+
+## SUPERVISOR-SCOPE — Escopo de supervisor (RN-005) não implementado
+
+Status: PENDING
+
+Description:
+RN-005 define que SUPERVISOR só enxerga recursos vinculados a si como supervisor. Atualmente,
+SUPERVISOR tem acesso irrestrito (mesma visibilidade de ADMIN) em todos os endpoints de listagem.
+
+Source:
+Backend audit 2026-09-22. Confirmado na re-auditoria 2026-10-13.
+Requirements: `perfis-de-usuario.md` §5.3, RN-005.
+
+Note: impacta queries e caching em praticamente todos os endpoints de listagem. Requer decisão
+de produto antes de implementar.
+
+---
+
+## WEB-SHELL — Shell web ausente (menu, logout, toasts)
+
+Status: PENDING
+
+Description:
+O app web não tem layout compartilhado entre telas autenticadas: sem menu lateral, sem botão de
+logout, sem sistema de toasts/notificações. Sem shell, o usuário não navega entre telas, erros
+ficam invisíveis, e logout é impossível.
+
+Source:
+`docs/auditoria-frontend-backend.md` (observação transversal). Confirmado na re-auditoria 2026-10-13.
+
+Scope: `ShellComponent` com `<mat-sidenav-container>`, `<mat-toolbar>` (logout + nome do usuário),
+`<mat-sidenav>` (menu), toast service.
+
+---
+
+## WEB-DISPLAYORDER — `displayOrder` ausente nos payloads do construtor de modelos
+
+Status: PENDING
+
+Description:
+`TemplateBuilderDialogComponent` não inclui `displayOrder` nos payloads de criação/edição de seções
+e itens. `TemplateSectionCreateRequest` e `TemplateItemRequest` têm `displayOrder*` obrigatório no
+backend → qualquer adição ou edição retorna 400 contra API real. O construtor de modelos é inutilizável
+contra a API real.
+
+Source:
+`docs/auditoria-frontend-backend.md` §19 (F1/F2). Confirmado na re-auditoria 2026-10-13.
+
+Scope: adicionar `displayOrder: index + 1` nos DTOs enviados pelo construtor web. Baixo risco, alto impacto.
+
+---
+
+## MOBILE-AUTH-CODE — `UNAUTHORIZED` não mapeado em `toAuthFailureCode()`
+
+Status: PENDING
+
+Description:
+`toAuthFailureCode()` em `mobile/src/features/auth/session-context.tsx` não mapeia o código
+`UNAUTHORIZED` (resposta real do backend para credenciais inválidas) → cai no `default: return 'UNEXPECTED'`
+→ UI exibe "Não foi possível entrar agora." em vez de "E-mail ou senha incorretos."
+
+Source:
+Re-auditoria 2026-10-13. Divergência F6 em `docs/auditoria-frontend-backend.md`.
+
+Scope: adicionar `case 'UNAUTHORIZED': return 'INVALID_CREDENTIALS'` em `toAuthFailureCode()`.
+Uma linha. Risco mínimo.
+
+---
+
+## MOBILE-MOCK-SYNC — `POST /mobile/sync/push` ausente do mock mobile
+
+Status: PENDING
+
+Description:
+`mobile/src/services/mock/mock-server.ts` não cobre `POST /mobile/sync/push`. Em modo mock
+(padrão), o outbox SQLite nunca drena: entradas ficam `synced=0` permanentemente. `summary.tsx`
+pode avaliar completude incorretamente.
+
+Source:
+Re-auditoria 2026-10-13 (leitura de `mock-server.ts`). Divergência F11.
+
+Scope: adicionar handler `POST /mobile/sync/push` ao mock retornando todos os `operationId`s como `APPLIED`.
+
+---
+
 ## Other divergences worth tracking (not backend-pending, do not treat as BF items)
 
 These came out of the same audit but are **not** "feature not built" — see

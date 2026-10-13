@@ -27,6 +27,44 @@ ACTIVE / SUPERSEDED
 
 ---
 
+### [2026-10-13] — Mobile em dev usa `.env` com IP da máquina; DB_PORT=5433 (não 5432)
+
+Context:
+O `.env` na raiz do projeto define `DB_PORT=5433`. O `docker-compose.yml` usa
+`${DB_PORT:-5432}:5432`, então o PostgreSQL é exposto na porta **5433** do host, não 5432.
+Ao tentar subir o backend com `DB_URL=jdbc:postgresql://localhost:5432/fieldops` o
+Spring Boot falha com "password authentication failed" (a porta 5432 não está mapeada).
+Para rodar o mobile contra a API real, não há script equivalente ao `start:api` do web —
+é necessário criar `mobile/.env` com as variáveis corretas.
+
+Decision:
+Backend: usar `DB_URL=jdbc:postgresql://localhost:5433/fieldops` (porta 5433).
+O `DB_URL` no `.env` raiz usa template shell e não é auto-expandido — preferir literais
+na linha de comando.
+
+Mobile: criar `mobile/.env` com:
+- `EXPO_PUBLIC_API_MOCK=false`
+- Dispositivo físico: `EXPO_PUBLIC_API_BASE_URL=http://<IP_DA_MAQUINA>:8090/api/v1`
+- Emulador Android: `EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:8090/api/v1`
+- Web preview: `EXPO_PUBLIC_API_BASE_URL=http://localhost:8090/api/v1`
+
+Reason:
+`DB_PORT=5433` evita conflito com PostgreSQL local na porta padrão (5432). Não é óbvio
+e causou falha de autenticação ao tentar a porta padrão. Registrado para evitar a mesma
+perda de tempo em sessões futuras.
+
+Alternatives considered:
+Mudar `DB_PORT` para 5432 — rejeitado; pode conflitar com instâncias locais.
+
+Impact:
+Toda sessão que sobe o backend manualmente precisa usar a porta 5433.
+O `docker compose up -d` não requer atenção especial — lê o `.env` automaticamente.
+
+Status:
+ACTIVE
+
+---
+
 ### [2026-10-05] — INT-011: web em dev fala com a API real via proxy do `ng serve`, não via CORS
 
 Context:

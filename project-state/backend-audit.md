@@ -6,7 +6,71 @@
 **Scope:** Backend Java/Spring Boot (`backend/src/main/java/com/codemind/fieldops`) compared against `./docs/**`, `openapi.yaml`, `test-plan.md`, `ESTADO-DO-PROJETO.md`, `PROMPT-MESTRE-DOCUMENTACAO.md`. `web/` and `mobile/` were only grepped to classify integration status (never treated as proof of backend implementation).
 **Full original report (not committed to the repo):** was written to a session scratchpad file during the audit; that file is ephemeral and may no longer exist. This document is the persistent record — treat it, not the scratchpad copy, as the source of truth going forward.
 
-Status: **ACTIVE** (not superseded)
+Status: **SUPERSEDED** — ver re-auditoria 2026-10-13 abaixo
+
+## Re-auditoria Backend — 2026-10-13
+
+**Data:** 2026-10-13
+**Branch analisada:** `main` (HEAD após INT-011 + todos os BF/fix items descritos em `progress.md`)
+**Tipo:** somente leitura — nenhum arquivo alterado durante a análise
+**Método:** leitura direta dos controllers, services, DTOs, `SecurityConfig.java`,
+`GlobalExceptionHandler`, migrations e test files.
+
+### Resumo 2026-10-13
+
+Todos os itens críticos do audit original (BF-001..BF-007, PEND-04/05/15, RN-038/039,
+ERR-HANDLER, AUTHZ-BOUNDARY, SYNC-ROBUST, NC-APPROVED-LOCK, INT-011) foram resolvidos.
+
+| Métrica | Valor |
+|---|---|
+| Controllers ativos | 16 |
+| Migrations Flyway | V1–V14 |
+| Test files | ~35 |
+| Métodos @Test | ~340 |
+
+**16 controllers confirmados:** `AuthController`, `UserController`, `ClientController`,
+`SiteController`, `EquipmentController`, `TemplateController` (dual mapping `/templates/*` +
+`/inspection-templates/*`), `InspectionTemplateVersionController`, `InspectionController`,
+`InspectionLifecycleController`, `InspectionResponseController`, `ReviewController`,
+`EvidenceController`, `NonConformityController`, `DashboardController`,
+`MobileInspectionController`, `SynchronizationController`.
+
+### Itens resolvidos desde o audit original
+
+| Item original | Status 2026-09-22 | Status 2026-10-13 | Onde |
+|---|---|---|---|
+| 🔴 Template multi-versioning | NÃO IMPL. | 🟢 DONE | BF-001 |
+| 🔴 Template versions/sections read | NÃO IMPL. | 🟢 DONE | BF-005 |
+| 🔴 Section/item builder | NÃO IMPL. | 🟢 DONE | BF-005 (DRAFT version) |
+| 🔴 Inspection history endpoint | NÃO IMPL. | 🟢 DONE | BF-004 |
+| 🔴 Lock responses after SUBMITTED | NÃO IMPL. | 🟢 DONE | BF-002 |
+| 🔴 Evidence upload blocked after APPROVED | NÃO IMPL. | 🟢 DONE | BF-006 |
+| 🔴 Dashboard endpoints | NÃO IMPL. | 🟢 DONE | BF-004 |
+| 🟡 Persist `conformity` field | PARCIAL | 🟢 DONE | BF-003 |
+| 🟡 Submit validates RN-038/039 | PARCIAL | 🟢 DONE | RN-038/039 |
+| 🟡 Nested navigation endpoints | PARCIAL | 🟢 DONE | NESTED-NAV |
+| 🟡 Admin filters on inspections | PARCIAL | 🟢 DONE | PEND-15 |
+| 🟡 Evidence ownership check | PARCIAL | 🟢 DONE | PEND-05 |
+| 🟡 QR scope enforcement (RN-063) | PARCIAL | 🟢 DONE | PEND-04 |
+| ⚪ Ownership authorization (NC/Evidence) | SEM TESTE | 🟢 DONE | AUTHZ-BOUNDARY |
+| 🟣 Offline sync (mobile integration) | NÃO INTEGRADO | 🟢 DONE | BF-007 |
+
+### Gaps confirmados ainda abertos (2026-10-13)
+
+| Item | Tracking |
+|---|---|
+| CORS ausente em `SecurityConfig.java` | `pending-features.md` CORS-CONFIG |
+| `db/seed.sql` incompatível com schema V14 | `pending-features.md` SEED-STALE |
+| `PUT /inspections/{id}` sem trava de estado | `pending-features.md` D7 |
+| `POST /inspections` sem validação de coerência | `pending-features.md` D9 |
+| Escopo de supervisor (RN-005) não implementado | `pending-features.md` SUPERVISOR-SCOPE |
+| `itemsToCorrect` em `/reject` aceito e ignorado | `docs/auditoria-frontend-backend.md` §19 |
+
+### Estado dos testes (2026-10-13)
+
+`./mvnw verify` completo: **BUILD SUCCESS — unit 50/50, IT 263/263** (primeiro sem falhas: 2026-09-30).
+
+---
 
 > **Related audit (2026-10-02):** `docs/auditoria-frontend-backend.md` re-inventoried the backend
 > against `main` @ `7a11db9` from the Frontend ↔ Backend contract angle (web + mobile screens).

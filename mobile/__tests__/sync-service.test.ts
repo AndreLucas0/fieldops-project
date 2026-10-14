@@ -4,6 +4,7 @@ import type { ApiClient } from '@/services/api-client';
 import {
   countPendingEntries,
   getPendingEntries,
+  getSyncMetadata,
   upsertOutboxEntry,
   type OutboxRow,
 } from '@/services/local-db';
@@ -261,6 +262,78 @@ describe('BF-007 — sync-service + outbox', () => {
       expect(outboxRow('op-present')).toMatchObject({ synced: 1, error_count: 0 });
       expect(outboxRow('op-missing')).toMatchObject({ synced: 0, error_count: 1 });
       expect(result).toEqual({ synced: 1, failed: 1 });
+    });
+  });
+
+  describe('SYNC-METADATA — last_successful_sync persistido após sync', () => {
+    it('salva last_successful_sync quando pelo menos uma entrada foi sincronizada', async () => {
+      await addEntry('op-1');
+      const { client } = fakeClient(allWith('APPLIED'));
+
+      await syncPending(client);
+
+      const savedSync = await getSyncMetadata('last_successful_sync');
+      expect(savedSync).not.toBeNull();
+      expect(new Date(savedSync!).getTime()).toBeGreaterThan(0);
+    });
+
+    it('não salva last_successful_sync quando nenhuma entrada foi sincronizada (todas REJECTED)', async () => {
+      await addEntry('op-1');
+      const { client } = fakeClient(allWith('REJECTED'));
+
+      await syncPending(client);
+
+      const savedSync = await getSyncMetadata('last_successful_sync');
+      expect(savedSync).toBeNull();
+    });
+
+    it('não salva last_successful_sync quando o outbox está vazio', async () => {
+      const { client } = fakeClient(allWith('APPLIED'));
+
+      await syncPending(client);
+
+      const savedSync = await getSyncMetadata('last_successful_sync');
+      expect(savedSync).toBeNull();
+    });
+  });
+
+  describe('SYNC-OUTBOX-SCHEMA — status no outbox após sync', () => {
+    it('APPLIED define status COMPLETED', async () => {
+      await addEntry('status-1');
+      const { client } = fakeClient(allWith('APPLIED'));
+
+      await syncPending(client);
+
+      expect(outboxRow('status-1').status).toBe('COMPLETED');
+    });
+
+    it('REJECTED define status FAILED', async () => {
+      await addEntry('status-2');
+      const { client } = fakeClient(allWith('REJECTED'));
+
+      await syncPending(client);
+
+      expect(outboxRow('status-2').status).toBe('FAILED');
+    });
+
+    it('CONFLICT define status CONFLICT', async () => {
+      await addEntry('status-3');
+      const { client } = fakeClient(allWith('CONFLICT'));
+
+      await syncPending(client);
+
+      expect(outboxRow('status-3').status).toBe('CONFLICT');
+    });
+
+    it('falha de rede define status FAILED em todas as entradas do lote', async () => {
+      await addEntry('status-4');
+      const { client } = fakeClient(() => {
+        throw new Error('network timeout');
+      });
+
+      await syncPending(client);
+
+      expect(outboxRow('status-4').status).toBe('FAILED');
     });
   });
 

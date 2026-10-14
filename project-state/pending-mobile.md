@@ -1,8 +1,8 @@
 # Mobile — Inventário de Telas e Status de Integração
 
-**Data:** 2026-10-13
-**Branch analisada:** `main` (HEAD após BASEVERSION-STALENESS/SYNC-RESILIENCE, não commitados)
-**Tipo:** inventário somente leitura — nenhum código alterado durante a análise
+**Data:** 2026-10-14 (atualizado — auditoria documental)
+**Branch analisada:** `main` (HEAD após SYNC-FE-M04-FULL/SYNC-OUTBOX-SCHEMA/SYNC-METADATA/F10, não commitados)
+**Tipo:** inventário atualizado em 2026-10-14 com base em evidências de código e testes (373/373 mobile GREEN)
 **Fonte primária:** `docs/telas-frontend.md` §2, `docs/auditoria-frontend-backend.md`, `mobile/src/`
 
 ---
@@ -15,21 +15,23 @@
 
 ---
 
-## Resumo executivo (2026-10-13)
+## Resumo executivo (2026-10-14)
 
 | Status | Contagem | % |
 |---|---:|---:|
 | COMPLETA | 1 | 7% |
-| PARCIAL | 11 | 79% |
-| AUSENTE | 2 | 14% |
+| PARCIAL | 13 | 93% |
+| AUSENTE | 0 | 0% |
+
+> Nota: FE-M04 foi rebaixada de COMPLETA para PARCIAL porque 3 itens da spec (`telas-frontend.md` §FE-M04) permanecem bloqueados pelo backend (SYNC-PULL, SYNC-OUTBOX-EVIDENCE). FE-M14 permanece COMPLETA (todos os itens frontend-only implementados). Ver SYNC-FE-M04-FULL em `pending-features.md`.
 
 Raízes dos problemas transversais:
 
-1. **`UNAUTHORIZED` não mapeado em `toAuthFailureCode()`** — senha errada retorna `UNEXPECTED`, mostrando "Não foi possível entrar agora." em vez de "E-mail ou senha incorretos." (mobile não recebeu a correção do INT-011, que foi só web).
+1. ~~**`UNAUTHORIZED` não mapeado em `toAuthFailureCode()`**~~ — **RESOLVIDO 2026-10-13**: `case 'UNAUTHORIZED': return 'INVALID_CREDENTIALS'` adicionado em `session-context.tsx`.
 2. **Nomes de entidade indisponíveis ao técnico** — `GET /clients/{id}`, `GET /sites/{id}` e `GET /equipment/{id}` retornam 403 para TECHNICIAN (AUTHZ-BOUNDARY). `MobileInspectionDetailResponse` não inclui `clientName`/`siteName`/`equipmentName`.
-3. **`POST /mobile/sync/push` ausente do mock** — em modo mock (`EXPO_PUBLIC_API_MOCK=true`, padrão), o outbox SQLite nunca é drenado: entradas ficam com `synced=0` permanentemente.
+3. ~~**`POST /mobile/sync/push` ausente do mock**~~ — **RESOLVIDO 2026-10-13**: rota adicionada a `mock-server.ts`; outbox drena em modo mock. Ver `mock-server.test.ts`.
 4. **Outbox cobre apenas `INSPECTION_RESPONSE`** — `local-db.ts` só suporta esse `entity_type`. Transições de inspeção e não conformidades vão direto para a API sem fallback offline.
-5. **`countPendingEntries()` sem UI** — função existe em `local-db.ts` mas nenhum componente a consome; usuário não vê o tamanho da fila.
+5. ~~**`countPendingEntries()` sem UI**~~ — **RESOLVIDO 2026-10-13**: FE-M04 implementada; consome `countPendingEntries()` e expõe botão de sync manual. Ver `sync.tsx` e `sync-screen.test.tsx`.
 
 ---
 
@@ -46,7 +48,7 @@ Raízes dos problemas transversais:
 Implementado: autenticação, renovação de token, persistência via `expo-secure-store`.
 
 Blockers:
-- **`UNAUTHORIZED` não mapeado (F6)**: `toAuthFailureCode()` em `session-context.tsx` não trata `UNAUTHORIZED` → cai no `default: return 'UNEXPECTED'`. Senha errada mostra mensagem genérica. Confirmado por leitura de código (`mobile/src/features/auth/session-context.tsx`).
+- ~~**`UNAUTHORIZED` não mapeado (F6)**~~ — **RESOLVIDO 2026-10-13**: `case 'UNAUTHORIZED': return 'INVALID_CREDENTIALS'` adicionado em `session-context.tsx:89-90`; teste em `session-context.test.tsx`.
 
 ---
 
@@ -84,12 +86,18 @@ Blockers: mesmos de FE-M02 (nomes ausentes, sem paginação de filtros no backen
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
-| Rota documentada | `/(protected)/(tabs)/sync` |
+| Status | **PARCIAL** — itens frontend-only completos; 3 itens blocked por backend |
+| Rota | `/(protected)/(tabs)/sync` |
+| Backend | `POST /mobile/sync/push` (via `syncPendingIfOnline`) |
 
-Nenhum arquivo ou componente correspondente encontrado. A aba de sincronização não existe.
+Implementado (2026-10-13/14): contagem da fila pendente, botão de sync manual, resultado da última sincronização (synced/failed), data/hora da última sync (`getSyncMetadata('last_successful_sync')`), indicador Online/Offline, contagem de entradas com erro (FAILED/CONFLICT), navegação para FE-M14 ("Ver detalhes"). Aba "Sync" no `_layout.tsx`, ícone `sync` no `Icon.tsx`.
 
-Impacto: o técnico não tem feedback do tamanho da fila offline nem pode acionar sync manualmente. A sync automática via `useSyncOnForeground()` acontece, mas de forma invisível.
+Testes: 11/11 em `__tests__/sync-screen.test.tsx` (GREEN — regressão completa 373/373).
+
+Blockers (backend-dependentes):
+- **Status por evidência pendente** — EVIDENCE não está no outbox; depende de SYNC-OUTBOX-EVIDENCE.
+- **Ação "Baixar alterações" (pull)** — depende de SYNC-PULL (backend).
+- **"Tentar novamente" por operação específica** — depende de SYNC-PULL (backend).
 
 ---
 
@@ -150,7 +158,7 @@ Blockers:
 Implementado: respostas salvas no outbox SQLite (`INSPECTION_RESPONSE`), sincronizadas via `syncPendingIfOnline()` em background.
 
 Blockers:
-- **`POST /mobile/sync/push` ausente do mock (F11)**: em modo mock, entradas do outbox nunca são drenadas.
+- ~~**`POST /mobile/sync/push` ausente do mock (F11)**~~ — **RESOLVIDO 2026-10-13**.
 - **`valueChoice` não volta no detalhe (F8)**: `MobileInspectionDetailResponse` não inclui `valueChoice` — respostas de `SINGLE_CHOICE` não renderizadas no detalhe.
 - **Flags RN-038/039 ausentes do DTO mobile (F9)**: `observationRequiredOnFailure` e `evidenceRequiredOnFailure` não chegam nos snapshots mobile — a UI não sabe quando exigir observação/evidência obrigatória em não conformidade.
 - **BASEVERSION-STALENESS corrigido** (2026-10-01): `versionsRef` agora incrementa atômicamente após cada `upsertOutboxEntry` bem-sucedido. Corrigido mas não commitado.
@@ -184,7 +192,7 @@ Blockers:
 Implementado: listagem e criação de NCs.
 
 Blockers:
-- **Vínculo com item se perde (F10)**: mobile envia `inspectionItemId`; backend espera `snapshotId` em `NonConformityCreateRequest`. Campo ignorado pelo Jackson → NC sem vínculo.
+- ~~**Vínculo com item se perde (F10)**~~ — **RESOLVIDO 2026-10-14**: mobile agora envia `snapshotId: context.responseId` em `NonConformityCreateRequest`. Fix em `shared/src/domain/requests.ts`, `use-non-conformities.ts` e `mock-server.ts`. Teste `F10` em `__tests__/summary-nc-screens.test.tsx`.
 - NC cria/altera direto na API sem fallback offline.
 - 409 em inspeção APPROVED (NC-APPROVED-LOCK) não tratado na UI.
 
@@ -236,12 +244,13 @@ Blockers: idem FE-M12 (offline não suportado por design).
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
-| Rota documentada | `/(protected)/sync/details` |
+| Status | **COMPLETA** — implementado 2026-10-14 |
+| Rota | `/(protected)/sync/details` |
+| Backend | — (somente leitura sobre dados locais SQLite) |
 
-Nenhum arquivo ou componente correspondente encontrado.
+Implementado: tela somente leitura exibindo entradas do outbox com `status` não-COMPLETED (`operationId`, `entityType`, `status`, `lastError`). Acessível via botão "Ver detalhes" em FE-M04.
 
-Impacto: técnico sem acesso a diagnóstico de fila (entradas pendentes, `error_count`, histórico de operações). `countPendingEntries()` em `local-db.ts` existe mas sem consumidor.
+Testes: 7/7 em `__tests__/sync-details-screen.test.tsx` (GREEN); navegação FE-M04→FE-M14 coberta pelo teste em `__tests__/sync-screen.test.tsx`. Regressão completa 373/373.
 
 ---
 
@@ -252,9 +261,9 @@ Impacto: técnico sem acesso a diagnóstico de fila (entradas pendentes, `error_
 | `services/auth-service.ts` | `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me` | INTEGRADO |
 | `services/sync-service.ts` | `POST /mobile/sync/push` | INTEGRADO (mock incompleto) |
 | `services/local-db.ts` | — (SQLite local) | LOCAL — só `INSPECTION_RESPONSE` |
-| `services/mock/mock-server.ts` | Todos os endpoints exceto `/mobile/sync/*` e DELETE | MOCK INCOMPLETO |
+| `services/mock/mock-server.ts` | Todos os endpoints exceto DELETE | MOCK COMPLETO (sync/push adicionado 2026-10-13) |
 | `features/checklist/use-checklist.ts` | Outbox → sync | INTEGRADO (via outbox) |
-| `features/sync/use-sync.ts` | `syncPendingIfOnline()` | INTEGRADO (sem UI de status) |
+| `features/sync/use-sync.ts` | `syncPendingIfOnline()`, `addNetworkStateListener` | INTEGRADO (FE-M04 exibe status; reconexão automática implementada) |
 
 ---
 
@@ -262,12 +271,12 @@ Impacto: técnico sem acesso a diagnóstico de fila (entradas pendentes, `error_
 
 | ID | Descrição | Impacto |
 |---|---|---|
-| F6 | `toAuthFailureCode()` não mapeia `UNAUTHORIZED` | Senha errada mostra mensagem genérica |
+| ~~F6~~ | ~~`toAuthFailureCode()` não mapeia `UNAUTHORIZED`~~ | **RESOLVIDO 2026-10-13** (MOBILE-AUTH-CODE) |
 | F7 | `clientName`/`siteName`/`equipmentName` ausentes do DTO mobile | Nomes não exibíveis no detalhe |
 | F8 | `valueChoice` ausente de `MobileInspectionDetailResponse` | Respostas SINGLE_CHOICE não renderizadas |
 | F9 | Flags RN-038/039 ausentes dos snapshots mobile | UI não valida observação/evidência obrigatória |
-| F10 | Mobile envia `inspectionItemId`; backend espera `snapshotId` em NC | Vínculo NC-item perdido |
-| F11 | `POST /mobile/sync/push` não está no mock | Outbox não drena em modo mock |
+| ~~F10~~ | ~~Mobile envia `inspectionItemId`; backend espera `snapshotId` em NC~~ | **RESOLVIDO 2026-10-14** |
+| ~~F11~~ | ~~`POST /mobile/sync/push` não está no mock~~ | **RESOLVIDO 2026-10-13** |
 
 ---
 
@@ -278,22 +287,50 @@ Impacto: técnico sem acesso a diagnóstico de fila (entradas pendentes, `error_
 | Outbox SQLite (`INSPECTION_RESPONSE`) | IMPLEMENTADO (BF-007, 2026-09-28) |
 | Sync resilience por entrada | IMPLEMENTADO (SYNC-RESILIENCE, 2026-10-01, não commitado) |
 | BASEVERSION-STALENESS fix | IMPLEMENTADO (2026-10-01, não commitado) |
+| `status` e `last_error` no outbox | IMPLEMENTADO — SYNC-OUTBOX-SCHEMA 2026-10-14 |
+| `markEntryFailed` (substitui `incrementErrorCount`) | IMPLEMENTADO — 2026-10-14 |
 | Outbox para transições de inspeção (`INSPECTION`) | NÃO IMPLEMENTADO |
 | Outbox para não conformidades (`NON_CONFORMITY`) | NÃO IMPLEMENTADO |
 | Pull incremental (`GET /mobile/sync/pull`) | NÃO IMPLEMENTADO no mobile |
-| FE-M04 (tela de sync) | AUSENTE |
-| FE-M14 (detalhes de sync) | AUSENTE |
-| `countPendingEntries()` exibida na UI | NÃO IMPLEMENTADO (função existe, sem consumidor) |
-| `bulkIncrementErrorCount()` | NÃO IMPLEMENTADO (sequential N updates, deferred) |
+| FE-M04 (tela de sync) | COMPLETO — 2026-10-13 |
+| FE-M14 (detalhes de sync) | COMPLETO — 2026-10-14 |
+| `countPendingEntries()` exibida na UI | IMPLEMENTADO — FE-M04 2026-10-13 |
+| `bulkIncrementErrorCount()` | N/A — substituído por `markEntryFailed` (2026-10-14) |
+
+---
+
+---
+
+## Análise de gaps da arquitetura offline-first (2026-10-13)
+
+A spec (`contrato-backend-frontend.md` §11, `aplicativo-mobile.md` §13.8) exige que **toda** alteração do técnico seja salva no SQLite primeiro. A implementação atual cobre apenas `INSPECTION_RESPONSE`. Gaps identificados:
+
+| ID | Problema | Scope | Status |
+|---|---|---|---|
+| ~~SYNC-RECONNECT~~ | ~~`useSyncOnForeground` não detecta reconexão de rede — só detecta app foreground~~ | Frontend | **DONE** 2026-10-13 |
+| ~~SYNC-METADATA~~ | ~~Tabela `SyncMetadata` ausente — sem `last_successful_sync`, `last_pull_cursor`~~ | Frontend | **DONE** 2026-10-14 |
+| ~~SYNC-OUTBOX-SCHEMA~~ | ~~Outbox sem `status`, `last_error` — FE-M04 não lista erros por operação~~ | Frontend | **DONE** 2026-10-14 |
+| SYNC-FE-M04-FULL | FE-M04 com 6/9 itens da spec implementados; 3 itens blocked por backend | Frontend+Backend | **PARTIAL** (2026-10-14) |
+| SYNC-OUTBOX-INSPECTION | `start.tsx` / `summary.tsx` chamam API diretamente — START/SUBMIT falham offline | Backend+Frontend | **PENDING** |
+| SYNC-OUTBOX-NC | `useNonConformities` chama API diretamente — NCs falham offline | Backend+Frontend | **PENDING** |
+| SYNC-OUTBOX-EVIDENCE | Uploads de evidência vão direto para multipart API — falham offline | Backend+Frontend | **PENDING** |
+| SYNC-PULL | `GET /mobile/sync/pull` não implementado — técnico não recebe mudanças do servidor | Backend+Frontend | **PENDING** |
+
+Ver detalhamento completo em `pending-features.md` seção `OFFLINE-FIRST-REPLAN`.
 
 ---
 
 ## Próximos passos recomendados
 
-1. **F6 — mapear `UNAUTHORIZED`** em `toAuthFailureCode()`: uma linha, alto impacto no login com senha errada.
-2. **F11 — adicionar mock de `POST /mobile/sync/push`** em `mock-server.ts`: baixo esforço, desbloqueia testes em modo mock.
-3. **FE-M04 — tela de sincronização**: exibir fila pendente (consumir `countPendingEntries()`), botão de sync manual.
-4. **F7 — nomes no DTO mobile**: adicionar `clientName`/`siteName`/`equipmentName` ao `MobileInspectionDetailResponse` no backend.
-5. **F8/F9 — campos no DTO mobile**: adicionar `valueChoice` e flags RN-038/039.
-6. **F10 — NC com vínculo de item**: corrigir campo `snapshotId` vs. `inspectionItemId`.
-7. **FE-M14 — detalhes de sincronização**: tela de diagnóstico com log de operações.
+1. ~~**F6 — mapear `UNAUTHORIZED`** em `toAuthFailureCode()`~~ — **RESOLVIDO 2026-10-13**
+2. ~~**F11 — adicionar mock de `POST /mobile/sync/push`**~~ — **RESOLVIDO 2026-10-13**
+3. ~~**FE-M04 — tela de sincronização básica**~~ — **RESOLVIDO 2026-10-13**
+4. ~~**SYNC-RECONNECT**~~ — **RESOLVIDO 2026-10-13**
+5. ~~**SYNC-METADATA**~~ — **RESOLVIDO 2026-10-14**
+6. ~~**SYNC-OUTBOX-SCHEMA**~~ — **RESOLVIDO 2026-10-14**: `status` e `last_error` adicionados; `markEntryFailed` substitui `incrementErrorCount`; mocks atualizados; 356/356 GREEN
+7. **SYNC-FE-M04-FULL** — completar FE-M04 com todos os campos da spec
+8. **SYNC-OUTBOX-INSPECTION** — START/SUBMIT via outbox (requer backend)
+9. **F7 — nomes no DTO mobile**: adicionar `clientName`/`siteName`/`equipmentName` ao `MobileInspectionDetailResponse` no backend
+10. **F8/F9 — campos no DTO mobile**: adicionar `valueChoice` e flags RN-038/039
+11. ~~**F10 — NC com vínculo de item**~~ — **RESOLVIDO 2026-10-14**
+12. ~~**FE-M14 — detalhes de sincronização**~~ — **RESOLVIDO 2026-10-14**

@@ -3,7 +3,7 @@ import * as Network from 'expo-network';
 import * as SecureStore from 'expo-secure-store';
 
 import type { ApiClient } from './api-client';
-import { getPendingEntries, incrementErrorCount, markEntriesSynced } from './local-db';
+import { getPendingEntries, markEntryFailed, markEntriesSynced, saveSyncMetadata } from './local-db';
 
 const DEVICE_ID_KEY = 'fieldops_device_id';
 const SYNC_BATCH_SIZE = 50;
@@ -67,7 +67,7 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
       try {
         parsed = JSON.parse(row.payload) as Record<string, unknown>;
       } catch {
-        await incrementErrorCount(row.id);
+        await markEntryFailed(row.id, 'FAILED');
         failed += 1;
         continue;
       }
@@ -92,7 +92,7 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
       });
     } catch {
       for (const op of operations) {
-        await incrementErrorCount(op.operationId);
+        await markEntryFailed(op.operationId, 'FAILED');
       }
       failed += operations.length;
       continue;
@@ -100,7 +100,7 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
 
     if (!Array.isArray(response.results)) {
       for (const op of operations) {
-        await incrementErrorCount(op.operationId);
+        await markEntryFailed(op.operationId, 'FAILED');
       }
       failed += operations.length;
       continue;
@@ -111,7 +111,8 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
       if (ACCEPTED_STATUSES.has(result.status)) {
         syncedIds.push(result.operationId);
       } else {
-        await incrementErrorCount(result.operationId);
+        const failStatus = result.status === 'CONFLICT' ? 'CONFLICT' : 'FAILED';
+        await markEntryFailed(result.operationId, failStatus);
         failed += 1;
       }
     }
@@ -119,7 +120,7 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
     const respondedIds = new Set(response.results.map((r) => r.operationId));
     for (const op of operations) {
       if (!respondedIds.has(op.operationId)) {
-        await incrementErrorCount(op.operationId);
+        await markEntryFailed(op.operationId, 'FAILED');
         failed += 1;
       }
     }
@@ -128,6 +129,10 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
       await markEntriesSynced(syncedIds);
       synced += syncedIds.length;
     }
+  }
+
+  if (synced > 0) {
+    await saveSyncMetadata('last_successful_sync', new Date().toISOString());
   }
 
   return { synced, failed };

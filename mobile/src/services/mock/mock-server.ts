@@ -587,7 +587,7 @@ const routes: Route[] = [
       const nonConformity: NonConformity = {
         id: nextMockId(),
         inspectionId: inspection.id,
-        inspectionItemId: request.inspectionItemId ?? null,
+        inspectionItemId: request.snapshotId ?? null,
         responseId: request.responseId ?? null,
         title: request.title ?? '',
         description: request.description ?? '',
@@ -736,6 +736,23 @@ const routes: Route[] = [
         nonConformitiesOpen: ctx.db.nonConformities.filter((item) => item.status === 'OPEN').length,
       };
       return ok(summary);
+    },
+  },
+  {
+    method: 'POST',
+    pattern: '/mobile/sync/push',
+    handle: (ctx) => {
+      const body = asRecord(ctx.body);
+      const operations = Array.isArray(body.operations)
+        ? (body.operations as Array<{ operationId: string }>)
+        : [];
+
+      const results = operations.map((op) => ({
+        operationId: op.operationId,
+        status: 'APPLIED' as const,
+      }));
+
+      return ok({ results });
     },
   },
 ];

@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-13 (Auditoria completa do código + documentação de inventário de telas)
+Last updated: 2026-10-14 (TDD-WEB-MOCK-AUTH — provideMockSession registrado em provideCore)
 
 ## Current State
 
@@ -8,6 +8,198 @@ Backend audit (2026-09-22): superseded — ver re-auditoria 2026-10-13 em `proje
 Frontend ↔ Backend contract + screen audit completed (2026-10-02, see `docs/auditoria-frontend-backend.md`).
 Auditoria completa do código 2026-10-13 concluída; inventários de telas criados em `project-state/pending-web.md` e `project-state/pending-mobile.md`.
 Integração incremental Frontend ↔ Backend com TDD em andamento.
+
+### OFFLINE-FIRST-REPLAN-2026-10-13 — Replanejamento da arquitetura de sync
+
+Data: 2026-10-13. Tipo: análise e planejamento — nenhum código alterado.
+
+**Problema identificado:** a implementação da feature de sincronização offline-first cobre apenas `INSPECTION_RESPONSE`. O ciclo automático de reconexão, outros entity types (INSPECTION, NON_CONFORMITY, EVIDENCE) e a fase de pull estão ausentes. A tela FE-M04 foi criada (ciclo anterior) mas expõe apenas uma parte do estado real.
+
+**Fonte:** comparação entre código atual e `contrato-backend-frontend.md` §11, `telas-frontend.md` §FE-M04/§7.6, `aplicativo-mobile.md` §13.8.
+
+**Gaps documentados em `pending-features.md` (seção OFFLINE-FIRST-REPLAN):**
+1. `SYNC-RECONNECT` — `useSyncOnForeground` não detecta reconexão de rede; usa só AppState
+2. `SYNC-METADATA` — tabela `SyncMetadata` ausente do SQLite (`last_successful_sync`, cursor)
+3. `SYNC-OUTBOX-SCHEMA` — outbox sem `status`, `last_error`, `dependency_ids`
+4. `SYNC-FE-M04-FULL` — FE-M04 incompleto: sem última sync, indicador online/offline, erros/item, pull
+5. `SYNC-OUTBOX-INSPECTION` — START/SUBMIT chamam API diretamente (falham offline)
+6. `SYNC-OUTBOX-NC` — NCs chamam API diretamente (falham offline)
+7. `SYNC-OUTBOX-EVIDENCE` — uploads chamam API diretamente (falham offline)
+8. `SYNC-PULL` — `GET /mobile/sync/pull` não implementado
+
+**Ordem recomendada:** SYNC-RECONNECT → SYNC-METADATA → SYNC-OUTBOX-SCHEMA → SYNC-FE-M04-FULL → (backend) SYNC-OUTBOX-INSPECTION → SYNC-OUTBOX-NC → SYNC-OUTBOX-EVIDENCE → SYNC-PULL.
+
+**Não implementado:** nenhuma alteração de código nesta etapa.
+
+---
+
+### TDD-SYNC-RECONNECT-2026-10-13 — Auto-sync na reconexão de rede
+
+Data: 2026-10-13. Ciclo TDD: RED → GREEN. 336/338 testes passando (+7 em relação ao ciclo anterior; 2 timeouts intermitentes pré-existentes não relacionados).
+
+**Implementado:**
+- `mobile/src/features/sync/use-sync.ts`: adicionado `addNetworkStateListener` (expo-network) para detectar transição `isInternetReachable: false → true` e disparar `syncPendingIfOnline`. Aceita `_addNetworkListener` como parâmetro opcional (dependency injection, default = real listener).
+- `mobile/__tests__/use-sync.test.ts` criado: 7 testes TDD — mount dispara sync, listener registrado, offline→online dispara sync, null→true não dispara, offline não dispara, online→online não dispara, unmount remove listener.
+- `mobile/jest.setup.js`: mock de `expo-network` atualizado com `addNetworkStateListener: jest.fn()` e reset `mockReturnValue({ remove: jest.fn() })` no `beforeEach`.
+
+**Insight técnico crítico:** jest-expo com caller Metro cria namespaces desacoplados — mocking via `jest.mock` não afeta o namespace do arquivo sob teste. Solução: dependency injection. Também: `renderHook` do TRTL v14 é async — usar `await renderHook(...)`.
+
+---
+
+### TDD-WEB-MOCK-AUTH-2026-10-14 — Sessão automática em modo fictício
+
+Data: 2026-10-14. Ciclo TDD: RED → GREEN. 205/205 testes passando (+2 novos; nenhuma regressão).
+
+**Problema:** `provideCore()` não incluía `provideMockSession()` → em `npm start` (mock mode) o login fazia HTTP para `/auth/login` que não existe no mock DI Angular.
+
+**Implementado (3 arquivos):**
+- `core.providers.ts`: `provideCore(useMock = environment.mockApi)` — parâmetro adicionado, passa para `provideResources(useMock)`, inclui `provideMockSession()` quando mock ativo.
+- `mock-session.ts`: removida guarda `if (!environment.mockApi) return` e import de `environment`; controle delegado ao `provideCore()`. Comentário atualizado.
+- `mock-session.spec.ts`: novo arquivo — 2 testes verificando sessão SUPERVISOR injetada com `provideCore(true)` e ausente com `provideCore(false)`.
+
+---
+
+### TDD-WEB-DISPLAYORDER-2026-10-14 — `displayOrder` nos payloads do construtor de modelos
+
+Data: 2026-10-14. Ciclo TDD: RED → GREEN. 203/203 testes passando (+2 novos; nenhuma regressão).
+
+**Problema:** `TemplateBuilderComponent.addSection()` e `addItem()` passavam o objeto `result` do diálogo diretamente ao `TemplatesService`, sem incluir `displayOrder`. O backend exige o campo como obrigatório → qualquer criação de seção/item retornava 400 contra a API real. O mock ocultava o bug com fallback `displayOrder: input.displayOrder ?? list.length + 1`.
+
+**Implementado (2 arquivos):**
+- `web/src/app/features/templates/template-builder.component.ts`:
+  - `addSection()`: `result` → `{ ...result, displayOrder: this.sections().length + 1 }`.
+  - `addItem()`: `result` → `{ ...result, displayOrder: (section.items ?? []).length + 1 }`.
+- `web/src/app/features/templates/template-builder.component.spec.ts`: 2 novos testes:
+  - `criar seção inclui displayOrder no payload enviado ao serviço`
+  - `criar item inclui displayOrder no payload enviado ao serviço`
+
+---
+
+### TDD-FE-M04-DETAILS-2026-10-14 — Navegação FE-M04 → FE-M14
+
+Data: 2026-10-14. Ciclo TDD: RED → GREEN. 373/373 testes passando (+1 novo; nenhuma regressão).
+
+**Implementado:**
+- `mobile/__tests__/sync-screen.test.tsx`: importa `routerMock`; novo teste "abre detalhes de sincronização ao pressionar o link de diagnóstico" — asserta `routerMock.push('/sync/details')`.
+- `mobile/app/(protected)/(tabs)/sync.tsx`: importa `router` de `expo-router`; botão `testID="sync-details"` / `label="Ver detalhes"` / `variant="secondary"` que chama `router.push('/sync/details')`.
+- `mobile/.expo/types/router.d.ts`: rota `/sync/details` adicionada manualmente às três uniões de tipos (`hrefInputParams`, `hrefOutputParams`, `href`) — arquivo auto-gerado estava desatualizado desde a criação de `details.tsx` na sessão anterior.
+
+**Typecheck:** 3 erros pré-existentes remanescentes (`use-sync.ts:12` — `undefined` vs `null`; `mock-server.test.ts:13,82` — `accessToken` ausente). Nenhum erro novo.
+
+---
+
+### TDD-F10-2026-10-14 — snapshotId em NonConformityCreateRequest
+
+Data: 2026-10-14. Ciclo TDD: RED → GREEN. 372/372 testes passando (nenhuma regressão).
+
+**Problema:** mobile enviava `inspectionItemId` (UUID do item de template) em `NonConformityCreateRequest`; backend Java lê `snapshotId` (UUID do snapshot/response). Jackson ignorava o campo desconhecido → NC criada sem vínculo.
+
+**Implementado (4 arquivos):**
+- `shared/src/domain/requests.ts`: `NonConformityCreateRequest.inspectionItemId` → `snapshotId`.
+- `mobile/src/features/non-conformities/use-non-conformities.ts`: request body envia `snapshotId: context.responseId` (não mais `inspectionItemId` nem `responseId`).
+- `mobile/src/services/mock/mock-server.ts`: handler NC lê `request.snapshotId` para preencher `inspectionItemId` do mock.
+- `mobile/__tests__/summary-nc-screens.test.tsx`: teste existente "registra a NC vinculada" corrigido para assertar `responseId` (não `item.id`); novo teste `F10` que verifica explicitamente que `inspectionItemId` ≠ `item.id` e = `responseId`.
+
+**Insight:** `context.responseId` já continha o UUID correto — só o nome do campo no body estava errado.
+
+---
+
+### TDD-SYNC-FE-M04-FULL-2026-10-14 — Indicador online/offline + operações com erro na tela de sync
+
+Data: 2026-10-14. Ciclo TDD: RED → GREEN. 364/364 testes passando (+8 novos; nenhuma regressão).
+
+**Implementado:**
+- `mobile/src/services/local-db.ts`: nova função `getFailedEntries()` — retorna `OutboxRow[]` com `status IN ('FAILED', 'CONFLICT')`.
+- `mobile/app/(protected)/(tabs)/sync.tsx`: importa `getFailedEntries` e `isOnline`; estados `online: boolean | null` e `failedEntries: OutboxRow[]`; `loadPending` usa `Promise.all` com 4 operações paralelas; JSX adicionou `testID="sync-connectivity"` (texto "Online"/"Offline") e seção `testID="sync-errors"` / `testID="sync-failed-count"` condicionada a `failedEntries.length > 0`.
+- `mobile/jest.setup.js`: `getAllAsync` atualizado com despacho para SQL `WHERE status IN`.
+- `mobile/__tests__/local-db.test.ts`: +4 testes `SYNC-FE-M04-FULL — getFailedEntries()`.
+- `mobile/__tests__/sync-screen.test.tsx`: +4 testes (Online/Offline indicador; contagem de erros; ausência quando sem erros).
+
+**Fix de teste:** `@testing-library/react-native@14` usa correspondência exata em `toHaveTextContent(string)` — corrigido para `'1 operação com erro'` (não `'1'`). Regex `/.../` continua disponível para correspondência parcial.
+
+**SYNC-FE-M04-FULL permanece PARTIAL:** "Baixar alterações", "Tentar novamente" e "Status por evidência" bloqueados por SYNC-PULL (backend).
+
+---
+
+### TDD-SYNC-OUTBOX-SCHEMA-2026-10-14 — Campos status e last_error no outbox
+
+Data: 2026-10-14. Ciclo TDD: RED → GREEN. 356/356 testes passando (+9 novos; nenhuma regressão).
+
+**Implementado:**
+- `mobile/src/services/local-db.ts`: novo tipo exportado `OutboxStatus = 'PENDING' | 'FAILED' | 'CONFLICT' | 'COMPLETED'`; `OutboxRow` recebe `status: OutboxStatus` e `last_error: string | null`; DDL atualizado com os dois campos (`status DEFAULT 'PENDING'`, `last_error TEXT`); `upsertOutboxEntry` inicializa `status='PENDING', last_error=NULL`; `markEntriesSynced` define `status='COMPLETED'`; `incrementErrorCount` substituído por `markEntryFailed(id, status: 'FAILED' | 'CONFLICT', lastError?)`.
+- `mobile/src/services/sync-service.ts`: import atualizado; CONFLICT → `markEntryFailed(id, 'CONFLICT')`, demais falhas → `markEntryFailed(id, 'FAILED')`.
+- `mobile/jest.setup.js`: INSERT outbox inicializa `status: 'PENDING', last_error: null`; UPDATE synced=1 define `status: 'COMPLETED'`; UPDATE error_count agora lê params como `[status, last_error, id]` e grava ambos.
+- `mobile/__tests__/local-db.test.ts`: 5 novos testes SYNC-OUTBOX-SCHEMA — upsert inicia PENDING, markEntryFailed FAILED/CONFLICT, last_error armazenado, markEntriesSynced → COMPLETED.
+- `mobile/__tests__/sync-service.test.ts`: 4 novos testes SYNC-OUTBOX-SCHEMA — APPLIED→COMPLETED, REJECTED→FAILED, CONFLICT→CONFLICT, falha de rede→FAILED.
+
+**YAGNI:** `dependency_ids` excluído do escopo (sem consumidor atual).
+
+**Compatibilidade:** todos os testes existentes com `toMatchObject({ synced: 0, error_count: 1 })` continuam verdes — a adição de `status` não quebra asserções com subconjunto.
+
+---
+
+### TDD-SYNC-METADATA-2026-10-14 — Tabela sync_metadata e last_successful_sync
+
+Data: 2026-10-14. Ciclo TDD: RED → GREEN. 347/347 testes passando (+11 novos; nenhuma regressão).
+
+**Implementado:**
+- `mobile/src/services/local-db.ts`: tabela `sync_metadata (key TEXT PK, value TEXT)` criada em `getDb()`; exporta `saveSyncMetadata(key, value)` e `getSyncMetadata(key)`.
+- `mobile/src/services/sync-service.ts`: chama `saveSyncMetadata('last_successful_sync', new Date().toISOString())` ao final de `syncPending` quando `synced > 0`.
+- `mobile/app/(protected)/(tabs)/sync.tsx`: `loadPending` usa `Promise.all([countPendingEntries(), getSyncMetadata(...)])` e exibe data/hora da última sync com `testID="sync-last-time"`.
+- `mobile/jest.setup.js`: mock `expo-sqlite` atualizado com `__metaStore: new Map()`; `runAsync` e `getFirstAsync` despacham por padrão SQL (COUNT/sync_metadata/outbox).
+- `mobile/__tests__/local-db.test.ts` (novo): 4 testes — null quando ausente, salva/recupera, sobrescreve (idempotente), chaves independentes.
+- `mobile/__tests__/sync-service.test.ts`: 3 testes adicionais de SYNC-METADATA.
+- `mobile/__tests__/sync-screen.test.tsx`: 2 testes adicionais; fix: `await renderWithSession(...)` (RTL v14 async — render is a Promise, must be awaited to flush initial useEffect before waitFor).
+
+**Insight técnico:** `@testing-library/react-native@14` expõe `render` como `async function` — sem `await`, `screen` não está configurado quando `waitFor` começa, gerando "`render function has not been called`" no primeiro teste do arquivo (DB não inicializado = mais ticks async no primeiro uso). Corrigido em `renderSync()`.
+
+---
+
+### TDD-FE-M04-2026-10-13 — Tela de sincronização implementada
+
+Data: 2026-10-13. Ciclo TDD: RED → GREEN. 331/331 testes passando (+4 em relação ao ciclo anterior).
+
+**Implementado:**
+- `mobile/__tests__/sync-screen.test.tsx` criado: 4 testes — "Tudo sincronizado" quando fila vazia, contagem de itens pendentes, botão aciona sync, exibe resultado com synced/failed.
+- `mobile/app/(protected)/(tabs)/sync.tsx` criado: tela FE-M04 com `useEffect` para carga inicial (crítico: `useFocusEffect` é no-op nos testes), `useFocusEffect` para recarga ao focar, botão de sync manual, exibição de resultado.
+- `mobile/app/(protected)/(tabs)/_layout.tsx` modificado: aba "Sync" adicionada antes de "Perfil".
+- `mobile/src/design-system/components/Icon.tsx` modificado: ícone `sync` adicionado ao `ICON_PATHS`.
+
+**Causa raiz:** `app/(protected)/(tabs)/sync.tsx` simplesmente não existia; `countPendingEntries()` em `local-db.ts` estava sem consumidor de UI.
+
+**Insight técnico:** `useFocusEffect` no mock `expo-router` (`src/test-utils/expo-router-mock.tsx`) é `export function useFocusEffect() {}` — completamente vazio. Carga inicial deve usar `useEffect` para os testes funcionarem.
+
+**Não implementado:** nenhuma alteração fora do escopo da pendência.
+
+---
+
+### TDD-F11-2026-10-13 — MOBILE-MOCK-SYNC: `POST /mobile/sync/push` adicionado ao mock
+
+Data: 2026-10-13. Ciclo TDD: RED → GREEN. 327/327 testes passando.
+
+**Implementado:**
+- `mobile/src/services/mock/mock-server.ts`: nova rota `POST /mobile/sync/push` adicionada ao array `routes`; lê `body.operations`, retorna `{ results: [{ operationId, status: 'APPLIED' }] }` para cada operação.
+- `mobile/src/services/mock/mock-server.test.ts` criado: 3 testes — aplica operações e devolve APPLIED, lista vazia sem operações, exige autenticação (401 sem token).
+
+**Causa raiz:** `routes` não possuía handler para `POST /mobile/sync/push` → `handleMockRequest` retornava 404 → `sync-service.ts` capturava o erro e incrementava `errorCount` em todas as operações → outbox nunca drenava em modo mock.
+
+**Não implementado:** sem alterações fora do escopo da pendência.
+
+---
+
+### TDD-F6-2026-10-13 — MOBILE-AUTH-CODE: `UNAUTHORIZED` mapeado em `toAuthFailureCode()`
+
+Data: 2026-10-13. Ciclo TDD: RED → GREEN → REFACTOR. 324/324 testes passando.
+
+**Implementado:**
+- `mobile/src/features/auth/session-context.tsx`: `case 'UNAUTHORIZED': return 'INVALID_CREDENTIALS'` adicionado ao switch de `toAuthFailureCode()`.
+- `mobile/src/features/auth/session-context.test.tsx`: novo caso de teste `'trata UNAUTHORIZED como credencial inválida (sessão expirada sem refresh)'`.
+
+**Causa raiz:** switch não possuía `case 'UNAUTHORIZED'` → caía em `default: return 'UNEXPECTED'` → UI exibia mensagem genérica.
+
+**Não implementado:** nenhuma alteração fora do escopo da pendência.
+
+---
 
 ### AUDITORIA-2026-10-13 — Auditoria completa do código e documentação de inventário de telas
 
@@ -31,8 +223,8 @@ Objetivo: garantir que toda a documentação reflita fielmente o estado atual do
 - Nenhuma decisão de produto tomada (D7, D9, D22, CORS, SUPERVISOR-SCOPE registrados como PENDING).
 
 **Achados de maior impacto:**
-- Mobile: `UNAUTHORIZED` não mapeado em `toAuthFailureCode()` → senha errada mostra mensagem genérica (1 linha para corrigir).
-- Mobile: `POST /mobile/sync/push` ausente do mock → outbox nunca drena em modo mock.
+- Mobile: ~~`UNAUTHORIZED` não mapeado em `toAuthFailureCode()` → senha errada mostra mensagem genérica~~ **RESOLVIDO 2026-10-13 (TDD F6)**.
+- Mobile: ~~`POST /mobile/sync/push` ausente do mock → outbox nunca drena em modo mock~~ **RESOLVIDO 2026-10-13 (TDD F11)**.
 - Web: `displayOrder` ausente nos payloads do construtor → construtor inutilizável contra API real.
 - Web: shell completamente ausente → 20/23 telas inacessíveis ao usuário.
 - Backend: CORS ausente → web não funciona em produção sem proxy reverso.

@@ -2,28 +2,20 @@ import { inject, provideAppInitializer, type EnvironmentProviders } from '@angul
 
 import { getMockStore } from '@fieldops/shared';
 
-import { environment } from '../../../environments/environment';
 import { AuthStore } from '../auth/auth.store';
 
 /**
  * Sessão de desenvolvimento do modo fictício.
  *
- * As rotas administrativas são protegidas por `authGuard`, que manda ao
- * `/login` quem não tem sessão. Enquanto a tela de login (FE-W01) não existe,
- * nenhuma tela protegida seria alcançável e não daria para conferir nada
- * localmente.
+ * Abre a sessão direto no store sem passar pela rede, permitindo que o modo
+ * fictício funcione sem backend. Registrado por `provideCore(true)` — não
+ * incluir manualmente fora desse contexto.
  *
- * Isto abre a sessão direto no store, sem passar pela rede — o backend fictício
- * cobre os recursos de domínio, não os endpoints de autenticação. Vale só com
- * `mockApi` ligado, e some junto com ele.
- *
- * **Apagar quando FE-W01 entrar.** Não é um caminho de autenticação: é um
- * andaime para a verificação visual.
+ * O supervisor é o perfil com acesso a tudo que a área administrativa oferece,
+ * incluindo a revisão de inspeções (RN-079).
  */
 export function provideMockSession(): EnvironmentProviders {
   return provideAppInitializer(() => {
-    if (!environment.mockApi) return;
-
     const store = inject(AuthStore);
     if (store.isAuthenticated()) return;
 

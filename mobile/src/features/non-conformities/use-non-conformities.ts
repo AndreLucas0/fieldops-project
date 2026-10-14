@@ -63,8 +63,7 @@ export function useNonConformities(
           description: draft.description.trim(),
           severity: draft.severity,
           createdAtDevice: new Date().toISOString(),
-          ...(context.inspectionItemId ? { inspectionItemId: context.inspectionItemId } : {}),
-          ...(context.responseId ? { responseId: context.responseId } : {}),
+          ...(context.responseId ? { snapshotId: context.responseId } : {}),
         };
 
         const created = await client.post<NonConformity>(

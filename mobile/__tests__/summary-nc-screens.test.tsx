@@ -212,7 +212,11 @@ describe('FE-M10 — Não conformidades', () => {
   it('registra a não conformidade vinculada ao item do checklist', async () => {
     const id = inspectionWith('IN_PROGRESS');
     const item = itemsOf(id)[0];
-    await renderNonConformities(id, { inspectionItemId: item?.id ?? '' });
+    const existingResponse = getMockDatabase().responses[id]?.find(
+      (r) => r.inspectionItemId === item?.id,
+    );
+    const responseId = existingResponse?.id ?? '';
+    await renderNonConformities(id, { inspectionItemId: item?.id ?? '', responseId });
 
     await fireEvent.press(screen.getByTestId('nc-nova'));
     await fireEvent.changeText(screen.getByTestId('nc-titulo'), 'Vazamento no flange');
@@ -224,8 +228,34 @@ describe('FE-M10 — Não conformidades', () => {
     const criada = getMockDatabase().nonConformities.find(
       (nc) => nc.title === 'Vazamento no flange',
     );
-    expect(criada?.inspectionItemId).toBe(item?.id);
+    expect(criada?.inspectionItemId).toBe(responseId);
     expect(screen.getByTestId(`nc-item-${criada?.id}`)).toBeOnTheScreen();
+  });
+
+  it('F10 — vincula a NC ao snapshotId do snapshot e não ao UUID do item de template', async () => {
+    const id = inspectionWith('IN_PROGRESS');
+    const item = itemsOf(id)[0];
+    const existingResponse = getMockDatabase().responses[id]?.find(
+      (r) => r.inspectionItemId === item?.id,
+    );
+    const responseId = existingResponse?.id ?? '';
+
+    await renderNonConformities(id, { inspectionItemId: item?.id ?? '', responseId });
+
+    await fireEvent.press(screen.getByTestId('nc-nova'));
+    await fireEvent.changeText(screen.getByTestId('nc-titulo'), 'Pressão acima do limite');
+    await fireEvent.changeText(screen.getByTestId('nc-descricao'), 'Manômetro fora da faixa.');
+    await fireEvent.press(screen.getByTestId('nc-salvar'));
+
+    await waitFor(() => expect(screen.queryByTestId('nc-formulario')).toBeNull());
+
+    const criada = getMockDatabase().nonConformities.find(
+      (nc) => nc.title === 'Pressão acima do limite',
+    );
+    // O backend lê snapshotId, não inspectionItemId — o vínculo deve apontar
+    // para o UUID do snapshot (responseId), não para o UUID do item de template.
+    expect(criada?.inspectionItemId).toBe(responseId);
+    expect(criada?.inspectionItemId).not.toBe(item?.id);
   });
 
   it('edita uma não conformidade existente (PEND-06)', async () => {

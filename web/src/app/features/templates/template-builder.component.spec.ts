@@ -147,6 +147,54 @@ describe('TemplateBuilderComponent', () => {
     expect(texto(fixture)).toContain('Disjuntor calibrado?');
   });
 
+  it('criar seção inclui displayOrder no payload enviado ao serviço', () => {
+    const fixture = setup(TEMPLATE_IDS.eletrico, {
+      sectionDialogResult: { title: 'Aterramento', description: null },
+    });
+    const templates = TestBed.inject(TemplatesService);
+    const createSection = vi.spyOn(templates, 'createSection');
+
+    const botao = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    ).find((el) => el.textContent?.includes('Nova seção'))!;
+    botao.click();
+    fixture.detectChanges();
+
+    expect(createSection).toHaveBeenCalledWith(
+      TEMPLATE_IDS.eletrico,
+      expect.objectContaining({ displayOrder: expect.any(Number) }),
+    );
+  });
+
+  it('criar item inclui displayOrder no payload enviado ao serviço', () => {
+    const fixture = setup(TEMPLATE_IDS.eletrico, {
+      itemDialogResult: {
+        code: null,
+        title: 'Disjuntor calibrado?',
+        description: null,
+        responseType: 'BOOLEAN',
+        required: true,
+        observationRequiredOnFailure: false,
+        evidenceRequiredOnFailure: false,
+        optionsJson: null,
+      },
+    });
+    const templates = TestBed.inject(TemplatesService);
+    const createItem = vi.spyOn(templates, 'createItem');
+
+    const botao = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    ).find((el) => el.textContent?.includes('Novo item'))!;
+    botao.click();
+    fixture.detectChanges();
+
+    expect(createItem).toHaveBeenCalledWith(
+      TEMPLATE_IDS.eletrico,
+      expect.any(String),
+      expect.objectContaining({ displayOrder: expect.any(Number) }),
+    );
+  });
+
   it('modelo inexistente mostra o erro com botão de nova tentativa', () => {
     const fixture = setup('id-que-nao-existe');
     expect(texto(fixture)).toContain('Tentar novamente');

@@ -1,8 +1,8 @@
 # Web — Inventário de Telas e Status de Integração
 
-**Data:** 2026-10-13
-**Branch analisada:** `main` (HEAD após INT-011, branch `task/int-011-web-login-real-backend` mergeada)
-**Tipo:** inventário somente leitura — nenhum código alterado durante a análise
+**Data:** 2026-10-14 (atualizado — auditoria documental)
+**Branch analisada:** `main` (HEAD após WEB-MOCK-AUTH + WEB-DISPLAYORDER, não commitados)
+**Tipo:** inventário atualizado em 2026-10-14 com base em evidências de código e testes (205/205 web GREEN)
 **Fonte primária:** `docs/telas-frontend.md` §2, `docs/auditoria-frontend-backend.md`, `web/src/app/`
 
 ---
@@ -15,7 +15,7 @@
 
 ---
 
-## Resumo executivo (2026-10-13)
+## Resumo executivo (2026-10-14)
 
 | Status | Contagem | % |
 |---|---:|---:|
@@ -27,7 +27,7 @@ Raízes dos blockers transversais:
 
 1. **Shell ausente** — não há menu lateral, botão de logout, toasts de sucesso/erro, nem cabeçalho de navegação. Toda tela que não seja Login ou Dashboard fica inacessível sem shell.
 2. **6 de 8 serviços HTTP órfãos** — `UsersService`, `ClientsService`, `SitesService`, `EquipmentService`, `InspectionsService` e `NonConformitiesService` existem em `resources.ts` mas nenhuma tela os consome.
-3. **`displayOrder` ausente nos payloads do construtor** — `POST .../sections` e `POST .../sections/{id}/items` enviados pelo construtor não incluem `displayOrder`, obrigatório no backend → 400 contra API real.
+3. ~~**`displayOrder` ausente nos payloads do construtor**~~ — **RESOLVIDO 2026-10-14** (WEB-DISPLAYORDER): `addSection()` e `addItem()` agora incluem `displayOrder`. Ver `pending-features.md` WEB-DISPLAYORDER.
 4. **URL inconsistente em `resources.ts`** — `list()`/`get()` usam `/templates/{id}`, enquanto `update()`, `createSection()`, `createItem()` usam `/inspection-templates/{id}`. O backend aceita ambos (dual mapping), mas `listVersions()` espera array e recebe `Page`.
 5. **Nested endpoints retornam `Page`, não array** — `GET /clients/{clientId}/sites` e `GET /sites/{siteId}/equipment` retornam `PageResponse`; `resources.ts` itera direto.
 
@@ -52,7 +52,7 @@ Implementado (após INT-011, 2026-10-05):
 - Identidade após F5 vem de `GET /auth/me` (refresh não traz `user`).
 
 Blockers abertos:
-- **WEB-MOCK-AUTH**: com `npm start` (mock), login não funciona — sem mock de `/auth` e `provideMockSession()` não registrado.
+- ~~**WEB-MOCK-AUTH**: com `npm start` (mock), login não funciona — sem mock de `/auth` e `provideMockSession()` não registrado.~~ — **RESOLVIDO 2026-10-14**: `provideCore(useMock)` agora inclui `provideMockSession()` quando `useMock=true`. Ver `pending-features.md` WEB-MOCK-AUTH.
 - **D22**: orientação específica para conta inativa pendente de decisão de produto.
 - **Shell ausente**: logout não existe.
 
@@ -232,10 +232,11 @@ Nenhum componente de criação de modelo.
 
 Implementado: editor visual de seções e itens existe e está roteado.
 
-Blockers confirmados por leitura de código:
-- **`displayOrder` ausente (F1/F2)**: `TemplateBuilderDialogComponent` não inclui `displayOrder` nos payloads de criação → backend retorna 400. Impede qualquer adição de seção ou item contra API real.
-- Reordenação também retorna 400 (campos obrigatórios ausentes em `PUT .../sections/{id}` e `PUT .../items/{id}`).
-- Publicar modelo funciona (`POST .../publish` sem corpo) — único fluxo do construtor que funciona contra API real.
+Blockers:
+- ~~**`displayOrder` ausente (F1/F2)**~~ — **RESOLVIDO 2026-10-14** (WEB-DISPLAYORDER): `addSection()` envia `{ ...result, displayOrder: this.sections().length + 1 }` e `addItem()` envia `{ ...result, displayOrder: (section.items ?? []).length + 1 }`. 2 testes RED→GREEN; regressão 203/203 GREEN.
+- **Reordenação ainda retorna 400**: `PUT .../sections/{id}` e `PUT .../items/{id}` não incluem todos os campos obrigatórios. Aguarda ciclo de implementação dedicado.
+- **Shell ausente**: construtor inacessível sem URL direta.
+- Publicar modelo funciona (`POST .../publish` sem corpo).
 
 ---
 
@@ -354,8 +355,8 @@ Sem endpoint de backend definido (PEND-08 — escopo futuro). Mantida no invent�
 
 | ID | Descrição | Impacto |
 |---|---|---|
-| F1 | `createSection()` não envia `displayOrder` → 400 | Construtor inutilizável contra API real |
-| F2 | `createItem()` não envia `displayOrder` → 400 | Idem |
+| ~~F1~~ | ~~`createSection()` não envia `displayOrder` → 400~~ | **RESOLVIDA 2026-10-14** (WEB-DISPLAYORDER) |
+| ~~F2~~ | ~~`createItem()` não envia `displayOrder` → 400~~ | **RESOLVIDA 2026-10-14** (WEB-DISPLAYORDER) |
 | F13 | `listVersions()` itera array; backend retorna `Page` | FE-W17 quebraria |
 | F14 | `GET /clients/{clientId}/sites` retorna `Page`, não array | FE-W07 quebraria |
 | F15 | `GET /sites/{siteId}/equipment` retorna `Page`, não array | FE-W10 quebraria |
@@ -369,8 +370,8 @@ Sem endpoint de backend definido (PEND-08 — escopo futuro). Mantida no invent�
 Em ordem de desbloqueio:
 
 1. **WEB-SHELL** — menu lateral, logout, toasts. Desbloqueia navegação para todas as telas.
-2. **WEB-DISPLAYORDER** — incluir `displayOrder` nos payloads do construtor. Desbloqueia FE-W15 contra API real.
-3. **WEB-MOCK-AUTH** — mock de `/auth` para `npm start`.
+2. ~~**WEB-DISPLAYORDER** — incluir `displayOrder` nos payloads do construtor.~~ — **RESOLVIDO 2026-10-14**.
+3. ~~**WEB-MOCK-AUTH** — mock de `/auth` para `npm start`.~~ — **RESOLVIDO 2026-10-14**.
 4. **FE-W03 + FE-W04** (Usuários) — menor dependência; bom ponto de entrada para cadastros.
 5. **FE-W05–W12** (Clientes, Locais, Equipamentos) — dependem do shell; podem ser feitas em paralelo.
 6. **FE-W18–W21** (Inspeções e Revisão) — maior complexidade; dependem de cadastros e shell.

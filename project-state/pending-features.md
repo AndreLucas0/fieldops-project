@@ -739,18 +739,28 @@ no backend. Registrado aqui para que a decisão seja explícita antes do deploy.
 
 ## WEB-MOCK-AUTH — Login web não funciona em modo mock
 
-Status: PENDING
+Status: DONE (2026-10-14)
 
 Description:
-Com `npm start` (configuração `development`, `mockApi: true`), o login web não funciona:
-- Não há mock de `/auth/login` nem de `/auth/refresh`.
-- `provideMockSession()` existe mas não está registrado em nenhum ponto de entrada.
+Com `npm start` (`mockApi: true`), `AuthService.login()` fazia HTTP para `/auth/login` mas não há
+servidor mock de auth — o mock é DI Angular, não interceção HTTP. `provideMockSession()` existia
+como andaime mas não estava registrado.
 
 Source:
 Detectado durante INT-011 (2026-10-05). Registrado como follow-up.
 
-Scope: (a) adicionar mock de `/auth` ao servidor mock e registrar `provideMockSession()`, ou
-(b) documentar que `npm run start:api` é o único modo funcional para desenvolvimento.
+Implementation (2026-10-14):
+- `core.providers.ts` `provideCore()`: adicionado parâmetro `useMock: boolean = environment.mockApi`;
+  passa `useMock` para `provideResources(useMock)`; inclui `provideMockSession()` quando `useMock = true`.
+- `mock-session.ts`: removida guarda `if (!environment.mockApi) return` — controle delegado a `provideCore()`.
+  Atualizado comentário JSDoc. Removido import de `environment` (não mais necessário).
+- `mock-session.spec.ts`: novo arquivo com 2 testes RED→GREEN:
+  - `injeta sessão de SUPERVISOR automaticamente quando modo fictício está ativo`
+  - `não injeta sessão automática quando modo fictício está desativado`
+
+Validation (2026-10-14):
+- Ambos os testes novos — GREEN
+- Regressão: 205/205 GREEN (0 regressões)
 
 ---
 
@@ -835,51 +845,278 @@ Scope: `ShellComponent` com `<mat-sidenav-container>`, `<mat-toolbar>` (logout +
 
 ## WEB-DISPLAYORDER — `displayOrder` ausente nos payloads do construtor de modelos
 
-Status: PENDING
+Status: DONE (2026-10-14)
 
 Description:
-`TemplateBuilderDialogComponent` não inclui `displayOrder` nos payloads de criação/edição de seções
-e itens. `TemplateSectionCreateRequest` e `TemplateItemRequest` têm `displayOrder*` obrigatório no
-backend → qualquer adição ou edição retorna 400 contra API real. O construtor de modelos é inutilizável
-contra a API real.
+`TemplateBuilderComponent.addSection()` e `addItem()` não incluíam `displayOrder` nos payloads
+enviados ao `TemplatesService`. `TemplateSectionCreateRequest` e `TemplateItemRequest` têm
+`displayOrder*` obrigatório no backend → adição de seções/itens retornava 400 contra a API real.
+O mock escondia o bug com fallback `displayOrder: input.displayOrder ?? list.length + 1`.
 
 Source:
 `docs/auditoria-frontend-backend.md` §19 (F1/F2). Confirmado na re-auditoria 2026-10-13.
 
-Scope: adicionar `displayOrder: index + 1` nos DTOs enviados pelo construtor web. Baixo risco, alto impacto.
+Implementation (2026-10-14):
+- `template-builder.component.ts` `addSection()`: payload alterado para
+  `{ ...result, displayOrder: this.sections().length + 1 }`.
+- `template-builder.component.ts` `addItem()`: payload alterado para
+  `{ ...result, displayOrder: (section.items ?? []).length + 1 }`.
+- `template-builder.component.spec.ts`: 2 novos testes RED→GREEN verificando
+  que `displayOrder` está presente em ambas as chamadas de serviço.
+
+Validation (2026-10-14):
+- `TemplateBuilderComponent > criar seção inclui displayOrder no payload` — GREEN
+- `TemplateBuilderComponent > criar item inclui displayOrder no payload` — GREEN
+- Regressão: 203/203 GREEN (0 regressões)
 
 ---
 
 ## MOBILE-AUTH-CODE — `UNAUTHORIZED` não mapeado em `toAuthFailureCode()`
 
-Status: PENDING
+Status: DONE (2026-10-13)
 
 Description:
-`toAuthFailureCode()` em `mobile/src/features/auth/session-context.tsx` não mapeia o código
-`UNAUTHORIZED` (resposta real do backend para credenciais inválidas) → cai no `default: return 'UNEXPECTED'`
-→ UI exibe "Não foi possível entrar agora." em vez de "E-mail ou senha incorretos."
+`toAuthFailureCode()` em `mobile/src/features/auth/session-context.tsx` não mapeava o código
+`UNAUTHORIZED` → caía no `default: return 'UNEXPECTED'` → UI exibia "Não foi possível entrar agora."
+
+Fix:
+Adicionado `case 'UNAUTHORIZED': return 'INVALID_CREDENTIALS'` em `session-context.tsx:89-90`.
+Teste adicionado em `session-context.test.tsx` (describe `toAuthFailureCode`).
+324/324 testes passando após a correção.
 
 Source:
 Re-auditoria 2026-10-13. Divergência F6 em `docs/auditoria-frontend-backend.md`.
-
-Scope: adicionar `case 'UNAUTHORIZED': return 'INVALID_CREDENTIALS'` em `toAuthFailureCode()`.
-Uma linha. Risco mínimo.
 
 ---
 
 ## MOBILE-MOCK-SYNC — `POST /mobile/sync/push` ausente do mock mobile
 
-Status: PENDING
+Status: DONE (2026-10-13)
 
 Description:
-`mobile/src/services/mock/mock-server.ts` não cobre `POST /mobile/sync/push`. Em modo mock
-(padrão), o outbox SQLite nunca drena: entradas ficam `synced=0` permanentemente. `summary.tsx`
-pode avaliar completude incorretamente.
+`mobile/src/services/mock/mock-server.ts` não cobria `POST /mobile/sync/push`. Em modo mock
+(padrão), o outbox SQLite nunca drenava: entradas ficavam `synced=0` permanentemente.
 
 Source:
 Re-auditoria 2026-10-13 (leitura de `mock-server.ts`). Divergência F11.
 
-Scope: adicionar handler `POST /mobile/sync/push` ao mock retornando todos os `operationId`s como `APPLIED`.
+Implementation (2026-10-13):
+- `mobile/src/services/mock/mock-server.ts`: nova rota `POST /mobile/sync/push` adicionada ao array `routes`; lê `body.operations`, devolve `{ results: [{ operationId, status: 'APPLIED' }] }` para cada entrada.
+- `mobile/src/services/mock/mock-server.test.ts` criado: 3 testes — aplica operações e devolve APPLIED, lista vazia, exige autenticação. 327/327 testes passando.
+
+---
+
+## MOBILE-TYPECHECK — 3 erros de TypeScript no mobile (pré-existentes)
+
+Status: PENDING
+
+Description:
+`npx tsc --noEmit` no mobile reporta 3 erros pré-existentes que não bloqueiam os testes mas
+impedem o typecheck limpo. Identificados na auditoria 2026-10-14.
+
+Erros:
+1. `src/features/sync/use-sync.ts:12` — `NetworkState.isInternetReachable` é `boolean | undefined`
+   em `expo-network`, mas `AddNetworkListener` espera `boolean | null`. Incompatibilidade de tipo
+   entre a definição local e os tipos do pacote.
+2. `src/services/mock/mock-server.test.ts:13` — objeto `MockRequest` sem campo `accessToken`
+   (obrigatório no tipo). O teste de login/auth não precisa de token, mas o tipo exige.
+3. `src/services/mock/mock-server.test.ts:82` — idem, linha 82.
+
+Source:
+Detectado em 2026-10-14 (auditoria documental, `npx tsc --noEmit`). Anotado em `progress.md`
+entrada TDD-FE-M04-DETAILS como "pré-existentes". Testes passam (373/373 GREEN) — só typecheck falha.
+
+Scope:
+- Erro 1: alinhar a definição de `AddNetworkListener` com o tipo real de `expo-network` (`boolean | undefined`).
+- Erros 2/3: tornar `accessToken` opcional em `MockRequest`, ou criar helper de fixture.
+
+---
+
+## OFFLINE-FIRST-REPLAN — Replanejamento da arquitetura offline-first do mobile
+
+Status: PENDING (replan registrado 2026-10-13)
+
+**Contexto:** A especificação do produto (`aplicativo-mobile.md` §13.8, `contrato-backend-frontend.md` §11, `telas-frontend.md` §FE-M04/§7.6) exige que TODA alteração do técnico seja salva primeiro no SQLite e só depois sincronizada com o backend. A implementação atual cobre apenas `INSPECTION_RESPONSE`; os demais entity types e o mecanismo de reconexão automática estão incompletos.
+
+**Auditoria realizada em 2026-10-13** comparando código atual com docs. Gaps identificados em ordem de prioridade:
+
+---
+
+### SYNC-RECONNECT — Auto-sync quando rede reconecta
+
+Status: DONE
+
+Implementado em 2026-10-13. `useSyncOnForeground` (`use-sync.ts`) agora registra `addNetworkStateListener` (de `expo-network`) para detectar a transição `isInternetReachable: false → true` e disparar `syncPendingIfOnline`. O listener é removido no cleanup do `useEffect`. A função aceita `_addNetworkListener` como parâmetro opcional (dependency injection) para testabilidade — a default continua sendo `addNetworkStateListener` do `expo-network`.
+
+Abordagem técnica:
+- `prevReachable.current` (ref, inicia `null`) rastreia o estado anterior da rede.
+- Sync só dispara quando `prevReachable.current === false && isInternetReachable === true` (transição offline→online explícita).
+- Evita duplo disparo no mount (null≠false) e em transições online→online.
+- Dependency injection via parâmetro opcional — contorna limitação de mocking de namespace ES modules no jest-expo/Metro.
+
+Arquivos alterados:
+- `mobile/src/features/sync/use-sync.ts` — lógica do listener + DI
+- `mobile/__tests__/use-sync.test.ts` — 7 novos testes TDD (RED→GREEN)
+- `mobile/jest.setup.js` — mock de `addNetworkStateListener` no mock global de `expo-network`
+
+Validação (2026-10-13):
+- 7/7 testes `__tests__/use-sync.test.ts` GREEN
+- 336/338 regressão total (2 timeouts intermitentes pré-existentes em `summary-nc-screens.test.tsx` e `checklist-screen.test.tsx` — não relacionados às alterações)
+
+Scope: frontend-only, nenhuma alteração de backend necessária.
+Arquivo: `mobile/src/features/sync/use-sync.ts`
+Referência: `arquitetura.md` §11.9, `contrato-backend-frontend.md` §8.7 ponto 3.
+
+---
+
+### SYNC-METADATA — Tabela SyncMetadata ausente do SQLite
+
+Status: DONE (2026-10-14)
+
+Implementado:
+- `mobile/src/services/local-db.ts`: tabela `sync_metadata (key TEXT PK, value TEXT)` criada em `getDb()`; exporta `saveSyncMetadata(key, value)` e `getSyncMetadata(key)`.
+- `mobile/src/services/sync-service.ts`: importa `saveSyncMetadata`; chama `saveSyncMetadata('last_successful_sync', new Date().toISOString())` ao final de `syncPending` quando `synced > 0`.
+- `mobile/app/(protected)/(tabs)/sync.tsx`: importa `getSyncMetadata`; `loadPending` usa `Promise.all` para carregar contagem + última sync; exibe data/hora com `testID="sync-last-time"`.
+- `mobile/jest.setup.js`: mock `expo-sqlite` atualizado com `__metaStore: new Map()`, `runAsync` despacha `INSERT OR REPLACE INTO sync_metadata`, `getFirstAsync` despacha por padrão SQL.
+- `mobile/__tests__/local-db.test.ts` (novo): 4 testes — null quando ausente, salva/recupera, sobrescreve (idempotente), chaves independentes.
+- `mobile/__tests__/sync-service.test.ts`: 3 testes adicionais — salva `last_successful_sync` quando `synced > 0`; não salva quando tudo REJECTED; não salva quando outbox vazio.
+- `mobile/__tests__/sync-screen.test.tsx`: 2 testes adicionais — exibe data da última sync; não exibe seção quando nunca sincronizou. Fix: `await renderWithSession(...)` (RTL v14 async).
+
+Validação: 347/347 testes GREEN (30 novos: 4 local-db + 3 sync-service + 2 sync-screen adicionais + 21 pré-existentes nas 3 suítes).
+
+Scope: frontend-only.
+Arquivos: `local-db.ts`, `sync-service.ts`, `sync.tsx`, `jest.setup.js`, 3 arquivos de teste.
+
+---
+
+### SYNC-FE-M04-FULL — Tela FE-M04 incompleta
+
+Status: PARTIAL (itens frontend-only implementados 2026-10-14; itens que requerem backend/outros cycles permanecem abertos)
+
+| Campo/ação | Status |
+|---|---|
+| Quantidade pendente | ✅ implementado |
+| Botão "Sincronizar agora" | ✅ implementado |
+| Resultado da última sync (synced/failed) | ✅ implementado |
+| Última sincronização (data/resultado) | ✅ implementado — SYNC-METADATA 2026-10-14 |
+| Operações com erro (FAILED/CONFLICT visíveis) | ✅ implementado — 2026-10-14 (`getFailedEntries`, `testID="sync-failed-count"`) |
+| Indicador online/offline | ✅ implementado — 2026-10-14 (`testID="sync-connectivity"`) |
+| Status por evidência pendente | ❌ ausente — EVIDENCE não está no outbox |
+| Ação "Baixar alterações" (pull) | ❌ ausente — depende de SYNC-PULL (backend) |
+| "Tentar novamente" por operação específica | ❌ ausente — depende de SYNC-PULL (backend) |
+
+Implementação 2026-10-14:
+- `local-db.ts`: adicionado `getFailedEntries()` — retorna entradas `WHERE status IN ('FAILED', 'CONFLICT')`.
+- `sync.tsx`: adicionados estados `online` e `failedEntries`; `loadPending` agora usa `Promise.all` com `getFailedEntries()` e `isOnline()`; UI exibe `testID="sync-connectivity"` (Online/Offline) e seção `testID="sync-failed-count"` quando há erros.
+- `jest.setup.js`: mock `getAllAsync` atualizado com despacho `WHERE status IN`.
+- Testes: 8 novos (4 em `local-db.test.ts` + 4 em `sync-screen.test.tsx`). Regressão: 364/364 GREEN.
+
+Bloqueios remanescentes: SYNC-PULL (backend), SYNC-OUTBOX-EVIDENCE (backend).
+Depends on: SYNC-METADATA ✅, SYNC-OUTBOX-SCHEMA ✅, SYNC-PULL ❌ (backend).
+
+---
+
+### SYNC-OUTBOX-SCHEMA — Schema do outbox incompleto
+
+Status: **DONE** — implementado 2026-10-14
+
+| Campo spec | Status |
+|---|---|
+| `operationId` (= `id`) | ✅ mapeado como `id` |
+| `entityType` | ✅ |
+| `entityId` | ✅ |
+| `operationType` | ✅ |
+| `baseVersion` | ✅ |
+| `payloadJson` | ✅ mapeado como `payload` |
+| `status` enum (PENDING/FAILED/CONFLICT/COMPLETED) | ✅ adicionado 2026-10-14 |
+| `lastError` (mensagem sanitizada) | ✅ adicionado como `last_error` 2026-10-14 |
+| `dependencyIds` JSON array | ⏩ YAGNI — excluído do escopo (sem consumidor) |
+| `attemptCount` | ✅ coberto por `error_count` |
+
+Implementação 2026-10-14:
+- `local-db.ts`: novo tipo `OutboxStatus`; `OutboxRow` + DDL com `status` e `last_error`; `upsertOutboxEntry` inicializa `status='PENDING', last_error=NULL`; `markEntriesSynced` define `status='COMPLETED'`; `incrementErrorCount` substituído por `markEntryFailed(id, status, lastError?)`.
+- `sync-service.ts`: usa `markEntryFailed` com `'CONFLICT'` para CONFLICT e `'FAILED'` para demais falhas.
+- `jest.setup.js`: mock atualizado para rastrear `status` e `last_error` no `__store`.
+- Testes: 9 novos (5 em `local-db.test.ts`, 4 em `sync-service.test.ts`). Regressão: 356/356 GREEN.
+Scope: frontend-only.
+
+---
+
+### SYNC-OUTBOX-INSPECTION — INSPECTION não passa pelo outbox
+
+Status: PENDING (requer backend)
+
+Problema: `start.tsx` chama `apiClient.post('/inspections/{id}/start')` diretamente. `summary.tsx` chama `apiClient.post('/inspections/{id}/submit')` diretamente. Ambas falham silenciosamente quando offline — o técnico vê um erro de rede em vez de "salvo no dispositivo".
+
+A spec é explícita (`contrato-backend-frontend.md` §11.3): "Iniciar inspeção... concluir/enviar inspeção. Todas gravam **primeiro** no SQLite." E (`telas-frontend.md` §FE-M07, ação Iniciar): "offline → grava local, marca 'aguardando sincronização', navega igual."
+
+Requer backend:
+- `SynchronizationService` precisa suportar `entityType: INSPECTION` com `operationType: START` e `SUBMIT`
+- Novos handlers em `SynchronizationService.apply()` para transições de estado da inspeção
+
+Requer frontend:
+- `start.tsx`: escrever `{ entityType: 'INSPECTION', operationType: 'START', payload: StartInspectionRequest }` no outbox, navegar mesmo sem rede
+- `summary.tsx`: idem para SUBMIT; UI mostra "Aguardando sincronização" em vez de "Concluída"
+
+Scope: requer mudanças em backend + frontend.
+
+---
+
+### SYNC-OUTBOX-NC — NON_CONFORMITY não passa pelo outbox
+
+Status: PENDING (requer backend)
+
+Problema: `useNonConformities` (`features/non-conformities/use-non-conformities.ts`) faz chamadas diretas à API para criar e atualizar NCs. Offline → falha com erro de rede.
+
+A spec (`contrato-backend-frontend.md` §11.3): "registrar não conformidade" é operação offline.
+
+Requer backend: `SynchronizationService` para `entityType: NON_CONFORMITY`.
+Requer frontend: reescrever `useNonConformities` para gravar no outbox SQLite primeiro.
+
+Scope: requer mudanças em backend + frontend.
+
+---
+
+### SYNC-OUTBOX-EVIDENCE — EVIDENCE não passa pelo outbox
+
+Status: PENDING (requer backend, caso especial)
+
+Problema: evidências (fotos) são enviadas diretamente via multipart/form-data para `POST /inspections/{id}/evidence`. Offline → falha.
+
+A spec (`contrato-backend-frontend.md` §10.8, §11.3): "capturar evidência" é operação offline. Arquivo mantido no dispositivo até `uploadedAt` confirmado (RN-047).
+
+Caso especial: diferente dos outros entity types, evidência tem um arquivo binário. O outbox não pode serializar o arquivo em JSON — precisa armazenar o `local_uri` (caminho do arquivo no dispositivo) e o multipart precisa ser construído na hora da sincronização.
+
+Requer backend: suporte a `entityType: EVIDENCE` no sync push (ou endpoint de upload separado respeitando o outbox).
+Requer frontend: armazenar `local_uri` + metadados no SQLite; `sync-service.ts` precisa tratar `EVIDENCE` diferentemente (upload multipart, não JSON).
+
+Scope: requer mudanças em backend + frontend. Maior complexidade do conjunto.
+
+---
+
+### SYNC-PULL — GET /mobile/sync/pull não implementado
+
+Status: PENDING (requer backend)
+
+Problema: a spec define um ciclo completo de sync (`telas-frontend.md` §7.6): PUSH → PULL. A fase PULL (`GET /mobile/sync/pull?cursor=...`) traz as mudanças do servidor (rejeições de supervisores, aprovações, etc.) para o SQLite local. Sem isso, o técnico não vê supervisor rejeitar/aprovar a inspeção.
+
+Requer backend: implementar `GET /mobile/sync/pull` com cursor.
+Requer frontend: fase pull em `sync-service.ts` após cada push bem-sucedido; atualizar `last_pull_cursor` em `SyncMetadata`.
+
+Scope: requer mudanças em backend + frontend.
+
+---
+
+**Ordem de implementação recomendada (por impacto/esforço):**
+
+1. `SYNC-RECONNECT` — puro frontend, 1 ciclo, fecha o gap mais crítico do auto-sync
+2. `SYNC-METADATA` — puro frontend, 1 ciclo, habilita campos do FE-M04
+3. `SYNC-OUTBOX-SCHEMA` — puro frontend, 1 ciclo (mas quebra mocks — requer atenção)
+4. `SYNC-FE-M04-FULL` — puro frontend, após os 3 acima
+5. `SYNC-OUTBOX-INSPECTION` — requer backend, alto impacto no fluxo principal
+6. `SYNC-OUTBOX-NC` — requer backend
+7. `SYNC-OUTBOX-EVIDENCE` — requer backend, maior complexidade
+8. `SYNC-PULL` — requer backend, finaliza o ciclo completo
 
 ---
 

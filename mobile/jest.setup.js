@@ -123,22 +123,25 @@ jest.mock('expo-image-picker', () => ({
 // expo-network não existe no ambiente de teste. Por padrão o dispositivo está
 // online; cada teste pode sobrescrever com mockResolvedValueOnce.
 jest.mock('expo-network', () => ({
+  __esModule: true,
   getNetworkStateAsync: jest.fn(),
+  addNetworkStateListener: jest.fn(),
 }));
 
-// expo-sqlite é nativo; um Map em memória reproduz o contrato de outbox
-// (insert/update synced/update error_count/select pending) sem I/O real.
+// expo-sqlite é nativo; Maps em memória reproduzem o contrato de outbox e
+// sync_metadata (insert/update/select) sem I/O real.
 // As funções ficam sem implementação no mock factory para que o beforeEach
 // possa fazer mockReset() + mockImplementation() sem perder a implementação.
 jest.mock('expo-sqlite', () => {
   const store = new Map();
+  const metaStore = new Map();
   const db = {
     execAsync: jest.fn(),
     runAsync: jest.fn(),
     getAllAsync: jest.fn(),
     getFirstAsync: jest.fn(),
   };
-  return { __store: store, __db: db, openDatabaseAsync: jest.fn(async () => db) };
+  return { __store: store, __metaStore: metaStore, __db: db, openDatabaseAsync: jest.fn(async () => db) };
 });
 
 beforeEach(() => {
@@ -146,10 +149,13 @@ beforeEach(() => {
   Network.getNetworkStateAsync
     .mockReset()
     .mockResolvedValue({ isConnected: true, isInternetReachable: true });
+  Network.addNetworkStateListener.mockReset().mockReturnValue({ remove: jest.fn() });
 
   const SQLite = require('expo-sqlite');
   SQLite.__store.clear();
+  SQLite.__metaStore.clear();
   const store = SQLite.__store;
+  const metaStore = SQLite.__metaStore;
   const db = SQLite.__db;
 
   db.execAsync.mockReset().mockResolvedValue(undefined);
@@ -167,29 +173,43 @@ beforeEach(() => {
         payload,
         synced: 0,
         error_count: 0,
+        status: 'PENDING',
+        last_error: null,
         created_at: new Date().toISOString(),
       });
     } else if (/UPDATE outbox SET synced = 1/i.test(sql)) {
       for (const rowId of params) {
         const row = store.get(rowId);
-        if (row) store.set(rowId, { ...row, synced: 1 });
+        if (row) store.set(rowId, { ...row, synced: 1, status: 'COMPLETED' });
       }
     } else if (/UPDATE outbox SET error_count/i.test(sql)) {
-      const rowId = params[0];
+      // markEntryFailed: params = [status, last_error, id]
+      const [status, last_error, rowId] = params;
       const row = store.get(rowId);
-      if (row) store.set(rowId, { ...row, error_count: row.error_count + 1 });
+      if (row) store.set(rowId, { ...row, error_count: row.error_count + 1, status, last_error });
+    } else if (/INSERT OR REPLACE INTO sync_metadata/i.test(sql)) {
+      const [key, value] = params;
+      metaStore.set(key, value);
     }
   });
-  db.getAllAsync.mockReset().mockImplementation(async (_sql, params) => {
+  db.getAllAsync.mockReset().mockImplementation(async (sql, params) => {
+    if (/WHERE status IN/i.test(sql)) {
+      return [...store.values()].filter((r) => r.status === 'FAILED' || r.status === 'CONFLICT');
+    }
     const rows = [...store.values()].filter((r) => r.synced === 0);
     if (params && params.length > 0 && params[0]) {
       return rows.filter((r) => r.inspection_id === params[0]);
     }
     return rows;
   });
-  db.getFirstAsync
-    .mockReset()
-    .mockImplementation(async () => ({
-      count: [...store.values()].filter((r) => r.synced === 0).length,
-    }));
+  db.getFirstAsync.mockReset().mockImplementation(async (sql, params) => {
+    if (/COUNT\(\*\)/i.test(sql)) {
+      return { count: [...store.values()].filter((r) => r.synced === 0).length };
+    }
+    if (/sync_metadata/i.test(sql)) {
+      const key = params && params[0];
+      return metaStore.has(key) ? { value: metaStore.get(key) } : null;
+    }
+    return null;
+  });
 });

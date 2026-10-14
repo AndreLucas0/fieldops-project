@@ -509,7 +509,7 @@ export class TemplateBuilderComponent implements OnInit {
       if (!result) return;
       this.saving.set(true);
       this.templates
-        .createSection(this.templateId(), result)
+        .createSection(this.templateId(), { ...result, displayOrder: this.sections().length + 1 })
         .pipe(finalize(() => this.saving.set(false)))
         .subscribe(() => {
           this.reloadSections();
@@ -556,7 +556,7 @@ export class TemplateBuilderComponent implements OnInit {
       if (!result) return;
       this.saving.set(true);
       this.templates
-        .createItem(this.templateId(), section.id, result)
+        .createItem(this.templateId(), section.id, { ...result, displayOrder: (section.items ?? []).length + 1 })
         .pipe(finalize(() => this.saving.set(false)))
         .subscribe(() => {
           this.reloadSections();

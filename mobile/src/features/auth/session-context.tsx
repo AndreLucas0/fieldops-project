@@ -86,6 +86,8 @@ export function toAuthFailureCode(error: unknown): AuthFailureCode {
       case 'INVALID_CREDENTIALS':
       case 'USER_INACTIVE':
         return error.code;
+      case 'UNAUTHORIZED':
+        return 'INVALID_CREDENTIALS';
       case 'NETWORK_UNAVAILABLE':
       case 'TIMEOUT':
         return 'NETWORK_UNAVAILABLE';

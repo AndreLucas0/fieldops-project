@@ -7,6 +7,7 @@ import { AuthService } from './auth/auth.service';
 import { authInterceptor } from './http/auth.interceptor';
 import { errorInterceptor } from './http/error.interceptor';
 import { MOCK_RESOURCE_PROVIDERS } from './mocks/mock-services';
+import { provideMockSession } from './mocks/mock-session';
 import { HTTP_RESOURCE_PROVIDERS } from './services/resources';
 
 /**
@@ -19,11 +20,12 @@ import { HTTP_RESOURCE_PROVIDERS } from './services/resources';
  * mensagem ao usuário. Invertendo, todo token expirado produziria um aviso
  * indevido de sessão encerrada.
  */
-export function provideCore(): (Provider | EnvironmentProviders)[] {
+export function provideCore(useMock: boolean = environment.mockApi): (Provider | EnvironmentProviders)[] {
   return [
     provideHttpClient(withInterceptors([errorInterceptor, authInterceptor])),
-    ...provideResources(),
+    ...provideResources(useMock),
     provideSessionBootstrap(),
+    ...(useMock ? [provideMockSession()] : []),
   ];
 }
 

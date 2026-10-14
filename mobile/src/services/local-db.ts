@@ -11,6 +11,8 @@
 
 import * as SQLite from 'expo-sqlite';
 
+export type OutboxStatus = 'PENDING' | 'FAILED' | 'CONFLICT' | 'COMPLETED';
+
 /** Linha crua da tabela `outbox` (nomes em snake_case = colunas do SQLite). */
 export interface OutboxRow {
   id: string;
@@ -22,6 +24,8 @@ export interface OutboxRow {
   payload: string;
   synced: number;
   error_count: number;
+  status: OutboxStatus;
+  last_error: string | null;
   created_at: string;
 }
 
@@ -43,8 +47,14 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
         payload       TEXT NOT NULL,
         synced        INTEGER NOT NULL DEFAULT 0,
         error_count   INTEGER NOT NULL DEFAULT 0,
+        status        TEXT NOT NULL DEFAULT 'PENDING',
+        last_error    TEXT,
         created_at    TEXT NOT NULL DEFAULT (datetime('now'))
-      )
+      );
+      CREATE TABLE IF NOT EXISTS sync_metadata (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
     `);
   }
   return db;
@@ -65,8 +75,8 @@ export async function upsertOutboxEntry(entry: NewOutboxEntry): Promise<void> {
   const database = await getDb();
   await database.runAsync(
     `INSERT OR REPLACE INTO outbox
-       (id, inspection_id, entity_type, entity_id, operation_type, base_version, payload, synced, error_count, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, datetime('now'))`,
+       (id, inspection_id, entity_type, entity_id, operation_type, base_version, payload, synced, error_count, status, last_error, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 'PENDING', NULL, datetime('now'))`,
     [
       entry.id,
       entry.inspectionId,
@@ -108,16 +118,47 @@ export async function markEntriesSynced(ids: string[]): Promise<void> {
   const database = await getDb();
   const placeholders = ids.map(() => '?').join(',');
   await database.runAsync(
-    `UPDATE outbox SET synced = 1 WHERE id IN (${placeholders})`,
+    `UPDATE outbox SET synced = 1, status = 'COMPLETED' WHERE id IN (${placeholders})`,
     ids,
   );
 }
 
-/** Incrementa o contador de erros (para observabilidade). */
-export async function incrementErrorCount(id: string): Promise<void> {
+/** Retorna entradas com status FAILED ou CONFLICT (visíveis na tela de sync). */
+export async function getFailedEntries(): Promise<OutboxRow[]> {
+  const database = await getDb();
+  return database.getAllAsync<OutboxRow>(
+    "SELECT * FROM outbox WHERE status IN ('FAILED', 'CONFLICT') ORDER BY created_at ASC",
+  );
+}
+
+/** Marca a entrada como falha, incrementando o contador e registrando o status e a mensagem. */
+export async function markEntryFailed(
+  id: string,
+  status: 'FAILED' | 'CONFLICT',
+  lastError?: string,
+): Promise<void> {
   const database = await getDb();
   await database.runAsync(
-    'UPDATE outbox SET error_count = error_count + 1 WHERE id = ?',
-    [id],
+    'UPDATE outbox SET error_count = error_count + 1, status = ?, last_error = ? WHERE id = ?',
+    [status, lastError ?? null, id],
   );
+}
+
+/** Grava ou sobrescreve um par chave/valor na tabela de metadados de sync. */
+export async function saveSyncMetadata(key: string, value: string): Promise<void> {
+  const database = await getDb();
+  await database.runAsync(
+    'INSERT OR REPLACE INTO sync_metadata (key, value) VALUES (?, ?)',
+    [key, value],
+  );
+}
+
+/** Retorna o valor associado à chave, ou `null` se não existir. */
+export async function getSyncMetadata(key: string): Promise<string | null> {
+  const database = await getDb();
+  const row = await database.getFirstAsync<{ value: string }>(
+    'SELECT value FROM sync_metadata WHERE key = ?',
+    [key],
+  );
+  return row?.value ?? null;
 }

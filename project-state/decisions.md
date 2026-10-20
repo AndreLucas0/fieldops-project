@@ -27,6 +27,40 @@ ACTIVE / SUPERSEDED
 
 ---
 
+### [2026-10-20] — CORS-CONFIG: backend aceita só origens de `CORS_ALLOWED_ORIGINS`
+
+Context:
+O preview web do mobile (`expo start --web`, origem `http://localhost:8081`) era
+bloqueado pelo navegador ao chamar a API real (8090): o backend não tinha CORS.
+O proxy do `ng serve` (INT-011) resolvia só o web, e só em dev.
+
+Decision:
+- `SecurityConfig` habilita `.cors()` com um `CorsConfigurationSource` alimentado por
+  `CorsProperties` (`fieldops.security.cors.allowed-origins` ← `CORS_ALLOWED_ORIGINS`,
+  lista separada por vírgula). Padrão de dev: `http://localhost:4200,http://localhost:8081`.
+- Métodos GET/POST/PUT/PATCH/DELETE/OPTIONS; cabeçalhos `Authorization`, `Content-Type`,
+  `Accept`; **sem** `allowCredentials` (autenticação é Bearer, não cookie); `maxAge` 3600 s.
+- Origem fora da lista: preflight recebe 403 e nenhum `Access-Control-Allow-Origin`.
+
+Reason:
+Cumpre `arquitetura.md` §11.10 ("CORS somente para origens autorizadas") e
+`plano-implementacao-backend.md` §5.5, que já previam exatamente essa variável.
+
+Alternatives considered:
+- Proxy no Metro/Expo: não existe mecanismo equivalente ao do `ng serve` sem config extra, e
+  não resolve produção.
+- `allowedOrigins("*")`: viola §11.10.
+
+Impact:
+O proxy do web (INT-011) continua funcionando e não é mais obrigatório. Em produção, defina
+`CORS_ALLOWED_ORIGINS` com a origem publicada do web. App nativo não é afetado (CORS é só do navegador).
+Supersede parcialmente a alternativa descartada "CORS no backend" da decisão INT-011 de 2026-10-05.
+
+Status:
+ACTIVE
+
+---
+
 ### [2026-10-13] — Mobile em dev usa `.env` com IP da máquina; DB_PORT=5433 (não 5432)
 
 Context:

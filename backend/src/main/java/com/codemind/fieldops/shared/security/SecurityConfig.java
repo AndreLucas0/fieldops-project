@@ -1,10 +1,13 @@
 package com.codemind.fieldops.shared.security;
 
 import java.util.List;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -17,10 +20,14 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import tools.jackson.databind.ObjectMapper;
 
 @Configuration
 @EnableMethodSecurity
+@EnableConfigurationProperties(CorsProperties.class)
 public class SecurityConfig {
 
 	@Bean
@@ -29,6 +36,7 @@ public class SecurityConfig {
 			JsonAuthenticationEntryPoint authenticationEntryPoint, JsonAccessDeniedHandler accessDeniedHandler)
 			throws Exception {
 		http
+			.cors(Customizer.withDefaults())
 			.csrf(AbstractHttpConfigurer::disable)
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(authorize -> authorize
@@ -57,6 +65,23 @@ public class SecurityConfig {
 				role == null ? List.of() : List.of(new SimpleGrantedAuthority("ROLE_" + role));
 			return new JwtAuthenticationToken(jwt, authorities);
 		};
+	}
+
+	/**
+	 * Only the configured origins are accepted (arquitetura.md §11.10). No
+	 * credentials: the API authenticates with a Bearer token, never cookies.
+	 */
+	@Bean
+	CorsConfigurationSource corsConfigurationSource(CorsProperties properties) {
+		CorsConfiguration configuration = new CorsConfiguration();
+		configuration.setAllowedOrigins(properties.allowedOrigins());
+		configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+		configuration.setAllowedHeaders(List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, HttpHeaders.ACCEPT));
+		configuration.setMaxAge(3600L);
+
+		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+		source.registerCorsConfiguration("/**", configuration);
+		return source;
 	}
 
 	@Bean

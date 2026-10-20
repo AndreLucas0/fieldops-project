@@ -718,7 +718,17 @@ pelo campo correto conforme schema V14 (`inspection_item_snapshot_id` ou equival
 
 ## CORS-CONFIG — Backend não tem configuração CORS
 
-Status: PENDING
+Status: DONE (2026-10-20, branch `task/cors-config`)
+
+Implementation (2026-10-20):
+- `shared/security/CorsProperties.java` (novo) + `.cors()` e bean `corsConfigurationSource` em `SecurityConfig.java`.
+- `application.yml`: `fieldops.security.cors.allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:8081}`.
+- `.env.example`: `CORS_ALLOWED_ORIGINS` passa a incluir `http://localhost:8081` (preview web do mobile).
+- Teste: `security/CorsConfigurationIT.java` (4 testes, RED → GREEN): preflight aceito para 8081 e 4200,
+  401 carregando `Access-Control-Allow-Origin`, preflight de origem desconhecida → 403 sem o cabeçalho.
+- Decisão em `decisions.md` [2026-10-20] — CORS-CONFIG. Não implementado: valor de produção (depende do deploy).
+
+Histórico (descrição original, mantida):
 
 Description:
 Nenhuma configuração CORS existe em `SecurityConfig.java`. Em produção ou em qualquer ambiente onde

@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-20 (SEED-STALE-FIX — integração validada ponta a ponta contra Postgres real)
+Last updated: 2026-10-20 (CORS-CONFIG — CORS restrito a origens autorizadas)
 
 ## Current State
 
@@ -8,6 +8,25 @@ Backend audit (2026-09-22): superseded — ver re-auditoria 2026-10-13 em `proje
 Frontend ↔ Backend contract + screen audit completed (2026-10-02, see `docs/auditoria-frontend-backend.md`).
 Auditoria completa do código 2026-10-13 concluída; inventários de telas criados em `project-state/pending-web.md` e `project-state/pending-mobile.md`.
 Integração incremental Frontend ↔ Backend com TDD em andamento.
+
+### CORS-CONFIG-2026-10-20 — CORS restrito a origens autorizadas
+
+Data: 2026-10-20. Branch: `task/cors-config`. Tipo: configuração de segurança (TDD).
+
+**Motivo:** o preview web do mobile (`localhost:8081`) recebia erro de CORS contra a API real.
+
+**Implementado:** `CorsProperties` + `.cors()` em `SecurityConfig`, origens de
+`CORS_ALLOWED_ORIGINS` (padrão dev `http://localhost:4200,http://localhost:8081`),
+sem credenciais, cabeçalhos `Authorization`/`Content-Type`/`Accept`. `.env.example` atualizado.
+
+**Não implementado:** valor de produção de `CORS_ALLOWED_ORIGINS` (depende do deploy);
+nenhuma mudança no mobile ou no web.
+
+**Testes:**
+- `CorsConfigurationIT` — 4 testes, RED confirmado (4 falhas pelo motivo esperado) → GREEN.
+- `./mvnw verify` — **50 unit + 296 IT (292 + 4 novos), 0 falhas, BUILD SUCCESS**.
+- Não executado: verificação HTTP real pelo navegador com o preview web do mobile
+  (requer reiniciar o backend em execução do usuário).
 
 ### SEED-STALE-FIX-2026-10-20 — seed.sql alinhado ao schema V14 + integração validada ponta a ponta
 

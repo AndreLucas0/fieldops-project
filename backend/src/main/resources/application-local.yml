@@ -3,3 +3,10 @@ spring:
     url: ${DB_URL}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
+
+fieldops:
+  security:
+    cors:
+      # Desenvolvimento: aceita qualquer origem (web e preview web do mobile de
+      # qualquer IP da rede). Fora do perfil local vale a lista de application.yml.
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:*}

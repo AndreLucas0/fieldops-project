@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-20 (TECH-PLACE-READ — técnico lê cliente/local/equipamento no próprio escopo)
+Last updated: 2026-10-20 (CORS-ANY-ORIGIN-LOCAL — perfil local aceita qualquer origem)
 
 ## Current State
 
@@ -8,6 +8,17 @@ Backend audit (2026-09-22): superseded — ver re-auditoria 2026-10-13 em `proje
 Frontend ↔ Backend contract + screen audit completed (2026-10-02, see `docs/auditoria-frontend-backend.md`).
 Auditoria completa do código 2026-10-13 concluída; inventários de telas criados em `project-state/pending-web.md` e `project-state/pending-mobile.md`.
 Integração incremental Frontend ↔ Backend com TDD em andamento.
+
+### CORS-ANY-ORIGIN-LOCAL-2026-10-20 — perfil local aceita qualquer origem
+
+Data: 2026-10-20. Branch: `task/technician-read-place-data`. Pedido: "libere o CORS para qualquer ip".
+
+**Implementado:** `application-local.yml` com `allowed-origins: ${CORS_ALLOWED_ORIGINS:*}`;
+`SecurityConfig` passa a `setAllowedOriginPatterns`. Lista restrita de `application.yml` segue fora do perfil local.
+
+**Testes:** `CorsConfigurationIT` reescrito (4; novo caso de IP da rede — RED 403 → GREEN) e
+`RestrictedCorsConfigurationIT` novo (2, lista explícita). `./mvnw verify`: **50 unit + 304 IT, BUILD SUCCESS**.
+Não executado: teste pelo navegador (requer reiniciar o backend do usuário).
 
 ### TECH-PLACE-READ-2026-10-20 — técnico lê cliente/local/equipamento da própria inspeção
 

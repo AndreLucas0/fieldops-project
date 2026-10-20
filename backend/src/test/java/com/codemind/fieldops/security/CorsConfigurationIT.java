@@ -16,11 +16,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 
 /**
- * CORS restrito às origens autorizadas (arquitetura.md §11.10,
- * plano-implementacao-backend.md §5.5): a lista vem de
- * {@code CORS_ALLOWED_ORIGINS} e nenhuma outra origem é aceita.
- * Sem variável definida vale o padrão de desenvolvimento — web
- * ({@code ng serve}, 4200) e preview web do mobile (Expo, 8081).
+ * CORS no perfil {@code local} (desenvolvimento): qualquer origem é aceita, para o
+ * web e o preview web do mobile funcionarem de qualquer IP da rede (decisão do dono
+ * do projeto, 2026-10-20). Fora do perfil local vale a lista restrita de
+ * {@code CORS_ALLOWED_ORIGINS} — ver {@link RestrictedCorsConfigurationIT}.
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(classes = FieldopsApplication.class)
@@ -30,7 +29,7 @@ class CorsConfigurationIT {
 
 	private static final String WEB_ORIGIN = "http://localhost:4200";
 	private static final String MOBILE_WEB_ORIGIN = "http://localhost:8081";
-	private static final String UNKNOWN_ORIGIN = "http://evil.example.com";
+	private static final String LAN_ORIGIN = "http://192.168.0.15:8081";
 
 	@Autowired
 	private MockMvcTester mvc;
@@ -60,8 +59,8 @@ class CorsConfigurationIT {
 	}
 
 	@Test
-	@DisplayName("resposta de erro (401) também carrega o cabeçalho CORS para a origem autorizada")
-	void errorResponseCarriesCorsHeaderForAllowedOrigin() {
+	@DisplayName("resposta de erro (401) também carrega o cabeçalho CORS")
+	void errorResponseCarriesCorsHeader() {
 		assertThat(mvc.get().uri("/dashboard/summary")
 				.header(HttpHeaders.ORIGIN, MOBILE_WEB_ORIGIN))
 			.hasStatus(HttpStatus.UNAUTHORIZED)
@@ -70,14 +69,15 @@ class CorsConfigurationIT {
 	}
 
 	@Test
-	@DisplayName("preflight de origem não autorizada é recusado")
-	void preflightFromUnknownOriginIsRejected() {
+	@DisplayName("perfil local aceita origem de qualquer IP da rede")
+	void preflightFromAnyLanOriginIsAllowedInLocalProfile() {
 		assertThat(mvc.options().uri("/auth/login")
-				.header(HttpHeaders.ORIGIN, UNKNOWN_ORIGIN)
-				.header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST"))
-			.hasStatus(HttpStatus.FORBIDDEN)
+				.header(HttpHeaders.ORIGIN, LAN_ORIGIN)
+				.header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
+				.header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "content-type"))
+			.hasStatus(HttpStatus.OK)
 			.headers()
-			.doesNotContainHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN);
+			.hasValue(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, LAN_ORIGIN);
 	}
 
 }

@@ -68,13 +68,14 @@ public class SecurityConfig {
 	}
 
 	/**
-	 * Only the configured origins are accepted (arquitetura.md §11.10). No
+	 * Only the configured origins are accepted (arquitetura.md §11.10). Entries are
+	 * origin patterns, so the local profile can use "*" to accept any LAN IP. No
 	 * credentials: the API authenticates with a Bearer token, never cookies.
 	 */
 	@Bean
 	CorsConfigurationSource corsConfigurationSource(CorsProperties properties) {
 		CorsConfiguration configuration = new CorsConfiguration();
-		configuration.setAllowedOrigins(properties.allowedOrigins());
+		configuration.setAllowedOriginPatterns(properties.allowedOrigins());
 		configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 		configuration.setAllowedHeaders(List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, HttpHeaders.ACCEPT));
 		configuration.setMaxAge(3600L);

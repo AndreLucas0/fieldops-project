@@ -95,6 +95,14 @@ Supersede parcialmente a alternativa descartada "CORS no backend" da decisão IN
 Status:
 ACTIVE
 
+Update (2026-10-20, a pedido do dono do projeto — "libere o CORS para qualquer ip"):
+- No perfil `local`, `fieldops.security.cors.allowed-origins` passa a `${CORS_ALLOWED_ORIGINS:*}`
+  (`application-local.yml`): qualquer origem é aceita em desenvolvimento, inclusive IPs da rede.
+- `SecurityConfig` usa `setAllowedOriginPatterns` (aceita `*` e padrões como `http://192.168.*:*`;
+  ecoa a origem em vez de devolver `*`). Sem credenciais, então `*` não expõe cookies.
+- Fora do perfil local continua a lista restrita de `application.yml` (§11.10), coberta por
+  `RestrictedCorsConfigurationIT`. Antes de qualquer deploy, não ative o perfil `local`.
+
 ---
 
 ### [2026-10-13] — Mobile em dev usa `.env` com IP da máquina; DB_PORT=5433 (não 5432)

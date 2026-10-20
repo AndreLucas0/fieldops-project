@@ -237,7 +237,7 @@ WHERE insp.id IN (:'insp_assigned_id', :'insp_submitted_id', :'insp_under_review
 -- ----------------------------------------------------------------------------
 
 -- Inspeção 2 (SUBMITTED) — tudo conforme, sem não conformidade.
-INSERT INTO inspection_responses (id, inspection_id, inspection_item_id, value_boolean, conformity, answered_by, answered_at_device, server_received_at)
+INSERT INTO inspection_responses (id, inspection_id, snapshot_id, value_boolean, conformity, responded_by, answered_at_device, server_received_at)
 SELECT gen_random_uuid(), s.inspection_id, s.id, v.value, v.conformity, :'tech1_id', now() - interval '1 day 2 hours 30 minutes', now() - interval '1 day 2 hours 20 minutes'
 FROM inspection_item_snapshots s
 JOIN (VALUES
@@ -250,21 +250,21 @@ WHERE s.inspection_id = :'insp_submitted_id';
 
 -- Inspeção 3 (UNDER_REVIEW) — só os itens obrigatórios foram respondidos
 -- (RN-037 permite concluir sem os opcionais).
-INSERT INTO inspection_responses (id, inspection_id, inspection_item_id, value_text, value_date, value_json, value_boolean, conformity, answered_by, answered_at_device, server_received_at)
-SELECT gen_random_uuid(), s.inspection_id, s.id, v.value_text, v.value_date, v.value_json, v.value_boolean, v.conformity, :'tech1_id', now() - interval '2 days 1 hour', now() - interval '2 days 50 minutes'
+INSERT INTO inspection_responses (id, inspection_id, snapshot_id, value_text, value_date, value_choice, value_boolean, conformity, responded_by, answered_at_device, server_received_at)
+SELECT gen_random_uuid(), s.inspection_id, s.id, v.value_text, v.value_date, v.value_choice, v.value_boolean, v.conformity, :'tech1_id', now() - interval '2 days 1 hour', now() - interval '2 days 50 minutes'
 FROM inspection_item_snapshots s
 JOIN (VALUES
-    ('Localização',                       'Corredor B, próximo à saída de emergência', NULL::date, NULL::jsonb, NULL::boolean, NULL),
-    ('Tipo do extintor',                  NULL, NULL, '{"selected": "PQS"}'::jsonb, NULL, NULL),
+    ('Localização',                       'Corredor B, próximo à saída de emergência', NULL::date, NULL::varchar, NULL::boolean, NULL),
+    ('Tipo do extintor',                  NULL, NULL, 'PQS', NULL, NULL),
     ('Data de validade',                  NULL, (CURRENT_DATE + interval '6 months')::date, NULL, NULL, NULL),
     ('O lacre está intacto?',             NULL, NULL, NULL, TRUE, 'CONFORMING'),
     ('O manômetro está na faixa verde?',  NULL, NULL, NULL, TRUE, 'CONFORMING'),
     ('Existe corrosão?',                  NULL, NULL, NULL, FALSE, NULL)
-) AS v(item_title, value_text, value_date, value_json, value_boolean, conformity) ON v.item_title = s.item_title
+) AS v(item_title, value_text, value_date, value_choice, value_boolean, conformity) ON v.item_title = s.item_title
 WHERE s.inspection_id = :'insp_under_review_id';
 
 -- Inspeção 4 (APPROVED) — narrativa de §10.17: item "bateria" não conforme.
-INSERT INTO inspection_responses (id, inspection_id, inspection_item_id, value_boolean, conformity, observation, answered_by, answered_at_device, server_received_at)
+INSERT INTO inspection_responses (id, inspection_id, snapshot_id, value_boolean, conformity, observation, responded_by, answered_at_device, server_received_at)
 SELECT gen_random_uuid(), s.inspection_id, s.id, v.value, v.conformity, v.observation, :'tech1_id', now() - interval '10 days 2 hours 30 minutes', now() - interval '10 days 2 hours 20 minutes'
 FROM inspection_item_snapshots s
 JOIN (VALUES
@@ -277,52 +277,52 @@ WHERE s.inspection_id = :'insp_approved_id';
 
 -- Inspeção 5 (IN_PROGRESS pós-reprovação) — manômetro não conforme, motivo
 -- da reprovação foi a qualidade da fotografia anexada a este item.
-INSERT INTO inspection_responses (id, inspection_id, inspection_item_id, value_text, value_date, value_json, value_boolean, conformity, answered_by, answered_at_device, server_received_at)
-SELECT gen_random_uuid(), s.inspection_id, s.id, v.value_text, v.value_date, v.value_json, v.value_boolean, v.conformity, :'tech1_id', now() - interval '5 days 1 hour', now() - interval '5 days 50 minutes'
+INSERT INTO inspection_responses (id, inspection_id, snapshot_id, value_text, value_date, value_choice, value_boolean, conformity, responded_by, answered_at_device, server_received_at)
+SELECT gen_random_uuid(), s.inspection_id, s.id, v.value_text, v.value_date, v.value_choice, v.value_boolean, v.conformity, :'tech1_id', now() - interval '5 days 1 hour', now() - interval '5 days 50 minutes'
 FROM inspection_item_snapshots s
 JOIN (VALUES
-    ('Localização',                       'Corredor A, próximo ao almoxarifado', NULL::date, NULL::jsonb, NULL::boolean, NULL),
-    ('Tipo do extintor',                  NULL, NULL, '{"selected": "CO2"}'::jsonb, NULL, NULL),
+    ('Localização',                       'Corredor A, próximo ao almoxarifado', NULL::date, NULL::varchar, NULL::boolean, NULL),
+    ('Tipo do extintor',                  NULL, NULL, 'CO2', NULL, NULL),
     ('Data de validade',                  NULL, (CURRENT_DATE + interval '2 months')::date, NULL, NULL, NULL),
     ('O lacre está intacto?',             NULL, NULL, NULL, TRUE, 'CONFORMING'),
     ('O manômetro está na faixa verde?',  NULL, NULL, NULL, FALSE, 'NON_CONFORMING'),
     ('Existe corrosão?',                  NULL, NULL, NULL, FALSE, NULL)
-) AS v(item_title, value_text, value_date, value_json, value_boolean, conformity) ON v.item_title = s.item_title
+) AS v(item_title, value_text, value_date, value_choice, value_boolean, conformity) ON v.item_title = s.item_title
 WHERE s.inspection_id = :'insp_rejected_id';
 
 -- ----------------------------------------------------------------------------
 -- Evidências
 -- ----------------------------------------------------------------------------
-INSERT INTO evidence (id, inspection_id, response_id, type, storage_key, mime_type, size_bytes, description, captured_at_device, server_received_at, uploaded_at, created_by, created_at)
-SELECT gen_random_uuid(), :'insp_approved_id', r.id, 'PHOTO', v.storage_key, 'image/jpeg', v.size_bytes, v.description,
+INSERT INTO evidence (id, idempotency_key, inspection_id, response_id, type, storage_key, mime_type, size_bytes, description, captured_at_device, server_received_at, uploaded_at, created_by, created_at)
+SELECT gen_random_uuid(), gen_random_uuid(), :'insp_approved_id', r.id, 'PHOTO', v.storage_key, 'image/jpeg', v.size_bytes, v.description,
        now() - interval '10 days 2 hours 15 minutes', now() - interval '10 days 2 hours 10 minutes', now() - interval '10 days 2 hours 10 minutes',
        :'tech1_id', now() - interval '10 days 2 hours 15 minutes'
 FROM inspection_responses r
-JOIN inspection_item_snapshots s ON s.id = r.inspection_item_id
+JOIN inspection_item_snapshots s ON s.id = r.snapshot_id
 JOIN (VALUES
     ('evidence/2026/generator/bateria-geral.jpg',     245678, 'Foto geral da bateria'),
     ('evidence/2026/generator/bateria-terminais.jpg', 198234, 'Foto aproximada dos terminais')
 ) AS v(storage_key, size_bytes, description) ON TRUE
 WHERE s.inspection_id = :'insp_approved_id' AND s.item_title = 'A bateria está em boas condições?';
 
-INSERT INTO evidence (id, inspection_id, response_id, type, storage_key, mime_type, size_bytes, description, captured_at_device, server_received_at, uploaded_at, created_by, created_at)
-SELECT gen_random_uuid(), :'insp_rejected_id', r.id, 'PHOTO', 'evidence/2026/extintor/manometro.jpg', 'image/jpeg', 87654, 'Foto do manômetro (reprovada por falta de nitidez)',
+INSERT INTO evidence (id, idempotency_key, inspection_id, response_id, type, storage_key, mime_type, size_bytes, description, captured_at_device, server_received_at, uploaded_at, created_by, created_at)
+SELECT gen_random_uuid(), gen_random_uuid(), :'insp_rejected_id', r.id, 'PHOTO', 'evidence/2026/extintor/manometro.jpg', 'image/jpeg', 87654, 'Foto do manômetro (reprovada por falta de nitidez)',
        now() - interval '5 days 50 minutes', now() - interval '5 days 45 minutes', now() - interval '5 days 45 minutes',
        :'tech1_id', now() - interval '5 days 50 minutes'
 FROM inspection_responses r
-JOIN inspection_item_snapshots s ON s.id = r.inspection_item_id
+JOIN inspection_item_snapshots s ON s.id = r.snapshot_id
 WHERE s.inspection_id = :'insp_rejected_id' AND s.item_title = 'O manômetro está na faixa verde?';
 
 -- ----------------------------------------------------------------------------
 -- Não conformidade (inspeção 4 — mesma narrativa de §10.17)
 -- ----------------------------------------------------------------------------
-INSERT INTO non_conformities (id, inspection_id, inspection_item_id, response_id, title, description, severity, status, created_by, created_at_device, server_received_at)
+INSERT INTO non_conformities (id, inspection_id, snapshot_id, response_id, title, description, severity, status, reported_by, created_at_device, server_received_at)
 SELECT gen_random_uuid(), :'insp_approved_id', s.id, r.id,
        'Corrosão nos terminais da bateria',
        'Foram identificados sinais de corrosão nos terminais.',
        'HIGH', 'OPEN', :'tech1_id', now() - interval '10 days 2 hours 10 minutes', now() - interval '10 days 2 hours 5 minutes'
 FROM inspection_responses r
-JOIN inspection_item_snapshots s ON s.id = r.inspection_item_id
+JOIN inspection_item_snapshots s ON s.id = r.snapshot_id
 WHERE s.inspection_id = :'insp_approved_id' AND s.item_title = 'A bateria está em boas condições?';
 
 -- ----------------------------------------------------------------------------

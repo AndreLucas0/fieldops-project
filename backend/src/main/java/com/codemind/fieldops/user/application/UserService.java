@@ -10,6 +10,7 @@ import com.codemind.fieldops.user.dto.UserUpdateRequest;
 import com.codemind.fieldops.user.repository.UserRepository;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -51,14 +52,15 @@ public class UserService {
 
 	@Transactional
 	public User create(UserCreateRequest request) {
-		requireEmailAvailable(request.email(), null);
+		String normalizedEmail = normalizeEmail(request.email());
+		requireEmailAvailable(normalizedEmail, null);
 		User user = User.builder()
-			.name(request.name())
-			.email(request.email())
+			.name(normalizeName(request.name()))
+			.email(normalizedEmail)
 			.passwordHash(passwordEncoder.encode(request.password()))
 			.role(request.role())
 			.status(UserStatus.ACTIVE)
-			.phone(request.phone())
+			.phone(normalizePhone(request.phone()))
 			.build();
 		return userRepository.save(user);
 	}
@@ -66,11 +68,12 @@ public class UserService {
 	@Transactional
 	public User update(UUID id, UserUpdateRequest request) {
 		User user = getById(id);
-		requireEmailAvailable(request.email(), id);
-		user.setName(request.name());
-		user.setEmail(request.email());
+		String normalizedEmail = normalizeEmail(request.email());
+		requireEmailAvailable(normalizedEmail, id);
+		user.setName(normalizeName(request.name()));
+		user.setEmail(normalizedEmail);
 		user.setRole(request.role());
-		user.setPhone(request.phone());
+		user.setPhone(normalizePhone(request.phone()));
 		return userRepository.save(user);
 	}
 
@@ -89,11 +92,26 @@ public class UserService {
 	}
 
 	private void requireEmailAvailable(String email, UUID excludingUserId) {
-		userRepository.findByEmail(email)
+		userRepository.findByEmailIgnoreCase(email)
 			.filter(existing -> !existing.getId().equals(excludingUserId))
 			.ifPresent(existing -> {
 				throw new ResourceConflictException(USER_EMAIL_ALREADY_REGISTERED_CODE, "Email is already registered");
 			});
+	}
+
+	private String normalizeEmail(String email) {
+		return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+	}
+
+	private String normalizeName(String name) {
+		return name == null ? null : name.trim();
+	}
+
+	private String normalizePhone(String phone) {
+		if (phone == null || phone.isBlank()) {
+			return null;
+		}
+		return phone.trim();
 	}
 
 	/**

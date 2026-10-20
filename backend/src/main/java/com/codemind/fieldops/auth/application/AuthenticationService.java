@@ -44,7 +44,8 @@ public class AuthenticationService {
 	}
 
 	public AuthenticationResult login(String email, String rawPassword) {
-		User user = userRepository.findByEmail(email)
+		String normalizedEmail = email == null ? null : email.trim().toLowerCase();
+		User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
 			.orElseThrow(() -> new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE));
 
 		if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {

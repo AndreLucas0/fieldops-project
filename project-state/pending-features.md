@@ -690,7 +690,7 @@ Status: DONE (2026-10-05, branch `task/int-011-web-login-real-backend`)
 Detalhes, testes e HTTP real em `progress.md` e em `docs/auditoria-frontend-backend.md` §27. Resolve a F16 (proxy dev) e a F17 (F5 deslogava, porque o refresh não traz `user`).
 
 Follow-ups abertos por esta etapa (não implementados):
-- **SEED-STALE (PENDING):** `db/seed.sql` falha no schema atual (V14). Usa `inspection_responses.inspection_item_id`, que não existe mais. Como roda em transação única, o rollback é total e nenhum usuário é criado. Impede o teste manual "do zero" com o seed completo. Contorno usado em INT-011: aplicar só o bloco de usuários (linhas 44–48 e 81–86).
+- ~~**SEED-STALE (PENDING):**~~ **RESOLVIDO 2026-10-20** (SEED-STALE-FIX): `db/seed.sql` alinhado ao schema V14 — eram cinco descompassos, não um (`snapshot_id`, `responded_by`, `value_choice`, `reported_by`, `idempotency_key`). Seed roda completo (COMMIT, 15 tabelas) e a integração foi validada ponta a ponta contra Postgres real. Ver `progress.md`.
 - **WEB-MOCK-AUTH (PENDING):** com `npm start` (mock), o login web não funciona. Não há mock de `/auth`, e o `provideMockSession()` existe, mas não é registrado.
 - **D22 (REQUER DECISÃO):** orientação específica para conta inativa no login (AC-AUTH, cenário "usuário inativo") × não revelar a existência do e-mail.
 
@@ -698,7 +698,7 @@ Follow-ups abertos por esta etapa (não implementados):
 
 ## SEED-STALE — db/seed.sql incompatível com o schema atual
 
-Status: PENDING
+Status: RESOLVIDO 2026-10-20 (ver progress.md, SEED-STALE-FIX)
 
 Description:
 `db/seed.sql` usa `inspection_responses.inspection_item_id` (coluna removida na migração V9).

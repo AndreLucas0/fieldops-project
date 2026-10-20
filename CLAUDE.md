@@ -41,12 +41,12 @@ technologies beyond what is listed here without re-verifying.
 - Spring Data JPA, Spring Security + OAuth2 Resource Server (JWT)
 - Flyway (`flyway-database-postgresql`) for migrations
 - MapStruct 1.6.3 + Lombok (with `lombok-mapstruct-binding`)
-- AWS SDK S3 client 2.29.52 (evidence storage, points at the MinIO service below)
+- AWS SDK S3 client 2.29.52 (evidence storage, points at the S3-compatible service below)
 - Test: JUnit via `spring-boot-starter-*-test`, Testcontainers (`postgresql` module), `maven-failsafe-plugin` (integration tests are `*IT.java`, separate from unit `*Test.java`)
 
 **Database / infra** (`docker-compose.yml`):
 - PostgreSQL 16 (`postgres:16-alpine`), service `db`
-- MinIO (`quay.io/minio/minio:latest`), service `evidence-storage` — S3-compatible object storage for evidence files
+- `adobe/s3mock` (`adobe/s3mock:latest`), service `evidence-storage` — S3-compatible object storage for evidence files (internal port 9090 → external 9000). Chosen over MinIO because the official MinIO images require registry authentication.
 - Adminer for DB inspection
 
 **Web** (`web/`, Angular CLI):
@@ -57,11 +57,13 @@ technologies beyond what is listed here without re-verifying.
 **Mobile** (`mobile/`, Expo):
 - Expo SDK 57, React Native 0.86.2, React 19.2.3, Expo Router
 - TypeScript, Jest for tests (`npm test`)
-- Note: the root `README.MD` stack table lists SQLite for mobile, but as of
-  the 2026-09-22 backend audit this is **not implemented** — there is no
-  local DB, outbox, or sync engine in `mobile/src` (see
-  `project-state/backend-audit.md`, BF-007). Treat "SQLite" as a planned/
-  documented target, not a current fact, until re-verified.
+- Offline-first: `expo-sqlite` outbox is **implemented** as of BF-007 — see
+  `mobile/src/services/local-db.ts`, `sync-service.ts` and
+  `mobile/src/features/sync/`. Supersedes the 2026-09-22 note that said
+  SQLite was only a documented target. Current limit: the outbox covers only
+  `INSPECTION_RESPONSE`; INSPECTION/NON_CONFORMITY/EVIDENCE still call the API
+  directly, and `GET /mobile/sync/pull` is not implemented (see
+  `project-state/pending-features.md`, OFFLINE-FIRST-REPLAN).
 
 **API contract:** REST, documented in `openapi.yaml` (root) and `docs/api-rest.md`.
 
@@ -195,9 +197,9 @@ Validation should include, when applicable:
 - build validation.
 
 Known validation commands (confirmed from `package.json`/`pom.xml`/README):
-- Backend: `./mvnw test` (unit), `./mvnw verify` (adds `*IT.java` via failsafe; integration tests use Testcontainers and require Docker).
-- Web: `npm test` (Vitest, 167 tests as of `ESTADO-DO-PROJETO.md` 2026-08-18), `npm run typecheck` if present, `npx ng build` for production build.
-- Mobile: `npm test` (Jest, 302 tests as of `ESTADO-DO-PROJETO.md` 2026-08-18), `npm run typecheck`, `npm run lint`.
+- Backend: `./mvnw test` (unit, **50 tests** verified 2026-10-20), `./mvnw verify` (adds `*IT.java` via failsafe; **292 integration tests, BUILD SUCCESS** verified 2026-10-20 — uses Testcontainers, requires Docker).
+- Web: `npm test` (Vitest, **208 tests / 18 suites** verified 2026-10-20), `npm run typecheck` if present, `npx ng build` for production build.
+- Mobile: `npm test` (Jest, **373 tests / 31 suites** verified 2026-10-20), `npm run typecheck`, `npm run lint`.
 
 When some validation cannot be executed:
 - record the command;
@@ -210,7 +212,18 @@ When some validation cannot be executed:
 Record only limitations actually observed in the project/session. Confirmed so far:
 
 - Backend integration tests (`*IT.java`) use Testcontainers and require a
-  running Docker daemon; this may not be available in every dev environment.
+  running Docker daemon.
+- ~~2026-10-20 (manhã): Docker daemon not running~~ — **SUPERSEDED 2026-10-20
+  (tarde):** the owner enabled hardware virtualization; Docker Desktop 29.9.1
+  runs and `./mvnw verify` completes (**292 IT, 0 failures**). PostgreSQL and
+  `adobe/s3mock` come up healthy via `docker compose up -d db evidence-storage`.
+  Kept for the record: PostgreSQL cannot be substituted by an in-memory DB —
+  the migrations use `TIMESTAMPTZ` (54 occurrences), `JSONB` (7) and
+  `CREATE EXTENSION`. A native PostgreSQL 16 install is the virtualization-free
+  alternative if Docker is ever unavailable again.
+- 2026-10-20: `java` on PATH resolves to **JRE 1.8**, but `JAVA_HOME` points to
+  JDK 21 and the Maven wrapper honours it — `./mvnw test` works (50/50).
+  Do not conclude "no JDK 21" from `java -version` alone.
 - iOS: Expo Go on the App Store is stuck at client 54.0.2 while the mobile
   project targets Expo SDK 57 (needs Expo Go 57.0.8); Expo only publishes the
   iOS SDK-57 simulator build, which requires macOS. No verified path from

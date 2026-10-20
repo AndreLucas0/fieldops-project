@@ -26,6 +26,12 @@ public interface InspectionRepository extends JpaRepository<Inspection, UUID>, J
     @Query("SELECT i.status AS status, COUNT(i) AS count FROM Inspection i GROUP BY i.status")
     List<StatusCountView> countGroupByStatus();
 
+    boolean existsByTechnicianIdAndClientId(UUID technicianId, UUID clientId);
+
+    boolean existsByTechnicianIdAndSiteId(UUID technicianId, UUID siteId);
+
+    boolean existsByTechnicianIdAndEquipmentId(UUID technicianId, UUID equipmentId);
+
     boolean existsByTechnicianIdAndSiteIdAndStatusNotIn(UUID technicianId, UUID siteId,
             Collection<InspectionStatus> excluded);
 

@@ -317,7 +317,7 @@ conformidade Alta) batem exatamente com o que o seed inseriu.
 | PEND-06 | edição de não conformidade não fechada no MVP; implementada mesmo assim |
 | PEND-F03 | GPS obrigatório? equipamento divergente bloqueia? hoje: avisa e deixa seguir |
 | — | `itemsToCorrect` é aceito em `/reject` e **não volta** em `InspectionReview` |
-| — | `GET /mobile/inspections` devolve só ids; os nomes são buscados um a um |
+| — | `GET /mobile/inspections` devolve só ids; os nomes são buscados um a um (técnico já tem permissão desde 2026-10-20 — TECH-PLACE-READ; resta o N+1) |
 | — | evidências não vêm em `InspectionDetail`; buscadas à parte |
 | — | escopo de supervisor (RN-005) não implementado |
 | — | `PUT /inspections/{id}` sem trava de estado; `POST /inspections` sem validação de coerência |

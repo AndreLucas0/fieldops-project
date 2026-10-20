@@ -27,6 +27,42 @@ ACTIVE / SUPERSEDED
 
 ---
 
+### [2026-10-20] — TECH-PLACE-READ: técnico lê cliente/local/equipamento por id, só no próprio escopo
+
+Context:
+Contra a API real, o detalhe e a lista de inspeções do mobile mostravam 403 em
+`GET /clients/{id}`, `/sites/{id}` e `/equipment/{id}` para o técnico. Divergência
+documental: `aplicativo-mobile.md` exige exibir cliente, local e equipamento ao técnico,
+mas `contrato-backend-frontend.md` §3.4 restringia a leitura a ADMIN/SUPERVISOR e
+`InspectionDetail` só traz os ids. O mock não checava perfil e escondia o problema.
+
+Decision (escolha do dono do projeto entre duas opções apresentadas):
+- Os três `GET /{id}` aceitam TECHNICIAN; o service devolve 403 (`AccessDeniedException`)
+  se não existir inspeção atribuída ao técnico que referencie aquele registro
+  (`InspectionRepository.existsByTechnicianIdAnd{Client,Site,Equipment}Id`), em qualquer estado.
+- Equipamento: escopo pelo `equipment_id` da inspeção, não pelo local (mais estrito que o
+  `by-qr`, que usa o local e só estados não terminais).
+- Listagens e combos encadeados continuam só ADMIN/SUPERVISOR.
+
+Reason:
+RN-004 (técnico consulta só o que é das inspeções atribuídas a ele). Mudança mínima: o mobile
+já chamava esses endpoints e não precisou mudar.
+
+Alternatives considered:
+- Embutir resumo (nome do cliente, local com endereço, equipamento) em `/mobile/inspections`
+  e `/mobile/inspections/{id}`: uma requisição só e melhor para offline, mas exige mudar
+  contrato, `shared/`, backend e mobile. Não escolhida; continua sendo a evolução natural se
+  o N+1 de requisições pesar.
+
+Impact:
+`contrato-backend-frontend.md` §3.4 e `openapi.yaml` atualizados. O mobile continua fazendo
+uma requisição por cliente/local/equipamento (pendência "nomes buscados um a um" permanece).
+
+Status:
+ACTIVE
+
+---
+
 ### [2026-10-20] — CORS-CONFIG: backend aceita só origens de `CORS_ALLOWED_ORIGINS`
 
 Context:

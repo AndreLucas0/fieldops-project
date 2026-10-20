@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-20 (CORS-CONFIG — CORS restrito a origens autorizadas)
+Last updated: 2026-10-20 (TECH-PLACE-READ — técnico lê cliente/local/equipamento no próprio escopo)
 
 ## Current State
 
@@ -8,6 +8,28 @@ Backend audit (2026-09-22): superseded — ver re-auditoria 2026-10-13 em `proje
 Frontend ↔ Backend contract + screen audit completed (2026-10-02, see `docs/auditoria-frontend-backend.md`).
 Auditoria completa do código 2026-10-13 concluída; inventários de telas criados em `project-state/pending-web.md` e `project-state/pending-mobile.md`.
 Integração incremental Frontend ↔ Backend com TDD em andamento.
+
+### TECH-PLACE-READ-2026-10-20 — técnico lê cliente/local/equipamento da própria inspeção
+
+Data: 2026-10-20. Branch: `task/technician-read-place-data` (a partir de `task/cors-config`). Tipo: permissão (TDD).
+
+**Motivo:** mobile contra a API real recebia 403 ao buscar nomes de cliente, local e
+equipamento no detalhe/lista de inspeções com perfil técnico.
+
+**Implementado:** `GET /clients/{id}`, `/sites/{id}`, `/equipment/{id}` aceitam TECHNICIAN
+com checagem de escopo (inspeção atribuída a ele, qualquer estado) nos services; 3 consultas
+`exists` novas em `InspectionRepository`; `openapi.yaml` (descrição + 403) e
+`contrato-backend-frontend.md` §3.4 atualizados. Decisão em `decisions.md`.
+
+**Não implementado:** resumo embutido em `/mobile/inspections` (alternativa registrada);
+nenhuma mudança no mobile.
+
+**Testes:**
+- `TechnicianPlaceReadScopeIT` — 6 testes; RED confirmado (2 falhas: 403 em vez de 200 no próprio escopo) → GREEN.
+- `./mvnw verify` — **50 unit + 302 IT, 0 falhas, BUILD SUCCESS**.
+- HTTP real (instância temporária na 8091, banco com seed): `tecnico` e `tecnico2` → 200 em
+  cliente/local/equipamento das próprias inspeções; `tecnico2` lendo cliente só do `tecnico` → 403.
+- Não executado: fluxo no app (requer reiniciar o backend do usuário nesta branch).
 
 ### CORS-CONFIG-2026-10-20 — CORS restrito a origens autorizadas
 

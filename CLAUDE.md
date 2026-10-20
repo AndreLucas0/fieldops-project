@@ -197,7 +197,7 @@ Validation should include, when applicable:
 - build validation.
 
 Known validation commands (confirmed from `package.json`/`pom.xml`/README):
-- Backend: `./mvnw test` (unit, **50 tests** verified 2026-10-20), `./mvnw verify` (adds `*IT.java` via failsafe; **296 integration tests, BUILD SUCCESS** verified 2026-10-20 after CORS-CONFIG — uses Testcontainers, requires Docker).
+- Backend: `./mvnw test` (unit, **50 tests** verified 2026-10-20), `./mvnw verify` (adds `*IT.java` via failsafe; **302 integration tests, BUILD SUCCESS** verified 2026-10-20 after TECH-PLACE-READ — uses Testcontainers, requires Docker).
 - Web: `npm test` (Vitest, **208 tests / 18 suites** verified 2026-10-20), `npm run typecheck` if present, `npx ng build` for production build.
 - Mobile: `npm test` (Jest, **373 tests / 31 suites** verified 2026-10-20), `npm run typecheck`, `npm run lint`.
 

@@ -67,9 +67,11 @@ public class EquipmentController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
-    public EquipmentResponse get(@PathVariable UUID id) {
-        return equipmentMapper.toResponse(equipmentService.getById(id));
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','TECHNICIAN')")
+    public EquipmentResponse get(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        UUID userId = UUID.fromString(jwt.getSubject());
+        boolean isTechnician = "TECHNICIAN".equals(jwt.getClaimAsString(JwtClaims.ROLE));
+        return equipmentMapper.toResponse(equipmentService.getById(id, userId, isTechnician));
     }
 
     @PutMapping("/{id}")

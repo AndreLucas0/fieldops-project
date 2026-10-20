@@ -215,8 +215,14 @@ export class MockSitesService extends MockBase implements SitesService {
     return this.page(filtered, query);
   }
 
-  listByClient(clientId: Uuid): Observable<InspectionSite[]> {
-    return this.respond(() => this.db.sites.filter((site) => site.clientId === clientId));
+  listByClient(
+    clientId: Uuid,
+    query: PageQuery<SiteFilters> = {},
+  ): Observable<Page<InspectionSite>> {
+    return this.page(
+      this.db.sites.filter((site) => site.clientId === clientId),
+      query,
+    );
   }
 
   get(id: Uuid): Observable<InspectionSite> {
@@ -273,8 +279,14 @@ export class MockEquipmentService extends MockBase implements EquipmentService {
     return this.page(filtered, query);
   }
 
-  listBySite(siteId: Uuid): Observable<Equipment[]> {
-    return this.respond(() => this.db.equipment.filter((equipment) => equipment.siteId === siteId));
+  listBySite(
+    siteId: Uuid,
+    query: PageQuery<EquipmentFilters> = {},
+  ): Observable<Page<Equipment>> {
+    return this.page(
+      this.db.equipment.filter((equipment) => equipment.siteId === siteId),
+      query,
+    );
   }
 
   get(id: Uuid): Observable<Equipment> {
@@ -365,9 +377,13 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
     });
   }
 
-  listVersions(templateId: Uuid): Observable<InspectionTemplateVersionDetail[]> {
-    return this.respond(() =>
+  listVersions(
+    templateId: Uuid,
+    query: PageQuery = {},
+  ): Observable<Page<InspectionTemplateVersionDetail>> {
+    return this.page(
       this.db.templateVersions.filter((version) => version.templateId === templateId),
+      query,
     );
   }
 

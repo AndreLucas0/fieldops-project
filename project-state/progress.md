@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-14 (TDD-WEB-MOCK-AUTH — provideMockSession registrado em provideCore)
+Last updated: 2026-10-20 (SEED-STALE-FIX — integração validada ponta a ponta contra Postgres real)
 
 ## Current State
 
@@ -8,6 +8,102 @@ Backend audit (2026-09-22): superseded — ver re-auditoria 2026-10-13 em `proje
 Frontend ↔ Backend contract + screen audit completed (2026-10-02, see `docs/auditoria-frontend-backend.md`).
 Auditoria completa do código 2026-10-13 concluída; inventários de telas criados em `project-state/pending-web.md` e `project-state/pending-mobile.md`.
 Integração incremental Frontend ↔ Backend com TDD em andamento.
+
+### SEED-STALE-FIX-2026-10-20 — seed.sql alinhado ao schema V14 + integração validada ponta a ponta
+
+Data: 2026-10-20. Branch: `main`. Tipo: correção de dados de carga + validação de integração.
+
+**Problema:** `db/seed.sql` falhava no schema atual. Como roda em transação única,
+o rollback era total e **nenhum usuário era criado** — impedia qualquer teste manual
+do zero. O item estava registrado como SEED-STALE (PENDING) citando uma única coluna;
+a execução real revelou **cinco** descompassos:
+
+| Seed usava | Schema real | Migração |
+|---|---|---|
+| `inspection_responses.inspection_item_id` | `snapshot_id` | V9 |
+| `inspection_responses.answered_by` | `responded_by` | V9 |
+| `inspection_responses.value_json` (jsonb) | `value_choice` (varchar 200) | V12 |
+| `non_conformities.created_by` | `reported_by` | V9 |
+| `evidence` sem `idempotency_key` | coluna NOT NULL | V10 |
+
+Os literais de `SINGLE_CHOICE` também mudaram de forma: `'{"selected": "PQS"}'::jsonb`
+passou a `'PQS'` em `value_choice`, coerente com o mapeamento que o mobile já fazia
+(`sync-service.ts`, SINGLE_CHOICE → `valueChoice`).
+
+**Cuidado registrado:** a troca de `NULL::jsonb` por `NULL::varchar` foi inicialmente
+global e quebrou `template_items.options_json`, que é legitimamente jsonb. Revertida
+nas 3 linhas de `options_json`. Um `grep` global por tipo é perigoso neste arquivo.
+
+**Validação — integração real, sem mock:**
+
+1. `docker compose up -d db evidence-storage` → ambos healthy (Postgres 16.14, s3mock).
+2. Backend `./mvnw spring-boot:run` com perfil `local` → Flyway aplicou **V1–V14**,
+   Tomcat na 8090, startup em 7,4 s.
+3. `db/seed.sql` → **COMMIT**, 15 tabelas populadas (5 usuários, 7 inspeções,
+   48 snapshots, 20 respostas, 3 evidências, 1 NC, 2 revisões, 26 eventos de auditoria).
+4. `POST /auth/login` (admin@fieldops.local) → **200**, JWT de 261 chars, `expiresIn` 900.
+5. `GET /clients` → **200**, envelope `{page,size,totalElements,totalPages,content}`.
+6. `POST /clients` → **201**; `GET /clients/{id}` → **200**; linha confirmada no
+   Postgres por `psql`. Registro de teste removido depois (`delete from clients`).
+7. Web `npm run start:api` → proxy `/api/v1` → backend. Login pelo navegador,
+   dashboard carregou com **4 requisições HTTP 200**. Números batem com o seed:
+   7 inspeções (1 por estado), 1 NC de severidade Alta. Console sem erros,
+   sem CORS, sem 401. Sessão sobreviveu ao reload (refresh token em `sessionStorage`).
+
+**Confirmação empírica de WEB-NESTED-PAGE:** `GET /clients/{id}/sites` devolveu
+`{page,size,totalElements,totalPages,content}` com `Array.isArray === false` —
+comprova contra a API real a correção feita antes apenas contra o código do controller.
+
+8. `./mvnw verify` completo com Docker disponível → **BUILD SUCCESS, 292 testes
+   de integração, 0 falhas** (antes inexecutável nesta máquina).
+
+**Não implementado:** CORS (CORS-CONFIG segue PENDING — o proxy do `ng serve` cobre
+desenvolvimento, mas não produção). `db/schema.sql` continua na raiz, embora o próprio
+arquivo diga que deveria sair quando o Flyway existisse.
+
+**Receita de execução do backend validada** e já documentada no `README.MD` nesta
+mesma sessão: o Spring não lê `.env`; o perfil `local` exige `DB_URL`, `DB_USER` e
+`DB_PASSWORD` no ambiente do processo.
+
+---
+
+### WEB-NESTED-PAGE-2026-10-20 — Endpoints aninhados devolviam Page, web esperava array
+
+Data: 2026-10-20. Branch: `main`. Tipo: correção de contrato Frontend ↔ Backend.
+
+**Problema (raiz #5 de `pending-web.md`):** três métodos de `core/services/resources.ts`
+declaravam `Observable<X[]>` e iteravam a resposta direto, mas o backend devolve
+`PageResponse`. Com `mockApi: false` a iteração quebra.
+
+| Método | Backend | Evidência |
+|---|---|---|
+| `SitesService.listByClient` | `PageResponse<SiteResponse>` | `ClientController.java:94` |
+| `EquipmentService.listBySite` | `PageResponse<EquipmentResponse>` | `SiteController.java:95` |
+| `TemplatesService.listVersions` | `PageResponse<...>` | `TemplateController.java:157` |
+
+**Agravante:** `mock-services.ts` devolvia array e `mock-services.spec.ts` afirmava
+`toHaveLength()` sobre ele — o mock validava o contrato errado e escondia a divergência.
+Esse era o caso de "mock mascarando integração real".
+
+**Correção:** assinaturas passaram a `Observable<Page<X>>` com `query?: PageQuery`
+opcional, usando `api.getPage`. Optou-se por expor o envelope em vez de desembrulhar
+com `.content`: desembrulhar descartaria silenciosamente itens além da primeira página
+(size padrão 20). O mock passou a usar o helper `page()`, espelhando o envelope real.
+
+**Arquivos:**
+- `web/src/app/core/services/resources.ts` — 3 assinaturas abstratas + 3 implementações HTTP
+- `web/src/app/core/mocks/mock-services.ts` — 3 implementações fictícias via `page()`
+- `web/src/app/core/services/resources.spec.ts` — +3 testes de contrato (HttpTestingController)
+- `web/src/app/core/mocks/mock-services.spec.ts` — asserções ajustadas ao envelope
+
+**Validação:** RED confirmado antes da correção (TS2339 `Property 'content' does not
+exist on type 'InspectionSite[]'`). GREEN: `ng test` 208/208 em 18 suítes;
+`ng build --configuration development` limpo. Backend `./mvnw test` 50/50 BUILD SUCCESS.
+
+**Não implementado:** nenhum componente consome esses métodos ainda (serviços órfãos —
+FE-W07 e FE-W10 ausentes). A correção previne o bug na primeira tela que os usar.
+
+---
 
 ### OFFLINE-FIRST-REPLAN-2026-10-13 — Replanejamento da arquitetura de sync
 
@@ -848,7 +944,10 @@ Todos os backend BFs do audit estão concluídos ou formalmente bloqueados. Opç
 
 ## Historical Note
 
-`ESTADO-DO-PROJETO.md` (2026-08-18) afirma "A API (Java/Spring) não existe neste
-repositório" — informação stale. O `backend/` tem 184+ Java files, 12 Flyway
-migrations e vários test files. Usar `project-state/backend-audit.md` como fonte de
-verdade do estado do backend, não `ESTADO-DO-PROJETO.md`.
+~~`ESTADO-DO-PROJETO.md` (2026-08-18) afirma "A API (Java/Spring) não existe neste
+repositório" — informação stale.~~ **SUPERSEDED 2026-10-20:** o arquivo foi reescrito
+e hoje reflete o estado atual (backend presente e validado, integração ponta a ponta,
+próximos passos). Continua valendo que `project-state/backend-audit.md` é a fonte de
+verdade do estado **detalhado** do backend; `ESTADO-DO-PROJETO.md` é a visão geral de
+uma página. As seções §8 (Expo Go) e §9 (armadilhas) foram preservadas na reescrita —
+são as referenciadas por `CLAUDE.md` §10.

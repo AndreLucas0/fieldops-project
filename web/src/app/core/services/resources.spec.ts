@@ -10,7 +10,16 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 
 import type { InspectionTemplate } from '../models/domain';
-import { HttpTemplatesService, TemplatesService } from './resources';
+import { firstValueFrom } from 'rxjs';
+
+import {
+  EquipmentService,
+  HttpEquipmentService,
+  HttpSitesService,
+  HttpTemplatesService,
+  SitesService,
+  TemplatesService,
+} from './resources';
 
 const FAKE_TEMPLATE: InspectionTemplate = {
   id: 'tpl-1',
@@ -77,5 +86,71 @@ describe('HttpTemplatesService — contratos HTTP', () => {
       expect(req.request.method).toBe('GET');
       req.flush(FAKE_TEMPLATE);
     });
+  });
+});
+
+/**
+ * Endpoints aninhados e de versões devolvem `PageResponse`, não array.
+ *
+ * Evidência no backend:
+ * - `ClientController.listClientSites` → `PageResponse<SiteResponse>`
+ * - `SiteController.listSiteEquipment` → `PageResponse<EquipmentResponse>`
+ * - `TemplateController` `GET /{id}/versions` → `PageResponse<...>`
+ *
+ * Os serviços declaravam `Observable<X[]>` e iteravam o envelope direto.
+ */
+describe('Endpoints aninhados — envelope paginado', () => {
+  let backend: HttpTestingController;
+
+  function setup<T>(token: abstract new (...args: never[]) => T, impl: new () => T): T {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([])),
+        provideHttpClientTesting(),
+        { provide: token, useClass: impl },
+      ],
+    });
+    backend = TestBed.inject(HttpTestingController);
+    return TestBed.inject(token as never) as T;
+  }
+
+  afterEach(() => backend.verify());
+
+  it('listByClient devolve a página de locais do cliente', async () => {
+    const service = setup(SitesService, HttpSitesService);
+    const promise = firstValueFrom(service.listByClient('cli-1'));
+
+    const req = backend.expectOne((r) => r.url === '/api/v1/clients/cli-1/sites');
+    expect(req.request.method).toBe('GET');
+    req.flush({ content: [{ id: 'site-1' }], totalElements: 1, totalPages: 1, page: 0, size: 20 });
+
+    const page = await promise;
+    expect(page.content).toHaveLength(1);
+    expect(page.totalElements).toBe(1);
+  });
+
+  it('listBySite devolve a página de equipamentos do local', async () => {
+    const service = setup(EquipmentService, HttpEquipmentService);
+    const promise = firstValueFrom(service.listBySite('site-1'));
+
+    const req = backend.expectOne((r) => r.url === '/api/v1/sites/site-1/equipment');
+    expect(req.request.method).toBe('GET');
+    req.flush({ content: [{ id: 'eq-1' }], totalElements: 1, totalPages: 1, page: 0, size: 20 });
+
+    const page = await promise;
+    expect(page.content).toHaveLength(1);
+  });
+
+  it('listVersions devolve a página de versões do modelo', async () => {
+    const service = setup(TemplatesService, HttpTemplatesService);
+    const promise = firstValueFrom(service.listVersions('tpl-1'));
+
+    const req = backend.expectOne((r) => r.url === '/api/v1/inspection-templates/tpl-1/versions');
+    expect(req.request.method).toBe('GET');
+    req.flush({ content: [{ id: 'ver-1' }], totalElements: 1, totalPages: 1, page: 0, size: 20 });
+
+    const page = await promise;
+    expect(page.content).toHaveLength(1);
   });
 });

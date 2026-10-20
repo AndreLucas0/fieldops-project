@@ -1,255 +1,210 @@
-# Estado do projeto — 18/08/2026
+# Estado do projeto — 20/10/2026
 
-Documento de retomada: o que existe, como rodar e o que decidir a seguir.
-Escrito para quem senta em outra máquina e precisa continuar sem reconstruir
+Documento de retomada: o que existe, como subir o sistema inteiro e o que
+decidir a seguir. Escrito para quem senta e precisa continuar sem reconstruir
 contexto.
+
+> Substitui a versão de 18/08/2026, que afirmava que a API não existia neste
+> repositório — informação que deixou de ser verdade. O histórico está no git.
+>
+> Este arquivo é a visão **humana** do estado. O contexto operacional detalhado,
+> entrada por entrada, vive em `project-state/` (ver §12).
 
 ---
 
-## 1. Antes de trocar de máquina
+## 1. Estado do git
 
-**Há trabalho não commitado** — 50 entradas: 36 alterados, 7 apagados (os
-antigos `mobile/src/models/*`, que viraram reexportação) e 7 novos, entre eles a
-pasta `shared/` inteira e a tela de painel da web.
+Trabalho desta sessão **não commitado** — 10 arquivos alterados, nenhum novo,
+nenhum apagado:
 
-```bash
-git status --short
-git add -A
-git commit -m "feat: contrato e dados ficticios compartilhados + painel da web"
-git push
+```text
+CLAUDE.md                                     divergências corrigidas
+README.MD                                     receita de execução real
+db/seed.sql                                   alinhado ao schema V14
+project-state/progress.md                     2 entradas novas
+project-state/pending-features.md             SEED-STALE resolvido
+project-state/pending-web.md                  raiz #5 resolvida
+web/src/app/core/services/resources.ts        3 contratos corrigidos
+web/src/app/core/services/resources.spec.ts   +3 testes
+web/src/app/core/mocks/mock-services.ts       mock alinhado ao envelope
+web/src/app/core/mocks/mock-services.spec.ts  asserções ajustadas
 ```
 
-| Item | Estado |
-|---|---|
-| Branch | `web` |
-| Remoto | `github.com/AndreLucas0/fieldops-project` |
-| Último commit | `80b43d9 feat: tela QR Code` |
-| Commits locais à frente | 0 |
+Branch `main`, sincronizada com `origin/main` antes destas alterações.
 
-## 2. Instalação na outra máquina
+---
 
-`node_modules/` não vai no git. São **dois** projetos npm; `shared/` não tem
-dependências e não se instala.
+## 2. Instalação
+
+`node_modules/` não vai no git. São três projetos independentes — **não há
+workspace**.
 
 ```bash
 git clone https://github.com/AndreLucas0/fieldops-project.git
 cd fieldops-project
 
 cd mobile && npm ci        # Expo SDK 57
-cd ../web  && npm ci       # Angular 21.2 + Material 21
+cd ../web  && npm ci       # Angular 21.2
+# backend: o Maven wrapper baixa as dependências no primeiro build
 ```
 
-Não é preciso criar `.env`: os dois sobem com o backend fictício ligado.
+Requisitos: **Java 21** (o `pom.xml` fixa), **Node 20.19+/22.12+/24+** (exigência
+do Angular 21), **Docker** com virtualização habilitada.
 
-**Node ≥ 20.19 ou ≥ 22.12.** O Angular 22 exigiria 22.22.3+, por isso o web está
-no 21.
+> Armadilha verificada: `java -version` pode mostrar JRE 8 e ainda assim o
+> `./mvnw` funcionar, porque o wrapper honra o `JAVA_HOME`. Não conclua "não
+> tenho JDK 21" pelo `java -version`.
+
+---
 
 ## 3. O que é cada pasta
 
 | Pasta | O que é | Estado |
 |---|---|---|
-| `shared/` | Contrato de dados + conjunto fictício, em TypeScript puro | fonte única dos dois clientes |
-| `mobile/` | App do técnico — Expo + React Native | telas do técnico completas; sem sincronização |
-| `web/` | Interface administrativa — Angular 21 + Material | core, componentes e o painel (FE-W02) |
-| `docs/` | Documentação normativa do produto | pronta, é a fonte de verdade |
-| `openapi.yaml` | Contrato REST | pronto, fonte de verdade dos DTOs |
-| `db/` | `schema.sql` e `seed.sql` | pronto |
-| `atividades/`, `github-kanban/` | material do curso e backlog | intocado |
+| `backend/` | API REST — Java 21, Spring Boot 4.1 | 16 controllers, 229 arquivos, suíte verde |
+| `web/` | Interface administrativa — Angular 21 + Material | **3 telas de 23** |
+| `mobile/` | App do técnico — Expo SDK 57 | fluxo do técnico completo contra o mock |
+| `shared/` | Contrato TypeScript consumido pelos dois clientes | em uso |
+| `docs/` | Documentação normativa — fonte de verdade dos requisitos | pronta |
+| `db/` | `seed.sql` (dados de demonstração) e `schema.sql` (legado) | seed corrigido hoje |
+| `project-state/` | Contexto persistente entre sessões | atualizado |
 
-A API (Java/Spring) **não existe neste repositório** — está sendo feita em
-paralelo. Por isso os dois clientes rodam contra um backend fictício.
+> `db/schema.sql` **não é migração**. O próprio arquivo diz que deveria sair
+> quando o Flyway existisse — e o Flyway existe (V1–V14). Continua na raiz.
 
 ---
 
-## 4. `shared/` — o que mudou de mais importante
+## 4. Backend
 
-Antes, `UserRole` era declarado no mobile **e** no web, e nada garantia que
-continuassem iguais. Agora o contrato e os dados de demonstração vivem num lugar
-só:
+Java 21 · Spring Boot 4.1.0 · Spring Data JPA · Security + OAuth2 Resource
+Server (JWT) · Flyway · MapStruct · AWS SDK S3.
 
-```
-shared/src/
-├── domain/     tipos e enums derivados de openapi.yaml
-└── mocks/      dados fictícios, banco em memória, paginação e indicadores
-```
+- Sobe em `http://localhost:8090/api/v1` (context-path configurado).
+- Swagger em `/swagger-ui.html`.
+- Perfil `local` exige `DB_URL`, `DB_USER` e `DB_PASSWORD` **no ambiente do
+  processo** — o Spring **não lê o `.env`**, que serve ao Docker Compose.
+- Flyway aplica V1–V14 no startup.
+- 16 controllers; `TemplateController` tem mapeamento duplo
+  (`/templates/*` e `/inspection-templates/*`).
 
-Nada aqui importa React, Angular ou API de plataforma — só tipo e função pura.
-
-**Como cada projeto enxerga** (detalhe em `shared/README.md`):
-
-- **mobile:** `metro.config.js` declara `watchFolders` e o apelido
-  `@fieldops/shared`; o Jest repete o apelido **e** mapeia `@babel/runtime` para
-  o `node_modules` do app. `@/models` virou uma linha reexportando o shared —
-  nenhuma tela mudou.
-- **web:** `paths` no `tsconfig.json` e `../shared/src/**/*.ts` nos `include`.
-  O core reexporta em `core/models/domain.ts`.
-
-### O conjunto fictício
-
-| Entidade | Quantidade |
-|---|---|
-| Usuários | 3 ativos (ADMIN, SUPERVISOR, TECHNICIAN) + 1 inativo |
-| Clientes | 2 — Indústria Alfa (2 locais), Empresa Beta (1 local) |
-| Locais | 3 — Planta São Paulo, Filial Campinas, Sede Rio |
-| Equipamentos | 4 — `GD001`, `CP002`, `BM003` ativos; `EL004` descomissionado |
-| Modelos | 2 — "Inspeção de Segurança" publicada (3 seções, 6 itens) e "Checklist Elétrico" em rascunho |
-| Inspeções | 6 — uma em cada estado do ciclo |
-| Não conformidades | 3 — LOW, HIGH e CRITICAL |
-
-Datas relativas a `now`: a inspeção agendada é sempre "amanhã". Identificadores
-são UUID v4 fixos com prefixo por entidade (`1000…` usuários, `6000…`
-inspeções).
-
-O que o conjunto promete cumprir (RN-009, 010, 011, 014, 024, 055, 080) é
-**verificado**: `mobile/src/services/mock/shared-dataset.test.ts` tem 33 testes
-de integridade. Rodam no Jest do mobile porque `shared/` não tem executor
-próprio; a web consome os mesmos dados.
-
-> **Ao mexer nos dados, rode os dois projetos.** Quebrar teste dos dois lados é
-> o sinal de que alguém dependia daquele valor.
+**Validado em 20/10:** `./mvnw test` 50/50 e `./mvnw verify` **292 testes de
+integração, BUILD SUCCESS** (Testcontainers, exige Docker).
 
 ---
 
 ## 5. Aplicativo mobile
 
-### Camadas
-
-```
+```text
 mobile/src/
-├── models/        reexporta o contrato de shared/domain
-├── services/      ApiClient, AuthService, config e adaptador do mock
-├── design-system/ tokens e componentes base (paleta escura, 48px de toque)
-├── components/    componentes de domínio (cartão, badge, checklist, progresso…)
-└── features/      lógica por assunto (auth, inspections, checklist, NCs, evidência, scanner)
+├── models/        reexporta o contrato de shared/src/domain
+├── services/      ApiClient, AuthService, backend fictício, outbox SQLite, sync
+├── design-system/ tokens e componentes base (paleta escura, toque de 48 px)
+├── components/    componentes de domínio (cartão, badge, checklist…)
+└── features/      lógica por assunto (auth, inspections, checklist, NCs, sync…)
 ```
 
 Regra que vale para tudo: **lógica em função pura sempre que possível**, tela só
-desenha.
+desenha. Por isso `inspection-filters.ts`, `completion.ts`, `checklist-value.ts`
+e `status-catalog.ts` existem separados — são os arquivos com teste denso.
 
-### Rotas
+Rotas: landing, login, abas (Início, Inspeções, Sync, Perfil), detalhe da
+inspeção, iniciar, checklist, resumo, não conformidades, scanner QR e captura e
+prévia de evidência.
 
-```
-/                                        landing pública
-/login                                   entrada
-/inicio          (aba)                   FE-M02 — do dia, atrasadas, em andamento
-/inspections     (aba)                   FE-M03 — lista com filtros por chip
-/perfil          (aba)                   FE-M05 — dados e sair
-/inspections/[id]                        FE-M06 — detalhe, ação conforme o estado
-/inspections/[id]/start                  FE-M07 — confirmar início + GPS
-/inspections/[id]/checklist              FE-M08 — execução (tela principal)
-/inspections/[id]/summary                FE-M09 — resumo e conclusão
-/inspections/[id]/non-conformities       FE-M10 — NCs da inspeção
-/scanner                                 FE-M11 — leitura de QR (código de exemplo: `GD001`)
-/evidence/capture                        FE-M12 — câmera ou galeria
-/evidence/preview                        FE-M13 — conferência e envio
-```
+**Offline-first:** o outbox SQLite está implementado (`local-db.ts`,
+`sync-service.ts`, `features/sync/`). Cobre **apenas `INSPECTION_RESPONSE`** —
+transições de inspeção, não conformidades e evidências ainda chamam a API
+direto e falham offline. `GET /mobile/sync/pull` não existe.
 
-### O que ainda não existe no mobile
-
-- **FE-M04 — Sincronização.** Não há motor de sync, fila nem banco local. O
-  botão "Sincronizar" do início recarrega a lista e simula 2 s. Ver §10.
-- Telas de supervisor e qualquer coisa fora do fluxo do técnico.
+**373 testes, 31 suítes, verdes.** Todos contra o backend fictício.
 
 ---
 
-## 6. Modo mock
+## 6. Modo mock e credenciais
 
-Ligado por padrão nos dois. Mesmos dados, mesma origem.
+O backend fictício responde no mesmo formato do contrato, inclusive os erros.
+Ligar ou desligar não muda nada nas telas — o `ApiClient` tem um só caminho.
 
-| Projeto | Chave | Padrão |
+| Variável | Padrão | Efeito |
 |---|---|---|
-| mobile | `EXPO_PUBLIC_API_MOCK` | `true` |
-| mobile | `EXPO_PUBLIC_API_BASE_URL` | `http://localhost:8090/api/v1` |
-| mobile | `EXPO_PUBLIC_API_MOCK_LATENCY_MS` | `450` |
-| web | `environment.mockApi` | `true` em desenvolvimento, `false` em produção |
+| `EXPO_PUBLIC_API_MOCK` | `true` | backend fictício em memória |
+| `EXPO_PUBLIC_API_BASE_URL` | `http://localhost:8090/api/v1` | quando o mock está desligado |
+| `environment.mockApi` (web) | `true` em `npm start`, `false` em `npm run start:api` | idem |
 
-No mobile o backend fictício responde no formato do contrato, inclusive os
-erros: o `ApiClient` tem um caminho de código só. Na web a troca acontece em
-`provideResources()` — as telas injetam `InspectionsService` e não sabem a
-origem dos dados.
-
-### Credenciais
-
-Senha `FieldOps@2026` **ou** `fieldops123` para qualquer conta:
+Credenciais — senha `FieldOps@2026` para todas as contas, tanto no mock quanto
+no seed do Postgres:
 
 | E-mail | Perfil |
 |---|---|
-| `tecnico@fieldops.local` | TECHNICIAN — Carlos Técnico, com as 6 inspeções |
-| `supervisor@fieldops.local` | SUPERVISOR — Marina Supervisora |
-| `admin@fieldops.local` | ADMIN — Ana Administradora |
-| `inativo@fieldops.local` | recusa proposital (RN-001) |
+| `admin@fieldops.local` | ADMIN |
+| `supervisor@fieldops.local` | SUPERVISOR |
+| `tecnico@fieldops.local` | TECHNICIAN |
+| `tecnico2@fieldops.local` | TECHNICIAN |
+| `inativo@fieldops.local` | recusado de propósito (RN-001) |
 
-**Atenção ao escrever testes:** a inspeção em andamento já vem com os três
-primeiros itens respondidos, e o item `VIS-01` vem não conforme *com* observação
-e evidência. Zere com `resetMockStore()` quando precisar do estado em branco.
+> No mock do mobile a senha antiga `fieldops123` também é aceita; contra o
+> Postgres, só `FieldOps@2026`.
+
+**Atenção ao escrever testes:** a inspeção em andamento do mock já vem com os
+três primeiros itens respondidos, e `GER-01` vem não conforme *com* observação.
+Zere com `getMockDatabase().responses[id] = []` quando precisar do estado limpo.
 
 ---
 
 ## 7. Interface administrativa (web)
 
-Angular 21.2 com Angular Material 21 (PrimeNG 22 exigiria Angular 22; o registro
-do porquê está em `web/src/app/shared/components/README.md`).
+Angular 21.2 com Angular Material 21 — escolhido porque o PrimeNG 22 exige
+Angular 22. O registro está em `web/src/app/shared/components/README.md`.
 
-```
-web/src/app/
-├── core/
-│   ├── auth/          guards, store de sessão, storage de token
-│   ├── http/          ApiService, interceptadores de auth e erro
-│   ├── models/        domain.ts (reexporta shared), page, api-error, session
-│   ├── mocks/         serviços fictícios + sessão de desenvolvimento
-│   └── services/      contratos de domínio + implementações HTTP
-├── shared/components/ DataTable, StatusBadge, ConfirmDialog, PageHeader…
-└── features/
-    └── dashboard/     FE-W02 — painel
-```
+**Existe:** `core/` (ApiService, interceptadores de auth e erro, guards,
+sessão), `shared/components/` (DataTable paginada, StatusBadge, ConfirmDialog,
+PageHeader, FormFieldError, LoadingState, EmptyState) e **três telas**:
+`login`, `dashboard` e `templates`.
 
-Detalhe do core em `web/src/app/core/README.md`.
+**Não existe:** as outras 19 telas, o shell (menu lateral, logout, toasts,
+cabeçalho de navegação) e consumo de 6 dos 8 serviços HTTP, que estão órfãos em
+`core/services/resources.ts`.
 
-### Serviços de domínio
-
-Oito recursos (usuários, clientes, locais, equipamentos, modelos, inspeções,
-NCs, painel). Cada um é uma **classe abstrata** que serve de contrato e de token
-de injeção, com duas implementações: HTTP e fictícia. Os mocks recusam o que a
-API recusaria — QR duplicado dá 409, equipamento descomissionado em nova
-inspeção dá 422, cancelar inspeção aprovada dá 409, reprovar sem motivo dá 422.
-
-### FE-W02 — Painel (`/dashboard`)
-
-Sete cartões numéricos e dois gráficos de barras horizontais, com as três
-chamadas em `forkJoin`. Estados de carga e erro com nova tentativa.
-
-Duas decisões de visualização que não são óbvias:
-
-- **Barras, não rosca.** As categorias têm nome longo e a leitura é comparar
-  quantidades; barra compara comprimento numa linha de base comum.
-- **Todas as barras da mesma cor.** O comprimento já codifica a grandeza e a
-  etiqueta já codifica a identidade. A cor reservada de cada estado continua na
-  etiqueta ao lado, a mesma das tabelas.
-
-O azul do preenchimento (`#2a78d6`) dá 4,42:1 sobre branco. Os tons `warning` e
-`serious` dos cartões ficam abaixo de 3:1 por definição da paleta de estado —
-por isso vêm sempre com ícone **e** rótulo coloridos, nunca só a cor.
+**208 testes, 18 suítes, verdes.**
 
 ---
 
 ## 8. Como rodar e verificar
 
-```bash
-# mobile
-cd mobile
-npm start                 # Expo; use -c para limpar cache do Metro
-npm test                  # 302 testes, 24 suítes
-npm run typecheck
-npm run lint
+### Sistema completo — receita validada em 20/10
 
-# web
-cd web
-npm start                 # http://localhost:4200 (redireciona para /dashboard)
-npm test                  # 167 testes, 13 arquivos
-npx ng build              # produção
+```bash
+# 1. infraestrutura
+cp .env.example .env
+docker compose up -d db evidence-storage     # Postgres 16 + s3mock
+
+# 2. backend (o Spring NÃO lê o .env)
+cd backend
+export SPRING_PROFILES_ACTIVE=local
+export DB_URL=jdbc:postgresql://localhost:5432/fieldops
+export DB_USER=fieldops
+export DB_PASSWORD=fieldops
+./mvnw spring-boot:run                       # http://localhost:8090/api/v1
+
+# PowerShell: $env:SPRING_PROFILES_ACTIVE='local'  (etc.)
+
+# 3. dados de demonstração
+docker compose exec -T db psql -U fieldops -d fieldops < db/seed.sql
+
+# 4. web contra a API real
+cd web && npm run start:api                  # http://localhost:4200
 ```
 
-Tudo verde em 18/08/2026.
+### Testes
+
+```bash
+cd backend && ./mvnw test      # 50 unitários
+cd backend && ./mvnw verify    # + 292 de integração (Testcontainers)
+cd web     && npm test         # 208
+cd mobile  && npm test         # 373
+```
+
+Tudo verde em 20/10/2026.
 
 ### Expo Go no celular
 
@@ -300,99 +255,103 @@ procura os helpers a partir de `shared/`, que não tem `node_modules`.
 e não são. Custou uma caça longa a um bug inexistente; para conferir telas
 estreitas de verdade, use um aparelho ou o modo dispositivo do navegador.
 
+**O mock pode validar o contrato errado.** Três endpoints declaravam
+`Observable<X[]>` enquanto o backend devolvia `PageResponse`, e o mock devolvia
+array — então o teste do mock *confirmava* o engano. Ao criar um método no
+`resources.ts`, confira o tipo de retorno no controller Java, não no mock.
+
+**`grep` global por tipo no `seed.sql` é perigoso.** Trocar `NULL::jsonb` por
+`NULL::varchar` no arquivo inteiro quebra `template_items.options_json`, que é
+legitimamente jsonb. Verifique a coluna de cada ocorrência.
+
+**`node_modules` desatualizado falha de forma enganosa.** Após um `git pull` que
+traga dependências novas, a suíte do mobile aborta com
+`Cannot find module 'expo-network'` em 31 suítes e **zero testes executados** —
+parece quebra de código, é `npm ci` faltando.
+
 ---
 
-## 10. Pendências
+## 10. Estado da integração
 
-### Bloqueante para a entrega
+O canal está provado de ponta a ponta; o produto integrado, não.
 
-**A §9.9 das regras de negócio (RN-065 a RN-078) não tem implementação.** Não há
-SQLite, outbox nem tela FE-M04. Isso arrasta a RN-041 ("salvar localmente cada
-alteração confirmada"): o checklist manda cada resposta direto à API e, sem
-rede, a resposta se perde.
+| Eixo | Situação |
+|---|---|
+| Backend ↔ Postgres | ✅ Flyway V1–V14, seed completo, escrita persistida e relida |
+| Web ↔ Backend — login | ✅ `POST /auth/login` 200 pelo navegador, via proxy |
+| Web ↔ Backend — dashboard | ✅ 3 endpoints, números batendo com o banco |
+| Web — demais telas | ❌ 19 de 23 não existem |
+| **Mobile ↔ Backend real** | ❌ **nunca testado** — o app roda com o mock por padrão |
+| Upload de evidência | ❌ o s3mock sobe, mas nenhuma foto passou por ele |
+| Sync pull | ❌ `GET /mobile/sync/pull` não implementado |
 
-Cortar sincronização **não é uma opção de escopo**: `criterios-de-aceitacao.md`
-§17.19 (AC-RELEASE) exige demonstrar perda de conectividade → conclusão offline
-→ retorno → sincronização sem duplicidade. `visao-geral.md` §1.6 põe o trabalho
-sem internet no MVP.
+Validação executada em 20/10, pelo navegador: login com `admin@fieldops.local`,
+dashboard com 4 requisições HTTP 200, console sem erros e sem CORS, sessão
+sobrevivendo ao reload. Os números exibidos (7 inspeções, 1 por estado; 1 não
+conformidade Alta) batem exatamente com o que o seed inseriu.
 
-Ordem sugerida: persistência local das respostas → outbox com idempotência (a
-chave já é gerada em `evidence-upload.ts`) → FE-M04 com contadores reais.
+---
 
-**Correção rápida e independente:** o botão "Sincronizar" do início exibe
-"Sincronizado às HH:MM" após uma espera simulada — afirma ao técnico que os
-dados foram enviados quando nada foi (RN-072 pede data *e resultado*). Trocar o
-rótulo para "Lista atualizada" custa um minuto.
+## 11. Pendências e próximos passos
 
-### Andaime a remover
+### Ordem recomendada
 
-`web/src/app/core/mocks/mock-session.ts` abre sessão de supervisor direto no
-store quando `mockApi` está ligado. Existe só porque o `authGuard` manda ao
-`/login` e **FE-W01 ainda não foi implementada** — sem isso nenhuma tela
-protegida renderiza. Não é caminho de autenticação. Apagar quando FE-W01 entrar.
-Note que o mock da web cobre os recursos de domínio, não os endpoints de `/auth`.
+1. **Mobile contra a API real** (`EXPO_PUBLIC_API_MOCK=false`). Barato e de alto
+   retorno: vai revelar descompassos de contrato que o mock esconde — foi
+   exatamente assim que os três endpoints paginados apareceram.
+2. **Shell do web.** Sem menu, logout e toasts, nenhuma tela nova fica
+   alcançável. É o bloqueador de 19 telas.
+3. **Telas do web**, começando pelas que já têm serviço pronto e órfão
+   (Clientes, Locais, Equipamentos).
+4. **CORS** (`CORS-CONFIG`, PENDING). Invisível em desenvolvimento por causa do
+   proxy do `ng serve`; em produção, com origens diferentes, bloqueia tudo.
+   Agora dá para validar com teste de integração, já que o Docker funciona.
+5. **Completar o outbox** — INSPECTION, NON_CONFORMITY e EVIDENCE — e
+   implementar `SYNC-PULL`.
 
-### Do contrato — precisam de decisão
+### Do contrato — precisam de decisão, não de código
 
 | Marca | Assunto |
 |---|---|
-| **PEND-03** | formato de `optionsJson` do `SINGLE_CHOICE`. Provisório em uso: `{ options: [{ value, label }] }` |
-| **PEND-06** | edição de não conformidade não está fechada no MVP; implementada mesmo assim |
-| **PEND-F03** | não há regra dizendo se GPS é obrigatório nem se equipamento divergente bloqueia. Hoje: avisa e deixa seguir |
-| — | `itemsToCorrect` é aceito em `RejectInspectionRequest` mas **não volta** em `InspectionReview`. O conjunto fictício já envia; leitura tolerante em `inspection-actions.ts` |
-| — | `GET /mobile/inspections` devolve só `clientId`/`siteId`; os nomes são buscados um a um (`use-place-names.ts`) |
+| PEND-03 | formato de `optionsJson` do `SINGLE_CHOICE`; provisório em uso: `{ options: [{ value, label }] }` |
+| PEND-06 | edição de não conformidade não fechada no MVP; implementada mesmo assim |
+| PEND-F03 | GPS obrigatório? equipamento divergente bloqueia? hoje: avisa e deixa seguir |
+| — | `itemsToCorrect` é aceito em `/reject` e **não volta** em `InspectionReview` |
+| — | `GET /mobile/inspections` devolve só ids; os nomes são buscados um a um |
 | — | evidências não vêm em `InspectionDetail`; buscadas à parte |
+| — | escopo de supervisor (RN-005) não implementado |
+| — | `PUT /inspections/{id}` sem trava de estado; `POST /inspections` sem validação de coerência |
 
-### Próximos passos naturais
+### Andaime a remover
 
-1. **Web: FE-W01 (login)** — destrava todas as telas protegidas e remove o
-   andaime.
-2. **Web: FE-W18 (lista de inspeções)** — os dois botões do painel já apontam
-   para `/inspections/new` e `/inspections?status=SUBMITTED`.
-3. **Mobile: persistência local** (ver bloqueante).
-4. **Ligar na API real** quando subir: `EXPO_PUBLIC_API_MOCK=false` e
-   `environment.mockApi = false`. Os dois clientes já tratam 401 com renovação.
-5. **Testar em Android.** Câmera, GPS e seletor de data nativo seguem sem
-   verificação em aparelho.
+- `db/schema.sql` — substituído pelas migrações Flyway.
 
 ---
 
-## 11. Decisões registradas
+## 12. Onde está o resto do contexto
+
+`project-state/` é o contexto persistente, mantido entrada por entrada:
+
+| Arquivo | Para quê |
+|---|---|
+| `progress.md` | o que já landou, com evidência e validação |
+| `pending-features.md` | backlog confirmado do backend |
+| `pending-web.md` / `pending-mobile.md` | inventário de telas e status de integração |
+| `decisions.md` | decisões técnicas e o porquê |
+| `backend-audit.md` | auditoria backend × documentação |
+
+As duas entradas mais recentes, ambas de 20/10, são `SEED-STALE-FIX` (seed
+alinhado ao V14 e integração validada) e `WEB-NESTED-PAGE` (contratos aninhados
+corrigidos).
+
+### Decisões que explicam o código
 
 | Decisão | Motivo |
 |---|---|
-| Contrato e mocks em `shared/` | `UserRole` era declarado nos dois lados sem nada garantir que continuassem iguais |
-| Mobile reexporta o contrato em `@/models` | preserva o ponto de importação; nenhuma tela mudou |
-| Web mantém `Page`/`PageQuery` próprios | o modelo da web tem filtros tipados usados pelo `ApiService`; o envelope é compatível |
-| Conta inativa fora da especificação do conjunto | é o que demonstra a recusa de login por usuário inativo (RN-001) |
-| Evidência na NC crítica | RN-055 exige descrição *e* evidência; semear sem foto violaria a regra que o app valida |
-| Serviços de domínio como classe abstrata | serve de contrato e de token de injeção; a troca mock↔HTTP não toca em componente |
-| Ordem `[errorInterceptor, authInterceptor]` | a resposta volta na ordem inversa; o auth precisa ver o 401 antes de virar mensagem |
-| Access token só em memória, refresh em `sessionStorage` | `arquitetura.md` §11.10; o F5 é recuperado pelo refresh |
-| Guard não redireciona no 403 | mandar para outra rota protegida pode dar laço; avisa e bloqueia |
-| Design system próprio no mobile | o app já tinha paleta, fontes e componentes em uso |
+| Design system próprio no mobile, não Paper/Gluestack | o app já tinha paleta escura, fontes e componentes em uso |
 | Angular Material no web | PrimeNG 22 exige Angular 22 |
-| Filtros da lista no cliente (mobile) | trocar chip não pode custar rede |
+| Um só caminho de autenticação no mobile | havia dois; o logout com `POST /auth/logout` forçou a unificação |
+| Filtros da lista no cliente | trocar chip não pode custar rede; em campo a conexão é o recurso escasso |
 | Descrição de NC obrigatória sempre | o contrato exige em qualquer severidade |
 | Debounce de 500 ms no checklist | sem ele, cada tecla vira um PUT |
-
----
-
-## 12. Resumo do que foi feito hoje
-
-1. **`shared/`** — contrato de dados e conjunto fictício como fonte única, com
-   banco em memória, paginação, filtros e indicadores derivados.
-2. **Mobile ligado ao shared** — `metro.config.js`, mapeamentos de Jest, models
-   reexportados, adaptador do backend fictício e 33 testes de integridade do
-   conjunto. Os 269 testes que já existiam continuam passando.
-3. **Web: tipos de domínio** — `core/models/domain.ts` reexporta o shared;
-   `user.model.ts`, que duplicava `UserRole`/`User`, foi apagado.
-4. **Web: serviços de domínio** — oito recursos com implementação HTTP e
-   fictícia, `provideResources()` escolhendo pelo environment, 36 testes.
-5. **Web: FE-W02 (painel)** — cartões, gráficos, `forkJoin`, esqueleto e erro com
-   nova tentativa; rota protegida, casca da aplicação e `app.routes.ts`.
-
-Correções de bugs reais no caminho: `@angular/material` declarado mas nunca
-instalado (o web não compilava), 401 na requisição já repetida que não encerrava
-a sessão, 401 sem refresh token que não fazia logout, e a sobreposição das
-fileiras de cartões do painel — essa só apareceu ao abrir a tela no navegador.
+| Endpoints aninhados expõem `Page<T>` | desembrulhar com `.content` descartaria itens além da primeira página |

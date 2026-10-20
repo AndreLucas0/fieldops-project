@@ -29,7 +29,7 @@ Raízes dos blockers transversais:
 2. **6 de 8 serviços HTTP órfãos** — `UsersService`, `ClientsService`, `SitesService`, `EquipmentService`, `InspectionsService` e `NonConformitiesService` existem em `resources.ts` mas nenhuma tela os consome.
 3. ~~**`displayOrder` ausente nos payloads do construtor**~~ — **RESOLVIDO 2026-10-14** (WEB-DISPLAYORDER): `addSection()` e `addItem()` agora incluem `displayOrder`. Ver `pending-features.md` WEB-DISPLAYORDER.
 4. **URL inconsistente em `resources.ts`** — `list()`/`get()` usam `/templates/{id}`, enquanto `update()`, `createSection()`, `createItem()` usam `/inspection-templates/{id}`. O backend aceita ambos (dual mapping), mas `listVersions()` espera array e recebe `Page`.
-5. **Nested endpoints retornam `Page`, não array** — `GET /clients/{clientId}/sites` e `GET /sites/{siteId}/equipment` retornam `PageResponse`; `resources.ts` itera direto.
+5. ~~**Nested endpoints retornam `Page`, não array**~~ — **RESOLVIDO 2026-10-20** (WEB-NESTED-PAGE): `listByClient`, `listBySite` e `listVersions` passaram a devolver `Page<T>` via `api.getPage`; mock alinhado ao envelope. Ver `progress.md`.
 
 ---
 

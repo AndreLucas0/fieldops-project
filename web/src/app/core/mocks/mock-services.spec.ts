@@ -149,8 +149,8 @@ describe('serviços fictícios da web', () => {
         TestBed.inject(SitesService).listByClient(clientes.content[0].id),
       );
 
-      expect(locais).toHaveLength(2);
-      expect(locais.map((site) => site.name)).toEqual(['Planta São Paulo', 'Filial Campinas']);
+      expect(locais.content).toHaveLength(2);
+      expect(locais.content.map((site) => site.name)).toEqual(['Planta São Paulo', 'Filial Campinas']);
     });
 
     it('recusa local sem cliente válido (RN-009)', async () => {
@@ -183,7 +183,7 @@ describe('serviços fictícios da web', () => {
       const gerador = await firstValueFrom(service.get(EQUIPMENT_IDS.gerador));
       const doLocal = await firstValueFrom(service.listBySite(gerador.siteId));
 
-      expect(doLocal).toHaveLength(2);
+      expect(doLocal.content).toHaveLength(2);
     });
   });
 
@@ -193,9 +193,11 @@ describe('serviços fictícios da web', () => {
       const modelos = await firstValueFrom(service.list({ status: 'ACTIVE' }));
       const versoes = await firstValueFrom(service.listVersions(modelos.content[0].id));
 
-      expect(versoes).toHaveLength(1);
-      expect(versoes[0].sections).toHaveLength(3);
-      expect(versoes[0].sections?.flatMap((secao) => secao.items ?? [])).toHaveLength(6);
+      expect(versoes.content).toHaveLength(1);
+      expect(versoes.content[0].sections).toHaveLength(3);
+      expect(
+        versoes.content[0].sections?.flatMap((secao) => secao.items ?? []),
+      ).toHaveLength(6);
     });
 
     it('o rascunho não tem versão publicada, mas tem seções para editar', async () => {
@@ -203,7 +205,7 @@ describe('serviços fictícios da web', () => {
       const rascunhos = await firstValueFrom(service.list({ status: 'DRAFT' }));
       const id = rascunhos.content[0].id;
 
-      expect(await firstValueFrom(service.listVersions(id))).toHaveLength(0);
+      expect((await firstValueFrom(service.listVersions(id))).content).toHaveLength(0);
       expect(await firstValueFrom(service.listDraftSections(id))).toHaveLength(1);
     });
   });

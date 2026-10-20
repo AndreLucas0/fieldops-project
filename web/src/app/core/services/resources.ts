@@ -88,7 +88,10 @@ export abstract class ClientsService {
 
 export abstract class SitesService {
   abstract list(query?: PageQuery<SiteFilters>): Observable<Page<InspectionSite>>;
-  abstract listByClient(clientId: Uuid): Observable<InspectionSite[]>;
+  abstract listByClient(
+    clientId: Uuid,
+    query?: PageQuery<SiteFilters>,
+  ): Observable<Page<InspectionSite>>;
   abstract get(id: Uuid): Observable<InspectionSite>;
   abstract create(input: Partial<InspectionSite>): Observable<InspectionSite>;
   abstract update(id: Uuid, input: Partial<InspectionSite>): Observable<InspectionSite>;
@@ -96,7 +99,10 @@ export abstract class SitesService {
 
 export abstract class EquipmentService {
   abstract list(query?: PageQuery<EquipmentFilters>): Observable<Page<Equipment>>;
-  abstract listBySite(siteId: Uuid): Observable<Equipment[]>;
+  abstract listBySite(
+    siteId: Uuid,
+    query?: PageQuery<EquipmentFilters>,
+  ): Observable<Page<Equipment>>;
   abstract get(id: Uuid): Observable<Equipment>;
   abstract getByQrCode(qrCode: string): Observable<Equipment>;
   abstract create(input: Partial<Equipment>): Observable<Equipment>;
@@ -109,7 +115,10 @@ export abstract class TemplatesService {
   abstract get(id: Uuid): Observable<InspectionTemplate>;
   /** Dados gerais (título, descrição, categoria) — só vale para modelos DRAFT (RN-018). */
   abstract update(id: Uuid, input: Partial<InspectionTemplate>): Observable<InspectionTemplate>;
-  abstract listVersions(templateId: Uuid): Observable<InspectionTemplateVersionDetail[]>;
+  abstract listVersions(
+    templateId: Uuid,
+    query?: PageQuery,
+  ): Observable<Page<InspectionTemplateVersionDetail>>;
   abstract getVersion(versionId: Uuid): Observable<InspectionTemplateVersionDetail>;
   /** Seções do rascunho, editadas pelo construtor (FE-W15). */
   abstract listDraftSections(templateId: Uuid): Observable<TemplateSectionDetail[]>;
@@ -210,8 +219,8 @@ export class HttpSitesService extends SitesService {
   list(query: PageQuery<SiteFilters> = {}) {
     return this.api.getPage<InspectionSite, SiteFilters>('/sites', query);
   }
-  listByClient(clientId: Uuid) {
-    return this.api.get<InspectionSite[]>(`/clients/${clientId}/sites`);
+  listByClient(clientId: Uuid, query: PageQuery<SiteFilters> = {}) {
+    return this.api.getPage<InspectionSite, SiteFilters>(`/clients/${clientId}/sites`, query);
   }
   get(id: Uuid) {
     return this.api.get<InspectionSite>(`/sites/${id}`);
@@ -231,8 +240,8 @@ export class HttpEquipmentService extends EquipmentService {
   list(query: PageQuery<EquipmentFilters> = {}) {
     return this.api.getPage<Equipment, EquipmentFilters>('/equipment', query);
   }
-  listBySite(siteId: Uuid) {
-    return this.api.get<Equipment[]>(`/sites/${siteId}/equipment`);
+  listBySite(siteId: Uuid, query: PageQuery<EquipmentFilters> = {}) {
+    return this.api.getPage<Equipment, EquipmentFilters>(`/sites/${siteId}/equipment`, query);
   }
   get(id: Uuid) {
     return this.api.get<Equipment>(`/equipment/${id}`);
@@ -264,9 +273,10 @@ export class HttpTemplatesService extends TemplatesService {
   update(id: Uuid, input: Partial<InspectionTemplate>) {
     return this.api.put<InspectionTemplate>(`/inspection-templates/${id}`, input);
   }
-  listVersions(templateId: Uuid) {
-    return this.api.get<InspectionTemplateVersionDetail[]>(
+  listVersions(templateId: Uuid, query: PageQuery = {}) {
+    return this.api.getPage<InspectionTemplateVersionDetail>(
       `/inspection-templates/${templateId}/versions`,
+      query,
     );
   }
   getVersion(versionId: Uuid) {

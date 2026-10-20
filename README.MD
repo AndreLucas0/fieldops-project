@@ -28,11 +28,13 @@ A solução integra **aplicativo mobile**, **interface administrativa web** e **
 
 | Componente | Tecnologias |
 |---|---|
-| **Mobile** | React Native, Expo, TypeScript, Expo Router, SQLite |
-| **Web** | React / Angular, TypeScript |
-| **Backend** | Java, Spring Boot |
-| **Banco de Dados** | PostgreSQL |
-| **API** | REST, OpenAPI |
+| **Mobile** | Expo SDK 57, React Native 0.86, React 19, Expo Router, TypeScript, SQLite (outbox offline) |
+| **Web** | Angular 21.2, Angular Material 21, RxJS, TypeScript, Vitest |
+| **Backend** | Java 21, Spring Boot 4.1, Spring Data JPA, Spring Security + OAuth2 Resource Server, Flyway, MapStruct |
+| **Banco de Dados** | PostgreSQL 16 (migrações Flyway V1–V14) |
+| **Evidências** | Armazenamento compatível com S3 (`adobe/s3mock` em desenvolvimento) |
+| **Contrato** | `shared/` — tipos TypeScript consumidos por mobile e web |
+| **API** | REST, documentada em `openapi.yaml` |
 | **Autenticação** | JWT |
 
 ---
@@ -40,11 +42,16 @@ A solução integra **aplicativo mobile**, **interface administrativa web** e **
 ## 📂 Estrutura
 
 ```text
-FieldOps/
-├── mobile/      # Aplicativo para técnicos
-├── admin/       # Interface administrativa
-├── backend/     # API REST
-└── README.md
+fieldops-project/
+├── backend/        API REST (Java / Spring Boot)
+├── web/            Interface administrativa (Angular)
+├── mobile/         Aplicativo do técnico (Expo / React Native)
+├── shared/         Contrato de dados + dados fictícios (TypeScript)
+├── docs/           Documentação normativa — fonte de verdade dos requisitos
+├── db/             schema.sql e seed.sql (fixtures de validação local)
+├── project-state/  Contexto persistente entre sessões de desenvolvimento
+├── openapi.yaml    Contrato REST
+└── docker-compose.yml
 ```
 
 ---
@@ -53,35 +60,75 @@ FieldOps/
 
 ### Pré-requisitos
 
-* Java 17+
-* Node.js 18+
-* PostgreSQL
-* Expo
+* **Java 21** (o `pom.xml` fixa `<java.version>21</java.version>`)
+* **Node.js 20.19+**, 22.12+ ou 24+ (exigência do Angular 21)
+* **Docker** para subir PostgreSQL e o armazenamento de evidências
+  — ou um **PostgreSQL 16** instalado nativamente
+* **Expo Go** no aparelho Android para testar o mobile
 
-### Backend
+### 1. Infraestrutura
+
+```bash
+cp .env.example .env
+docker compose up -d db evidence-storage
+
+# Inspecionar o banco pelo navegador (opcional):
+docker compose --profile tools up -d adminer   # http://localhost:8081
+```
+
+### 2. Backend
+
+O Spring **não lê o `.env`** (ele serve ao Docker Compose). O perfil `local`
+espera as variáveis de conexão no ambiente do processo:
 
 ```bash
 cd backend
+
+# bash
+export SPRING_PROFILES_ACTIVE=local
+export DB_URL=jdbc:postgresql://localhost:5432/fieldops
+export DB_USER=fieldops
+export DB_PASSWORD=fieldops
+
+# PowerShell
+#   $env:SPRING_PROFILES_ACTIVE='local'
+#   $env:DB_URL='jdbc:postgresql://localhost:5432/fieldops'
+#   $env:DB_USER='fieldops'; $env:DB_PASSWORD='fieldops'
+
 ./mvnw spring-boot:run
 ```
 
-### Mobile
+Sobe em `http://localhost:8090/api/v1`. O Flyway aplica as migrações no
+startup. Swagger em `http://localhost:8090/api/v1/swagger-ui.html`.
+
+### 3. Interface administrativa
+
+```bash
+cd web
+npm ci
+npm start        # backend fictício, nenhuma API necessária
+npm run start:api  # API real, via proxy para localhost:8090
+```
+
+### 4. Mobile
 
 ```bash
 cd mobile
-npm install
-npx expo start
+npm ci
+npm start        # backend fictício ligado por padrão
 ```
 
-### Interface Administrativa
+Para falar com a API real, defina `EXPO_PUBLIC_API_MOCK=false` e
+`EXPO_PUBLIC_API_BASE_URL` apontando para o host acessível pelo aparelho.
+
+### Testes
 
 ```bash
-cd admin
-npm install
-npm start
+cd backend && ./mvnw test      # unitários
+cd backend && ./mvnw verify    # + integração (Testcontainers, exige Docker)
+cd web     && npm test
+cd mobile  && npm test
 ```
-
-*Consulte os arquivos de configuração de cada aplicação para definir as variáveis de ambiente e conexão com o banco de dados.*
 
 ---
 
@@ -95,57 +142,28 @@ npm start
 * Leonardo Rodrigues Vieira
 * Lucas Ianovski
 * Nickolas Machado
-Este repositório contém o **aplicativo mobile**, a **interface administrativa
-web** e o **contrato de dados compartilhado**. A API (Java/Spring) é
-desenvolvida em paralelo, em repositório próprio — por isso os dois clientes
-sobem com um **backend fictício ligado por padrão** e funcionam sem ela.
+---
 
-```
-fieldops-project/
-├── shared/   contrato de dados + dados fictícios (TypeScript puro, sem instalação)
-├── mobile/   app do técnico — Expo / React Native
-├── web/      interface administrativa — Angular
-├── docs/     documentação normativa do produto
-└── db/       schema.sql e seed.sql
-```
+## 🔑 Credenciais do modo fictício
 
-### Pré-requisitos
-
-* [Node.js](https://nodejs.org/) **≥ 20.19 ou ≥ 22.12**
-* [Docker](https://www.docker.com/) — opcional, para PostgreSQL e MinIO (`docker compose up -d`)
-* Um aparelho **Android** com Expo Go, para o mobile (ver `ESTADO-DO-PROJETO.md` §8)
-
-### 1. Interface administrativa (Angular)
-
-```bash
-cd web
-npm install
-npm start          # http://localhost:4200
-```
-
-### 2. Aplicativo mobile (Expo)
-
-```bash
-cd mobile
-npm install
-npm start          # escaneie o QR com o Expo Go
-```
-
-### Credenciais do modo fictício
-
-Senha `FieldOps@2026` ou `fieldops123` para qualquer conta:
+Senha `FieldOps@2026` ou `fieldops123` para qualquer uma das contas:
 `admin@fieldops.local`, `supervisor@fieldops.local`, `tecnico@fieldops.local`.
-
-### Testes
-
-```bash
-cd mobile && npm test    # 302 testes
-cd web    && npm test    # 167 testes
-```
+A conta `inativo@fieldops.local` é recusada de propósito (RN-001).
 
 ---
 
-**Antes de continuar o desenvolvimento, leia `ESTADO-DO-PROJETO.md`** — traz o
-que já existe, as decisões tomadas, as armadilhas conhecidas e as pendências
-(incluindo a sincronização offline, que ainda não foi implementada e é exigida
-pelos critérios de aceitação).
+## 📌 Antes de continuar o desenvolvimento
+
+Leia `project-state/` — é o contexto persistente do projeto:
+
+| Arquivo | Para quê |
+|---|---|
+| `progress.md` | o que já landou, com commit e validação |
+| `pending-features.md` | backlog confirmado do backend |
+| `pending-web.md` / `pending-mobile.md` | inventário de telas e status de integração |
+| `decisions.md` | decisões técnicas e o porquê |
+| `backend-audit.md` | auditoria backend × documentação |
+
+> Para uma visão geral em uma página — como subir o sistema completo, o que
+> está integrado e o que vem a seguir — leia `ESTADO-DO-PROJETO.md` na raiz,
+> atualizado em 2026-10-20. O `project-state/` é o detalhe entrada por entrada.

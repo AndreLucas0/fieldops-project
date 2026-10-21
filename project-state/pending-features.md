@@ -1169,3 +1169,41 @@ Além disso, o setUp de `InspectionTemplateControllerIT` foi atualizado (em `755
 para usar `TRUNCATE TABLE inspection_template_versions CASCADE` via `JdbcTemplate`,
 eliminando o risco de violação de FK quando ITs que criam inspeções executam antes
 desta classe em `./mvnw verify`.
+
+---
+
+## EVIDENCE-ACCESS-URL-HOST — `accessUrl` da evidência aponta para `localhost`, inacessível no celular
+
+Status: PENDING
+
+Description:
+Ao enviar uma evidência, a API devolve `accessUrl` assinada no formato
+`http://fieldops-evidence.localhost:9000/evidence/...` (estilo virtual-host do SDK S3 +
+`EVIDENCE_STORAGE_ENDPOINT=http://localhost:9000`). No aparelho, esse host não resolve para o PC,
+então as miniaturas de `EvidenceThumbnailGrid` (que usa `accessUrl` direto) não carregam.
+
+Source:
+Verificado por HTTP real em 2026-10-20 (upload 201 numa instância de teste; registro e objeto
+de teste removidos em seguida). Encontrado ao investigar "erro de conexão ao confirmar evidência
+no celular" — não é a causa desse erro (o erro acontece no próprio upload), mas afeta o passo seguinte.
+
+Possible directions (decidir antes de implementar):
+- endpoint público separado do endpoint interno do storage (ex.: `EVIDENCE_STORAGE_PUBLIC_ENDPOINT`
+  com o IP do PC) + path-style access no presigner;
+- ou a API servir o arquivo (proxy) em vez de devolver URL direta do storage.
+
+---
+
+## MOBILE-PREEXISTING-CHECKS — typecheck/lint com erros e teste instável (pré-existentes)
+
+Status: PENDING
+
+Description (observado em 2026-10-20, durante EVIDENCE-URI-EXPO-GO; nenhum destes arquivos foi tocado):
+- `npm run typecheck`: erros TS em `src/features/sync/use-sync.ts` (1) e
+  `src/services/mock/mock-server.test.ts` (2 — `MockRequest` exige `accessToken`).
+- `npm run lint`: 2 erros `react-hooks` ("setState synchronously within an effect") em
+  `app/(protected)/(tabs)/sync.tsx:40` e `app/(protected)/sync/details.tsx:24`; 6 warnings.
+- `__tests__/inspections-screen.test.tsx` › "mostra erro com nova tentativa quando a busca falha":
+  falhou 1 vez na suíte completa e passou 11/11 isolada duas vezes — instável sob carga.
+
+Classificação: dívida técnica; tarefa dedicada.

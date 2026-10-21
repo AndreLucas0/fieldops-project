@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Button, colors, Feedback, spacing, Text } from '@/design-system';
 import { uploadEvidence } from '@/features/evidence/evidence-upload';
+import { readCapture, releaseCapture } from '@/features/evidence/pending-capture';
 import { captureLocation } from '@/features/inspections/location';
 import { toApiError, type GeoLocation } from '@/models';
 
@@ -15,16 +16,17 @@ import { toApiError, type GeoLocation } from '@/models';
  */
 export default function EvidencePreviewScreen() {
   const router = useRouter();
-  const { inspectionId, uri, description, origin, responseId, nonConformityId } =
+  const { inspectionId, captureId, description, origin, responseId, nonConformityId } =
     useLocalSearchParams<{
       inspectionId: string;
-      uri: string;
+      captureId: string;
       description?: string;
       origin?: string;
       inspectionItemId?: string;
       responseId?: string;
       nonConformityId?: string;
     }>();
+  const uri = readCapture(captureId);
 
   const [sending, setSending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -48,6 +50,7 @@ export default function EvidencePreviewScreen() {
         nonConformityId,
         location,
       });
+      releaseCapture(captureId);
 
       // Volta à tela que pediu a evidência, descartando captura e prévia.
       if (origin === 'non-conformities') {

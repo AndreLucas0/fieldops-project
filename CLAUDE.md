@@ -199,7 +199,7 @@ Validation should include, when applicable:
 Known validation commands (confirmed from `package.json`/`pom.xml`/README):
 - Backend: `./mvnw test` (unit, **50 tests** verified 2026-10-20), `./mvnw verify` (adds `*IT.java` via failsafe; **304 integration tests, BUILD SUCCESS** verified 2026-10-20 after CORS-ANY-ORIGIN-LOCAL — uses Testcontainers, requires Docker).
 - Web: `npm test` (Vitest, **208 tests / 18 suites** verified 2026-10-20), `npm run typecheck` if present, `npx ng build` for production build.
-- Mobile: `npm test` (Jest, **373 tests / 31 suites** verified 2026-10-20), `npm run typecheck`, `npm run lint`.
+- Mobile: `npm test` (Jest, **375 tests / 31 suites** verified 2026-10-20 after EVIDENCE-URI-EXPO-GO; typecheck/lint have pre-existing errors — see MOBILE-PREEXISTING-CHECKS), `npm run typecheck`, `npm run lint`.
 
 When some validation cannot be executed:
 - record the command;

@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-20 (CORS-ANY-ORIGIN-LOCAL — perfil local aceita qualquer origem)
+Last updated: 2026-10-20 (EVIDENCE-URI-EXPO-GO — envio de evidência no Expo Go)
 
 ## Current State
 
@@ -19,6 +19,26 @@ Data: 2026-10-20. Branch: `task/technician-read-place-data`. Pedido: "libere o C
 **Testes:** `CorsConfigurationIT` reescrito (4; novo caso de IP da rede — RED 403 → GREEN) e
 `RestrictedCorsConfigurationIT` novo (2, lista explícita). `./mvnw verify`: **50 unit + 304 IT, BUILD SUCCESS**.
 Não executado: teste pelo navegador (requer reiniciar o backend do usuário).
+
+### EVIDENCE-URI-EXPO-GO-2026-10-20 — envio de evidência falhava em todo aparelho com Expo Go
+
+Data: 2026-10-20. Branch: `task/fix-evidence-uri-expo-go` (a partir de `task/technician-read-place-data`). Tipo: correção (TDD).
+
+**Sintoma:** no celular, confirmar a evidência (câmera ou galeria) dava "Sem conexão com o servidor" e
+nenhuma requisição aparecia no tráfego; o resto do app funcionava contra a API.
+
+**Causa:** a captura passava a URI do arquivo para a prévia como parâmetro de rota. O `useLocalSearchParams`
+do expo-router 57 aplica `decodeURIComponent` a todo valor (`node_modules/expo-router/build/hooks/useLocalSearchParams.js:36`)
+e no Expo Go o cache fica em `.../ExperienceData/%2540anonymous%252F...`; decodificada, a URI aponta para um
+arquivo inexistente e o `fetch` multipart falha antes de enviar. No navegador a URI é `blob:` e não é afetada.
+
+**Implementado:** `src/features/evidence/pending-capture.ts` (URI em memória; rota leva só `captureId`);
+`capture.tsx` e `preview.tsx` passam a usá-lo. O mock de `expo-router` dos testes agora decodifica os parâmetros
+como o real — sem isso o defeito era invisível nos testes.
+
+**Testes:** 2 novos em `scanner-evidence-screens.test.tsx` (falham sem a correção, verificado com stash) + 5 ajustados.
+`npx jest`: **375/375, 31 suítes**. Lint dos arquivos tocados: limpo. Typecheck/lint globais têm erros
+pré-existentes em arquivos não tocados (MOBILE-PREEXISTING-CHECKS). Não executado: teste no aparelho.
 
 ### TECH-PLACE-READ-2026-10-20 — técnico lê cliente/local/equipamento da própria inspeção
 

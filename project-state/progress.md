@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-20 (OFFLINE-FIRST-REST — interrompido; inconsistências documentadas)
+Last updated: 2026-10-21 (SYNC-EVIDENCE-LINK — achados 2, 3 e 5 do offline-first resolvidos)
 
 ## Current State
 
@@ -8,6 +8,36 @@ Backend audit (2026-09-22): superseded — ver re-auditoria 2026-10-13 em `proje
 Frontend ↔ Backend contract + screen audit completed (2026-10-02, see `docs/auditoria-frontend-backend.md`).
 Auditoria completa do código 2026-10-13 concluída; inventários de telas criados em `project-state/pending-web.md` e `project-state/pending-mobile.md`.
 Integração incremental Frontend ↔ Backend com TDD em andamento.
+
+### SYNC-EVIDENCE-LINK-2026-10-21 — vínculo da evidência, recusas definitivas e ordem da conclusão
+
+Data: 2026-10-21. Branch: `task/sync-evidence-response-link` (a partir de `task/sync-outbox-nc`). Tipo: bugfix (TDD).
+Pedido: "continue a implementação da feature de offline first". Decisões do dono: vínculo resolvido no mobile;
+recusa definitiva vira REJECTED com descarte manual (ver `decisions.md` 2026-10-21).
+
+**Implementado (só mobile, API inalterada):**
+- Achado 2: `queueEvidence` guarda `inspectionItemId` e ignora `responseId` `local-…`; `syncEvidenceEntries` resolve
+  o id da resposta via `GET /mobile/inspections/{id}` depois do push e espera resposta/NC ainda no outbox.
+  `preview.tsx` passa `inspectionItemId`.
+- Achado 3: `useEvidences` expõe as fotos do outbox (`pending`); o resumo usa `withPendingEvidences`
+  (`pending-overlay.ts`) na avaliação de conclusão.
+- Achado 5: status `REJECTED` (`local-db.ts`); push REJECTED e upload 4xx definitivo param de ser reenviados; aba
+  Sincronização lista cada recusa com motivo e "Descartar" (`discardOutboxEntry`, apaga a foto).
+- Encontrado na tarefa: o backend exige a evidência para concluir; `syncPending` agora envia conclusões (SUBMITTED)
+  depois do upload das fotos, e segura a conclusão se ainda houver foto da inspeção no aparelho.
+- `settleQueuedOperation` lê a entrada por id (`getOutboxEntry`) para enxergar REJECTED.
+
+**Testes:** `__tests__/sync-evidence-link.test.ts` novo (21 casos) + 1 em `summary-nc-screens` + 1 em `sync-screen`,
+todos vistos falhando antes da implementação. 4 testes existentes ajustados porque descreviam o comportamento
+antigo que o dono mandou mudar (REJECTED → FAILED/continuava na fila). `npx jest`: **434/434, 36 suítes**.
+`npm run typecheck` e `npm run lint`: só os erros pré-existentes (MOBILE-PREEXISTING-CHECKS); o erro de lint de
+`sync.tsx` mudou de linha (40 → 52) por causa dos imports novos, mesma causa.
+
+**Não executado:** teste ponta a ponta no aparelho com backend real (offline → reconectar → foto vinculada →
+conclusão aceita). Backend não alterado, então `./mvnw verify` não foi rodado.
+
+**Não implementado (fora do escopo):** UI de resolução de CONFLICT; achado 1 (textos desatualizados em
+`CLAUDE.md`/`ESTADO-DO-PROJETO.md`), achados 4 e 6.
 
 ### CORS-ANY-ORIGIN-LOCAL-2026-10-20 — perfil local aceita qualquer origem
 

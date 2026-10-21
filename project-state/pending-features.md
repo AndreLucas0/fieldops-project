@@ -1120,7 +1120,7 @@ Scope: requer mudanças em backend + frontend. Maior complexidade do conjunto.
 
 ### SYNC-PULL — GET /mobile/sync/pull não implementado
 
-Status: IMPLEMENTED, NOT COMMITTED (2026-10-20) — código e testes no working tree da branch `task/sync-outbox-nc`; o endpoint já existia no backend. Ver OFFLINE-FIRST-FINDINGS-2026-10-20.
+Status: DONE (commit `7e4d6d4`, branch `task/sync-outbox-nc`) — o endpoint já existia no backend. ~~IMPLEMENTED, NOT COMMITTED (2026-10-20)~~ SUPERSEDED 2026-10-21. Ver OFFLINE-FIRST-FINDINGS-2026-10-20.
 
 Histórico (status original): PENDING (requer backend)
 
@@ -1228,7 +1228,7 @@ Classificação: dívida técnica; tarefa dedicada.
 
 ## OFFLINE-FIRST-FINDINGS-2026-10-20 — inconsistências encontradas ao completar o offline-first
 
-Status: PENDING (somente documentado, por pedido do dono do projeto — nada abaixo foi corrigido)
+Status: PARTIALLY RESOLVED (2026-10-21, SYNC-EVIDENCE-LINK, branch `task/sync-evidence-response-link`): itens 2, 3, 5 e 7 resolvidos; 1, 4 e 6 seguem pendentes. Histórico: em 2026-10-20 foi só documentado, por pedido do dono.
 
 Contexto: implementação de SYNC-OUTBOX-EVIDENCE, -INSPECTION, -NC e SYNC-PULL (cache de leitura) em 2026-10-20.
 A implementação foi interrompida no ponto em que as inconsistências 2 e 3 foram encontradas.
@@ -1239,7 +1239,7 @@ A implementação foi interrompida no ponto em que as inconsistências 2 e 3 for
 (`SynchronizationController`, coberto por `SyncPullControllerIT`). `CLAUDE.md` §2 e `ESTADO-DO-PROJETO.md`
 §5/§10 ainda dizem que o pull "não está implementado". Nenhum desses textos foi corrigido.
 
-### 2. Evidência de resposta ainda não sincronizada fica sem vínculo ou com vínculo inválido — Classificação: bug (alto)
+### 2. Evidência de resposta ainda não sincronizada fica sem vínculo ou com vínculo inválido — Classificação: bug (alto) — **RESOLVIDO 2026-10-21** (vínculo resolvido no mobile pelo snapshotId na hora do sync; ver `decisions.md` SYNC-EVIDENCE-LINK)
 - O checklist passa `responseId = checklist.responses.get(item.id)?.id` para a captura
   (`app/(protected)/inspections/[inspectionId]/checklist.tsx:115`). O mapa `responses` só tem respostas vindas do
   servidor (`indexResponses`, `use-checklist.ts:80`); salvar localmente não lhe dá id.
@@ -1255,7 +1255,7 @@ A implementação foi interrompida no ponto em que as inconsistências 2 e 3 for
 - Decisão necessária (não tomada): aceitar `snapshotId` no upload de evidência (backend) **ou** resolver o
   `responseId` no momento do sync da evidência (mobile, após o push das respostas).
 
-### 3. Evidência pendente não conta no resumo/conclusão — Classificação: bug (médio)
+### 3. Evidência pendente não conta no resumo/conclusão — Classificação: bug (médio) — **RESOLVIDO 2026-10-21** (`withPendingEvidences`; conclusão só sobe depois das fotos)
 `useEvidences` lê só a lista do servidor (agora com cópia local). Fotos ainda no outbox (`EVIDENCE`) não entram em
 `evaluateCompletion`, então um item com evidência obrigatória bloqueia a conclusão offline mesmo com a foto tirada.
 Depende da decisão do item 2 (a evidência pendente precisa saber a qual resposta pertence).
@@ -1265,7 +1265,7 @@ Depende da decisão do item 2 (a evidência pendente precisa saber a qual respos
 registros") é cumprida, mas o reenvio não é tratado como sucesso. Contornado no mobile (`evidence-outbox.ts` trata o
 409 como enviado); registrar se o contrato deve mudar.
 
-### 5. Recusas definitivas de RESPONSE e EVIDENCE são retentadas indefinidamente — Classificação: comportamento (médio)
+### 5. Recusas definitivas de RESPONSE e EVIDENCE são retentadas indefinidamente — Classificação: comportamento (médio) — **RESOLVIDO 2026-10-21** (status REJECTED + "Descartar" na aba Sincronização; CONFLICT segue reenviado)
 INSPECTION e NC iniciados pelas telas descartam a operação recusada (`settleQueuedOperation`). Respostas do checklist e
 evidências recusadas (ex.: inspeção aprovada, 413, 415, RESPONSE_NOT_FOUND) ficam FAILED e voltam a ser enviadas a cada
 sincronização, aparecendo só na aba Sincronização. Falta política de descarte/ação do usuário.
@@ -1275,7 +1275,7 @@ O push do mock aplica INSPECTION e NON_CONFORMITY, mas `INSPECTION_RESPONSE` con
 efeito (já era assim). O pull do mock sempre responde "nada mudou". Testes em modo mock não exercitam o caminho
 de respostas via push nem mudanças vindas do pull.
 
-### 7. Código do cache de leitura + pull não commitado — Classificação: estado do repositório
+### 7. Código do cache de leitura + pull não commitado — Classificação: estado do repositório — **SUPERSEDED**: commitado em `7e4d6d4` ("feat: escopo sync outbox completo")
 Implementado e verde, **não commitado**, no working tree da branch `task/sync-outbox-nc`:
 `services/offline-cache.ts`, `services/offline-data.ts`, `features/inspections/pending-overlay.ts`, tabela
 `read_cache` (`local-db.ts`), hooks de lista/detalhe/nomes/evidências usando `cachedGet` + sobreposição das

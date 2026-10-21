@@ -11,7 +11,7 @@ import { randomUUID } from 'expo-crypto';
 
 import type { GeoLocation } from '@/models';
 import type { ApiClient } from '@/services/api-client';
-import { deleteOutboxEntry, getPendingEntries, upsertOutboxEntry } from '@/services/local-db';
+import { deleteOutboxEntry, getOutboxEntry, upsertOutboxEntry } from '@/services/local-db';
 import { syncPendingIfOnline } from '@/services/sync-service';
 
 export const INSPECTION_ENTITY_TYPE = 'INSPECTION';
@@ -62,11 +62,13 @@ export async function settleQueuedOperation(
 ): Promise<QueuedOutcome> {
   await syncPendingIfOnline(client, inspectionId).catch(() => undefined);
 
-  const entry = (await getPendingEntries(inspectionId)).find((row) => row.id === operationId);
-  if (!entry) return { state: 'synced' };
+  // Pelo id, não pela fila: uma entrada REJECTED já saiu da fila pendente.
+  const entry = await getOutboxEntry(operationId);
+  if (!entry || entry.synced === 1) return { state: 'synced' };
 
   const rejectedByServer =
-    (entry.status === 'FAILED' || entry.status === 'CONFLICT') && entry.last_error !== null;
+    entry.status === 'REJECTED' ||
+    ((entry.status === 'FAILED' || entry.status === 'CONFLICT') && entry.last_error !== null);
   if (rejectedByServer) {
     await deleteOutboxEntry(operationId);
     return { state: 'rejected', message: entry.last_error ?? 'O servidor recusou a operação.' };

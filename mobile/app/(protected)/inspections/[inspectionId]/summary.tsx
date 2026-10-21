@@ -10,6 +10,7 @@ import {
   queueInspectionTransition,
   settleQueuedOperation,
 } from '@/features/inspections/inspection-outbox';
+import { withPendingEvidences } from '@/features/inspections/pending-overlay';
 import { useEvidences } from '@/features/inspections/use-evidences';
 import { useInspectionDetail } from '@/features/inspections/use-inspection-detail';
 import { toApiError, type GeoLocation } from '@/models';
@@ -26,7 +27,11 @@ export default function SummaryScreen() {
   const { inspectionId } = useLocalSearchParams<{ inspectionId: string }>();
 
   const { inspection, loading, error, reload } = useInspectionDetail(inspectionId);
-  const { evidences, loading: loadingEvidences } = useEvidences(inspectionId);
+  const {
+    evidences,
+    pending: pendingEvidences,
+    loading: loadingEvidences,
+  } = useEvidences(inspectionId);
 
   const [submitting, setSubmitting] = useState(false);
   const [locationNotice, setLocationNotice] = useState<string | null>(null);
@@ -81,7 +86,8 @@ export default function SummaryScreen() {
   const summary = evaluateCompletion(
     detail.items ?? [],
     detail.responses ?? [],
-    evidences,
+    // Fotos ainda no aparelho contam: subirão antes da conclusão (sync-service).
+    withPendingEvidences(evidences, pendingEvidences, detail.responses ?? []),
     detail.nonConformities ?? [],
   );
 

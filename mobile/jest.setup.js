@@ -263,9 +263,12 @@ beforeEach(() => {
   });
   db.getAllAsync.mockReset().mockImplementation(async (sql, params) => {
     if (/WHERE status IN/i.test(sql)) {
-      return [...store.values()].filter((r) => r.status === 'FAILED' || r.status === 'CONFLICT');
+      return [...store.values()].filter((r) =>
+        ['FAILED', 'CONFLICT', 'REJECTED'].includes(r.status),
+      );
     }
-    const rows = [...store.values()].filter((r) => r.synced === 0);
+    // Pendentes: não sincronizadas e não recusadas de vez pelo servidor.
+    const rows = [...store.values()].filter((r) => r.synced === 0 && r.status !== 'REJECTED');
     if (params && params.length > 0 && params[0]) {
       return rows.filter((r) => r.inspection_id === params[0]);
     }
@@ -273,7 +276,12 @@ beforeEach(() => {
   });
   db.getFirstAsync.mockReset().mockImplementation(async (sql, params) => {
     if (/COUNT\(\*\)/i.test(sql)) {
-      return { count: [...store.values()].filter((r) => r.synced === 0).length };
+      return {
+        count: [...store.values()].filter((r) => r.synced === 0 && r.status !== 'REJECTED').length,
+      };
+    }
+    if (/FROM outbox WHERE id = \?/i.test(sql)) {
+      return store.get(params && params[0]) ?? null;
     }
     if (/read_cache/i.test(sql)) {
       const key = params && params[0];

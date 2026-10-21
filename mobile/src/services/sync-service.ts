@@ -2,10 +2,21 @@ import { randomUUID } from 'expo-crypto';
 import * as Network from 'expo-network';
 import * as SecureStore from 'expo-secure-store';
 
-import { EVIDENCE_ENTITY_TYPE, syncEvidenceEntries } from '@/features/evidence/evidence-outbox';
+import {
+  discardEvidenceFile,
+  EVIDENCE_ENTITY_TYPE,
+  syncEvidenceEntries,
+} from '@/features/evidence/evidence-outbox';
 
 import type { ApiClient } from './api-client';
-import { getPendingEntries, markEntryFailed, markEntriesSynced, saveSyncMetadata } from './local-db';
+import {
+  deleteOutboxEntry,
+  getPendingEntries,
+  markEntryFailed,
+  markEntriesSynced,
+  saveSyncMetadata,
+  type OutboxRow,
+} from './local-db';
 import { refreshOfflineData } from './offline-data';
 
 const DEVICE_ID_KEY = 'fieldops_device_id';
@@ -63,19 +74,69 @@ interface SyncPushResponse {
 
 const ACCEPTED_STATUSES = new Set(['APPLIED', 'ALREADY_APPLIED']);
 
+/** Conclusão da inspeção: o backend exige as evidências já no servidor para aceitá-la. */
+function isSubmission(row: OutboxRow): boolean {
+  if (row.entity_type !== 'INSPECTION') return false;
+  try {
+    return (JSON.parse(row.payload) as { status?: unknown }).status === 'SUBMITTED';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Ordem do envio: (1) push JSON de tudo menos as conclusões; (2) upload das
+ * evidências, que precisam da resposta ou NC já no servidor; (3) push das
+ * conclusões — a de uma inspeção com foto ainda no aparelho espera a próxima
+ * sincronização (o servidor a recusaria por falta de evidência).
+ */
 export async function syncPending(client: ApiClient, inspectionId?: string): Promise<SyncResult> {
   const entries = await getPendingEntries(inspectionId);
   if (entries.length === 0) return { synced: 0, failed: 0 };
 
-  // Evidências sobem por upload multipart, não pelo push JSON — e depois dele,
-  // para que a resposta ou NC a que a foto se vincula já exista no servidor.
-  const pending = entries.filter((row) => row.entity_type !== EVIDENCE_ENTITY_TYPE);
   const evidence = entries.filter((row) => row.entity_type === EVIDENCE_ENTITY_TYPE);
+  const json = entries.filter((row) => row.entity_type !== EVIDENCE_ENTITY_TYPE);
+  const submissions = json.filter(isSubmission);
+  const others = json.filter((row) => !isSubmission(row));
 
+  const pushed = await pushEntries(client, others);
+  const uploaded = await syncEvidenceEntries(client, evidence);
+
+  const evidenceLeft = new Set(
+    (await getPendingEntries(inspectionId))
+      .filter((row) => row.entity_type === EVIDENCE_ENTITY_TYPE)
+      .map((row) => row.inspection_id),
+  );
+  const submitted = await pushEntries(
+    client,
+    submissions.filter((row) => !evidenceLeft.has(row.inspection_id)),
+  );
+
+  const synced = pushed.synced + uploaded.synced + submitted.synced;
+  const failed = pushed.failed + uploaded.failed + submitted.failed;
+
+  if (synced > 0) {
+    await saveSyncMetadata('last_successful_sync', new Date().toISOString());
+  }
+
+  return { synced, failed };
+}
+
+/**
+ * Remove do aparelho uma operação recusada — na aba Sincronização, por decisão
+ * do técnico. Evidência leva junto a foto guardada.
+ */
+export async function discardOutboxEntry(row: OutboxRow): Promise<void> {
+  if (row.entity_type === EVIDENCE_ENTITY_TYPE) discardEvidenceFile(row);
+  await deleteOutboxEntry(row.id);
+}
+
+async function pushEntries(client: ApiClient, pending: OutboxRow[]): Promise<SyncResult> {
   let synced = 0;
   let failed = 0;
+  if (pending.length === 0) return { synced, failed };
 
-  const deviceId = pending.length > 0 ? await getOrCreateDeviceId() : '';
+  const deviceId = await getOrCreateDeviceId();
 
   for (let offset = 0; offset < pending.length; offset += SYNC_BATCH_SIZE) {
     const batch = pending.slice(offset, offset + SYNC_BATCH_SIZE);
@@ -132,7 +193,7 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
       if (ACCEPTED_STATUSES.has(result.status)) {
         syncedIds.push(result.operationId);
       } else {
-        const failStatus = result.status === 'CONFLICT' ? 'CONFLICT' : 'FAILED';
+        const failStatus = failureStatus(result.status);
         await markEntryFailed(result.operationId, failStatus, result.error?.message ?? undefined);
         failed += 1;
       }
@@ -152,15 +213,17 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
     }
   }
 
-  const uploaded = await syncEvidenceEntries(client, evidence);
-  synced += uploaded.synced;
-  failed += uploaded.failed;
-
-  if (synced > 0) {
-    await saveSyncMetadata('last_successful_sync', new Date().toISOString());
-  }
-
   return { synced, failed };
+}
+
+/**
+ * REJECTED é definitivo: a entrada sai da fila e espera o técnico descartá-la.
+ * DEPENDENCY_FAILED depende de outra operação e pode passar no próximo envio.
+ */
+function failureStatus(status: SyncOperationResult['status']): 'FAILED' | 'CONFLICT' | 'REJECTED' {
+  if (status === 'REJECTED') return 'REJECTED';
+  if (status === 'CONFLICT') return 'CONFLICT';
+  return 'FAILED';
 }
 
 export async function syncPendingIfOnline(

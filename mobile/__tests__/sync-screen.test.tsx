@@ -5,16 +5,21 @@ jest.mock('@/services/sync-service', () => ({
   syncPendingIfOnline: jest.fn().mockResolvedValue({ synced: 0, failed: 0 }),
   isOnline: jest.fn().mockResolvedValue(true),
   getOrCreateDeviceId: jest.fn().mockResolvedValue('device-test-001'),
+  // Remove de verdade do outbox (mock), sem a parte de arquivo.
+  discardOutboxEntry: jest.fn(async (row: { id: string }) =>
+    jest.requireActual('@/services/local-db').deleteOutboxEntry(row.id),
+  ),
 }));
 
 import SyncScreen from '../app/(protected)/(tabs)/sync';
 import { resetRouterMock, routerMock } from '@/test-utils/expo-router-mock';
 import { renderWithSession } from '@/test-utils/render';
-import { isOnline, syncPendingIfOnline } from '@/services/sync-service';
+import { discardOutboxEntry, isOnline, syncPendingIfOnline } from '@/services/sync-service';
 import { markEntryFailed, saveSyncMetadata, upsertOutboxEntry } from '@/services/local-db';
 
 const mockSync = syncPendingIfOnline as jest.Mock;
 const mockIsOnline = isOnline as jest.Mock;
+const mockDiscard = discardOutboxEntry as jest.Mock;
 
 beforeEach(() => {
   resetRouterMock();
@@ -126,6 +131,29 @@ describe('FE-M04 — Sincronização', () => {
     await renderSync();
 
     expect(screen.getByTestId('sync-failed-count')).toHaveTextContent('1 operação com erro');
+  });
+
+  it('lista a operação recusada com o motivo e permite descartá-la (achado 5)', async () => {
+    await upsertOutboxEntry({
+      id: 'rej-1',
+      inspectionId: 'insp-1',
+      entityType: 'EVIDENCE',
+      entityId: 'rej-1',
+      operationType: 'CREATE',
+      baseVersion: 0,
+      payload: '{}',
+    });
+    await markEntryFailed('rej-1', 'REJECTED', 'Arquivo maior que 10 MB.');
+
+    await renderSync();
+
+    expect(screen.getByTestId('sync-rejected-rej-1')).toHaveTextContent(/Evidência/);
+    expect(screen.getByTestId('sync-rejected-rej-1')).toHaveTextContent(/Arquivo maior que 10 MB\./);
+
+    await fireEvent.press(screen.getByTestId('sync-rejected-rej-1-discard'));
+
+    await waitFor(() => expect(screen.queryByTestId('sync-rejected-rej-1')).toBeNull());
+    expect(mockDiscard).toHaveBeenCalledWith(expect.objectContaining({ id: 'rej-1' }));
   });
 
   it('não exibe seção de erros quando não há entradas com falha', async () => {

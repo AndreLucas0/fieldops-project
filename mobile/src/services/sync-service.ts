@@ -2,6 +2,8 @@ import { randomUUID } from 'expo-crypto';
 import * as Network from 'expo-network';
 import * as SecureStore from 'expo-secure-store';
 
+import { EVIDENCE_ENTITY_TYPE, syncEvidenceEntries } from '@/features/evidence/evidence-outbox';
+
 import type { ApiClient } from './api-client';
 import { getPendingEntries, markEntryFailed, markEntriesSynced, saveSyncMetadata } from './local-db';
 
@@ -51,12 +53,18 @@ interface SyncPushResponse {
 const ACCEPTED_STATUSES = new Set(['APPLIED', 'ALREADY_APPLIED']);
 
 export async function syncPending(client: ApiClient, inspectionId?: string): Promise<SyncResult> {
-  const pending = await getPendingEntries(inspectionId);
-  if (pending.length === 0) return { synced: 0, failed: 0 };
+  const entries = await getPendingEntries(inspectionId);
+  if (entries.length === 0) return { synced: 0, failed: 0 };
 
-  const deviceId = await getOrCreateDeviceId();
+  // Evidências sobem por upload multipart, não pelo push JSON — e depois dele,
+  // para que a resposta ou NC a que a foto se vincula já exista no servidor.
+  const pending = entries.filter((row) => row.entity_type !== EVIDENCE_ENTITY_TYPE);
+  const evidence = entries.filter((row) => row.entity_type === EVIDENCE_ENTITY_TYPE);
+
   let synced = 0;
   let failed = 0;
+
+  const deviceId = pending.length > 0 ? await getOrCreateDeviceId() : '';
 
   for (let offset = 0; offset < pending.length; offset += SYNC_BATCH_SIZE) {
     const batch = pending.slice(offset, offset + SYNC_BATCH_SIZE);
@@ -130,6 +138,10 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
       synced += syncedIds.length;
     }
   }
+
+  const uploaded = await syncEvidenceEntries(client, evidence);
+  synced += uploaded.synced;
+  failed += uploaded.failed;
 
   if (synced > 0) {
     await saveSyncMetadata('last_successful_sync', new Date().toISOString());

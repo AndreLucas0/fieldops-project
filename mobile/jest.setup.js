@@ -120,6 +120,61 @@ jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: [] })),
 }));
 
+// expo-file-system é nativo. `__files` guarda as URIs criadas por cópia;
+// `__missing` simula arquivos de origem que sumiram (copy lança erro).
+jest.mock('expo-file-system', () => {
+  const files = new Set();
+  const missing = new Set();
+  const join = (...parts) =>
+    parts
+      .map((part) => (typeof part === 'string' ? part : part.uri))
+      .map((segment, index) =>
+        index === 0 ? segment.replace(/\/+$/, '') : segment.replace(/^\/+|\/+$/g, ''),
+      )
+      .join('/');
+
+  class Directory {
+    constructor(...parts) {
+      this.uri = join(...parts);
+    }
+    create() {}
+  }
+
+  class File {
+    constructor(...parts) {
+      this.uri = join(...parts);
+    }
+    get exists() {
+      return files.has(this.uri);
+    }
+    copy(destination) {
+      if (missing.has(this.uri)) throw new Error(`File not found: ${this.uri}`);
+      files.add(destination.uri);
+    }
+    delete() {
+      files.delete(this.uri);
+    }
+  }
+
+  return {
+    __files: files,
+    __missing: missing,
+    File,
+    Directory,
+    Paths: {
+      get document() {
+        return new Directory('file:///document');
+      },
+    },
+  };
+});
+
+beforeEach(() => {
+  const FileSystem = require('expo-file-system');
+  FileSystem.__files.clear();
+  FileSystem.__missing.clear();
+});
+
 // expo-network não existe no ambiente de teste. Por padrão o dispositivo está
 // online; cada teste pode sobrescrever com mockResolvedValueOnce.
 jest.mock('expo-network', () => ({

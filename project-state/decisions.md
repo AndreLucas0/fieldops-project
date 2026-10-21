@@ -27,6 +27,31 @@ ACTIVE / SUPERSEDED
 
 ---
 
+### [2026-10-20] — SYNC-OUTBOX-EVIDENCE: evidência entra no outbox e sobe pelo endpoint multipart existente
+
+Context:
+Contrato §10.8/§11.3 e RN-047: capturar evidência é operação offline e o arquivo fica no aparelho até o upload
+ser confirmado. A pendência dizia "requer backend" (entityType EVIDENCE no sync push).
+
+Decision:
+- Sem mudança no backend: a entrada EVIDENCE do outbox guarda `localUri` + metadados; o sync refaz o
+  `POST /inspections/{id}/evidence` multipart com a mesma `idempotencyKey` (= id da entrada).
+- Foto copiada para `Paths.document/evidence-pending/` (o cache pode ser limpo pelo sistema); apagada só após sucesso.
+- Ordem: push JSON primeiro, evidências depois (vínculo com resposta/NC já existe no servidor).
+- 409 `EVIDENCE_ALREADY_PROCESSED` = sucesso (o backend responde assim a chave repetida, não 200).
+- A prévia não mostra mais rejeição do servidor; ela aparece na aba Sincronização.
+
+Reason:
+Endpoint já idempotente por chave (RN-068); multipart não cabe no push JSON. Menor mudança que cumpre a spec.
+
+Alternatives considered:
+- `entityType: EVIDENCE` no `/mobile/sync/push` com arquivo em base64: payload enorme e mudança de contrato.
+
+Status:
+ACTIVE
+
+---
+
 ### [2026-10-20] — TECH-PLACE-READ: técnico lê cliente/local/equipamento por id, só no próprio escopo
 
 Context:

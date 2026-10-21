@@ -9,7 +9,9 @@
 import { randomUUID } from 'expo-crypto';
 
 import type { Evidence, GeoLocation, UploadFile, Uuid } from '@/models';
-import { apiClient, type ApiClient } from '@/services';
+// Direto do módulo (não do índice `@/services`): o sync-service usa este arquivo e
+// o índice reexporta o sync-service — importar o índice criaria um ciclo.
+import { apiClient, type ApiClient } from '@/services/api-client';
 
 /** De onde a captura partiu — decide para onde voltar depois de confirmar. */
 export type EvidenceOrigin = 'checklist' | 'non-conformities';

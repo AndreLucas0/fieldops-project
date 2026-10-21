@@ -1089,6 +1089,16 @@ Scope: requer mudanças em backend + frontend.
 
 ### SYNC-OUTBOX-EVIDENCE — EVIDENCE não passa pelo outbox
 
+Status: DONE (2026-10-20, branch `task/sync-outbox-evidence`) — sem mudança no backend
+
+Implementation (2026-10-20): `src/features/evidence/evidence-outbox.ts` — `queueEvidence` copia a foto para
+`Paths.document/evidence-pending/<idempotencyKey>.jpg` e grava `EVIDENCE` no outbox (payload JSON com `localUri`,
+`idempotencyKey`, `capturedAtDevice`, vínculos e `location`); `syncPending` separa as evidências e, depois do push
+JSON, faz o upload multipart pelo endpoint existente; sucesso (ou 409 `EVIDENCE_ALREADY_PROCESSED`) marca
+sincronizada e apaga a cópia; falha mantém PENDING/FAILED e o arquivo (RN-047). A prévia (FE-M13) grava
+localmente e depois tenta sincronizar. "Requer backend" não se confirmou: o endpoint já é idempotente por chave.
+
+Histórico (status original):
 Status: PENDING (requer backend, caso especial)
 
 Problema: evidências (fotos) são enviadas diretamente via multipart/form-data para `POST /inspections/{id}/evidence`. Offline → falha.

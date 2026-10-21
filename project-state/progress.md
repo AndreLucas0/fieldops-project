@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-20 (EVIDENCE-URI-EXPO-GO — envio de evidência no Expo Go)
+Last updated: 2026-10-20 (SYNC-OUTBOX-EVIDENCE — evidência offline-first)
 
 ## Current State
 
@@ -19,6 +19,24 @@ Data: 2026-10-20. Branch: `task/technician-read-place-data`. Pedido: "libere o C
 **Testes:** `CorsConfigurationIT` reescrito (4; novo caso de IP da rede — RED 403 → GREEN) e
 `RestrictedCorsConfigurationIT` novo (2, lista explícita). `./mvnw verify`: **50 unit + 304 IT, BUILD SUCCESS**.
 Não executado: teste pelo navegador (requer reiniciar o backend do usuário).
+
+### SYNC-OUTBOX-EVIDENCE-2026-10-20 — evidência offline-first (outbox SQLite)
+
+Data: 2026-10-20. Branch: `task/sync-outbox-evidence` (a partir de `task/fix-evidence-uri-expo-go`). Tipo: feature (TDD). Escopo escolhido pelo dono: só evidências.
+
+**Implementado:** `evidence-outbox.ts` (`queueEvidence`, `syncEvidenceEntries`); `sync-service.ts` envia JSON e depois
+evidências; `preview.tsx` grava local e tenta sincronizar; `evidence-upload.ts` importa `@/services/api-client` direto
+(evita ciclo com o índice); mock de `expo-file-system` em `jest.setup.js`. Sem mudança no backend.
+
+**Mudança de comportamento:** rejeição do servidor (ex.: inspeção aprovada) não aparece mais na prévia; a evidência
+fica com status FAILED e aparece na aba Sincronização/detalhes. Teste "mostra a falha do servidor sem sair da tela"
+substituído por "sem conexão, guarda no outbox e volta" e "falha ao guardar a foto mostra erro".
+
+**Não implementado:** miniatura de evidência pendente no checklist (só aparece após sincronizar); descarte de
+rejeições permanentes (4xx ≠ 409) — são retentadas a cada sync; INSPECTION/NC no outbox (fora do escopo).
+
+**Testes:** `evidence-outbox.test.ts` (6, RED → GREEN, incl. 409 já processada); 3 testes de prévia novos/ajustados.
+`npx jest`: **382/382, 32 suítes**. Lint dos tocados limpo; typecheck só com erros pré-existentes. Não executado: aparelho.
 
 ### EVIDENCE-URI-EXPO-GO-2026-10-20 — envio de evidência falhava em todo aparelho com Expo Go
 

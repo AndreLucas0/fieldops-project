@@ -7,7 +7,11 @@ jest.mock('expo-router', () => require('@/test-utils/expo-router-mock'));
 import ScannerScreen from '../app/(protected)/scanner';
 import EvidenceCaptureScreen from '../app/(protected)/evidence/capture';
 import EvidencePreviewScreen from '../app/(protected)/evidence/preview';
-import * as evidenceUpload from '@/features/evidence/evidence-upload';
+import * as FileSystem from 'expo-file-system';
+import * as Network from 'expo-network';
+
+import * as evidenceOutbox from '@/features/evidence/evidence-outbox';
+import { getPendingEntries } from '@/services/local-db';
 import { readCapture, resetCaptures, stashCapture } from '@/features/evidence/pending-capture';
 import { resetRouterMock, routerMock, setSearchParams } from '@/test-utils/expo-router-mock';
 import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/test-utils/render';
@@ -276,7 +280,7 @@ describe('FE-M13 — Prévia de evidência', () => {
 
   it('envia o arquivo pela URI original do Expo Go, sem decodificar', async () => {
     const id = inspectionId();
-    const upload = jest.spyOn(evidenceUpload, 'uploadEvidence');
+    const queue = jest.spyOn(evidenceOutbox, 'queueEvidence');
 
     await render(<EvidencePreviewScreen />, {
       inspectionId: id,
@@ -287,8 +291,8 @@ describe('FE-M13 — Prévia de evidência', () => {
     await fireEvent.press(screen.getByTestId('previa-confirmar'));
 
     await waitFor(() => expect(routerMock.dismissTo).toHaveBeenCalled());
-    expect(upload).toHaveBeenCalledWith(expect.objectContaining({ fileUri: EXPO_GO_URI }));
-    upload.mockRestore();
+    expect(queue).toHaveBeenCalledWith(expect.objectContaining({ fileUri: EXPO_GO_URI }));
+    queue.mockRestore();
   });
 
   it('evidência de NC volta para a lista de não conformidades', async () => {
@@ -311,9 +315,33 @@ describe('FE-M13 — Prévia de evidência', () => {
     );
   });
 
-  it('mostra a falha do servidor sem sair da tela', async () => {
+  it('sem conexão, guarda a evidência no outbox e volta (offline-first)', async () => {
+    asMock(Network.getNetworkStateAsync).mockResolvedValue({
+      isConnected: false,
+      isInternetReachable: false,
+    });
+    const id = inspectionId();
+    const antes = getMockDatabase().evidence[id]?.length ?? 0;
+
     await render(<EvidencePreviewScreen />, {
-      inspectionId: 'inspecao-inexistente',
+      inspectionId: id,
+      captureId: stashCapture('file:///foto.jpg'),
+      origin: 'checklist',
+    });
+
+    await fireEvent.press(screen.getByTestId('previa-confirmar'));
+
+    await waitFor(() => expect(routerMock.dismissTo).toHaveBeenCalled());
+    const pendentes = await getPendingEntries(id);
+    expect(pendentes).toEqual([expect.objectContaining({ entity_type: 'EVIDENCE' })]);
+    expect(getMockDatabase().evidence[id]?.length ?? 0).toBe(antes);
+  });
+
+  it('se não conseguir guardar a foto no aparelho, mostra a falha e fica na tela', async () => {
+    (FileSystem as unknown as { __missing: Set<string> }).__missing.add('file:///foto.jpg');
+
+    await render(<EvidencePreviewScreen />, {
+      inspectionId: inspectionId(),
       captureId: stashCapture('file:///foto.jpg'),
     });
 
@@ -321,5 +349,6 @@ describe('FE-M13 — Prévia de evidência', () => {
 
     await waitFor(() => expect(screen.getByTestId('previa-falha')).toBeOnTheScreen());
     expect(routerMock.dismissTo).not.toHaveBeenCalled();
+    expect(await getPendingEntries()).toHaveLength(0);
   });
 });

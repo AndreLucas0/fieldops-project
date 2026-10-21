@@ -11,5 +11,5 @@ public record UserCreateRequest(
 	@NotBlank @Email @Size(max = 255) String email,
 	@NotBlank @Size(min = 8, max = 255) String password,
 	@NotNull UserRole role,
-	String phone) {
+	@Size(max = 30) String phone) {
 }

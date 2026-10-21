@@ -141,6 +141,22 @@ class UserControllerIT {
 	}
 
 	@Test
+<<<<<<< Updated upstream
+=======
+	void creatingUserWithPhoneLongerThanDatabaseColumnIsRejectedAsBadRequest() {
+		String payload = """
+			{"name":"Roberta Técnica","email":"roberta.phone@fieldops.local",
+				"password":"OutraSenha1!","role":"TECHNICIAN",
+				"phone":"1234567890123456789012345678901"}""";
+
+		assertThat(mvc.post().uri("/users").header("Authorization", bearer(adminToken))
+			.contentType(MediaType.APPLICATION_JSON).content(payload))
+			.hasStatus(HttpStatus.BAD_REQUEST);
+	}
+
+	@Test
+	@DisplayName("RN-003, AC-SECURITY - técnico não gerencia usuários nem recebe dados administrativos")
+>>>>>>> Stashed changes
 	void technicianCannotAccessUserManagementEndpoints() {
 		assertThat(mvc.get().uri("/users").header("Authorization", bearer(technicianToken)))
 			.hasStatus(HttpStatus.FORBIDDEN);
@@ -182,6 +198,27 @@ class UserControllerIT {
 			.hasStatusOk()
 			.bodyJson()
 			.extractingPath("$.name").asString().isEqualTo("Carlos Técnico Sênior");
+	}
+
+	@Test
+	void updatingUnknownUserReturnsNotFound() {
+		String payload = """
+			{"name":"Carlos","email":"carlos.updated@fieldops.local","role":"TECHNICIAN"}""";
+
+		assertThat(mvc.put().uri("/users/" + UUID.randomUUID()).header("Authorization", bearer(adminToken))
+			.contentType(MediaType.APPLICATION_JSON).content(payload))
+			.hasStatus(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void updatingUserWithPhoneLongerThanDatabaseColumnIsRejectedAsBadRequest() {
+		String payload = """
+			{"name":"Carlos","email":"%s","role":"TECHNICIAN","phone":"1234567890123456789012345678901"}"""
+			.formatted(technicianUser.getEmail());
+
+		assertThat(mvc.put().uri("/users/" + technicianUser.getId()).header("Authorization", bearer(adminToken))
+			.contentType(MediaType.APPLICATION_JSON).content(payload))
+			.hasStatus(HttpStatus.BAD_REQUEST);
 	}
 
 	@Test

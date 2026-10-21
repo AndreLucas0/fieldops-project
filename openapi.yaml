@@ -2377,7 +2377,7 @@ components:
         email: { type: string, format: email }
         password: { type: string, format: password, minLength: 8 }
         role: { $ref: '#/components/schemas/UserRole' }
-        phone: { type: string, nullable: true }
+        phone: { type: string, maxLength: 30, nullable: true }
       required: [name, email, password, role]
 
     UserUpdateRequest:
@@ -2386,7 +2386,7 @@ components:
         name: { type: string, maxLength: 150 }
         email: { type: string, format: email }
         role: { $ref: '#/components/schemas/UserRole' }
-        phone: { type: string, nullable: true }
+        phone: { type: string, maxLength: 30, nullable: true }
       required: [name, email, role]
 
     UserStatusUpdateRequest:

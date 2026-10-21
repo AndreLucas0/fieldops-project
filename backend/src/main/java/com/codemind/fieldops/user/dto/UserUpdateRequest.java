@@ -10,5 +10,5 @@ public record UserUpdateRequest(
 	@NotBlank @Size(max = 150) String name,
 	@NotBlank @Email @Size(max = 255) String email,
 	@NotNull UserRole role,
-	String phone) {
+	@Size(max = 30) String phone) {
 }

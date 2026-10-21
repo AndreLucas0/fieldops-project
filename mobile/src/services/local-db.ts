@@ -55,6 +55,11 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
         key   TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS read_cache (
+        key      TEXT PRIMARY KEY,
+        value    TEXT NOT NULL,
+        saved_at TEXT NOT NULL
+      );
     `);
   }
   return db;
@@ -123,6 +128,12 @@ export async function markEntriesSynced(ids: string[]): Promise<void> {
   );
 }
 
+/** Remove uma entrada — usado quando o servidor a recusa de forma definitiva. */
+export async function deleteOutboxEntry(id: string): Promise<void> {
+  const database = await getDb();
+  await database.runAsync('DELETE FROM outbox WHERE id = ?', [id]);
+}
+
 /** Retorna entradas com status FAILED ou CONFLICT (visíveis na tela de sync). */
 export async function getFailedEntries(): Promise<OutboxRow[]> {
   const database = await getDb();
@@ -142,6 +153,25 @@ export async function markEntryFailed(
     'UPDATE outbox SET error_count = error_count + 1, status = ?, last_error = ? WHERE id = ?',
     [status, lastError ?? null, id],
   );
+}
+
+/** Guarda a última resposta lida do servidor para uma consulta (leitura offline). */
+export async function saveCachedResponse(key: string, value: unknown): Promise<void> {
+  const database = await getDb();
+  await database.runAsync(
+    'INSERT OR REPLACE INTO read_cache (key, value, saved_at) VALUES (?, ?, ?)',
+    [key, JSON.stringify(value), new Date().toISOString()],
+  );
+}
+
+/** Última resposta guardada para a consulta, ou `null` se nunca foi lida. */
+export async function readCachedResponse<T>(key: string): Promise<T | null> {
+  const database = await getDb();
+  const row = await database.getFirstAsync<{ value: string }>(
+    'SELECT value FROM read_cache WHERE key = ?',
+    [key],
+  );
+  return row ? (JSON.parse(row.value) as T) : null;
 }
 
 /** Grava ou sobrescreve um par chave/valor na tabela de metadados de sync. */

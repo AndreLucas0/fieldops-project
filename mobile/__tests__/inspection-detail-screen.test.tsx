@@ -10,7 +10,9 @@ import {
   setSearchParams,
 } from '@/test-utils/expo-router-mock';
 import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/test-utils/render';
-import { getMockDatabase, resetMockDatabase } from '@/services';
+import { queueInspectionTransition } from '@/features/inspections/inspection-outbox';
+import { ApiError, CLIENT_ERROR_CODES } from '@/models';
+import { apiClient, getMockDatabase, resetMockDatabase } from '@/services';
 import type { InspectionStatus } from '@/models';
 
 const TECHNICIAN_ID = USER_IDS.technician;
@@ -137,5 +139,42 @@ describe('FE-M06 — Detalhes da inspeção', () => {
 
     await waitFor(() => expect(screen.getByTestId('detalhe-error')).toBeOnTheScreen());
     expect(screen.getByTestId('detalhe-error-retry')).toBeOnTheScreen();
+  });
+});
+
+describe('Offline-first — abrir inspeção sem rede (aplicativo-mobile.md §13.12)', () => {
+  const semRede = () =>
+    jest
+      .spyOn(apiClient, 'get')
+      .mockRejectedValue(ApiError.client(CLIENT_ERROR_CODES.NETWORK_UNAVAILABLE, 'Sem conexão.'));
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('sem rede, abre pela cópia local e mostra o início feito offline', async () => {
+    const id = inspectionWith('ASSIGNED');
+    const online = await renderDetail(id);
+    await waitFor(() =>
+      expect(screen.getByTestId('detalhe-local')).toHaveTextContent(/Indústria Alfa/),
+    );
+    online.unmount();
+
+    semRede();
+    await queueInspectionTransition(id, {
+      status: 'IN_PROGRESS',
+      startedAtDevice: '2026-10-20T12:00:00Z',
+    });
+    await renderDetail(id);
+
+    expect(screen.getByTestId('detalhe-screen')).toHaveTextContent(/Em andamento/);
+    await waitFor(() =>
+      expect(screen.getByTestId('detalhe-local')).toHaveTextContent(/Indústria Alfa/),
+    );
+    expect(screen.getByTestId('detalhe-pendente')).toBeOnTheScreen();
+  });
+
+  it('sem pendências, não mostra o aviso de envio pendente', async () => {
+    await renderDetail(inspectionWith('IN_PROGRESS'));
+
+    expect(screen.queryByTestId('detalhe-pendente')).toBeNull();
   });
 });

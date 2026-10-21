@@ -54,6 +54,16 @@ public class EquipmentService {
             .orElseThrow(() -> new ResourceNotFoundException(EQUIPMENT_NOT_FOUND_CODE, "Equipment not found"));
     }
 
+    /** A technician only reads equipment of inspections assigned to them, in any status (RN-004). */
+    @Transactional(readOnly = true)
+    public Equipment getById(UUID id, UUID userId, boolean isTechnician) {
+        Equipment equipment = getById(id);
+        if (isTechnician && !inspectionRepository.existsByTechnicianIdAndEquipmentId(userId, id)) {
+            throw new AccessDeniedException("Equipment is not in scope for this technician");
+        }
+        return equipment;
+    }
+
     @Transactional(readOnly = true)
     public Equipment getByQrCode(String qrCode, UUID userId, boolean isTechnician) {
         Equipment equipment = equipmentRepository.findByQrCode(qrCode)

@@ -2,6 +2,7 @@ package com.codemind.fieldops.site.application;
 
 import com.codemind.fieldops.client.application.ClientService;
 import com.codemind.fieldops.client.domain.Client;
+import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.shared.error.ResourceNotFoundException;
 import com.codemind.fieldops.site.domain.InspectionSite;
 import com.codemind.fieldops.site.domain.SiteStatus;
@@ -12,6 +13,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,10 +24,13 @@ public class SiteService {
 
     private final InspectionSiteRepository siteRepository;
     private final ClientService clientService;
+    private final InspectionRepository inspectionRepository;
 
-    public SiteService(InspectionSiteRepository siteRepository, ClientService clientService) {
+    public SiteService(InspectionSiteRepository siteRepository, ClientService clientService,
+            InspectionRepository inspectionRepository) {
         this.siteRepository = siteRepository;
         this.clientService = clientService;
+        this.inspectionRepository = inspectionRepository;
     }
 
     @Transactional(readOnly = true)
@@ -41,6 +46,16 @@ public class SiteService {
     public InspectionSite getById(UUID id) {
         return siteRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException(SITE_NOT_FOUND_CODE, "Site not found"));
+    }
+
+    /** A technician only reads sites of inspections assigned to them, in any status (RN-004). */
+    @Transactional(readOnly = true)
+    public InspectionSite getById(UUID id, UUID userId, boolean isTechnician) {
+        InspectionSite site = getById(id);
+        if (isTechnician && !inspectionRepository.existsByTechnicianIdAndSiteId(userId, id)) {
+            throw new AccessDeniedException("Site is not in scope for this technician");
+        }
+        return site;
     }
 
     @Transactional

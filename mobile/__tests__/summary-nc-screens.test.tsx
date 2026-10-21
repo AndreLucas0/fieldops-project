@@ -1,5 +1,6 @@
 import { USER_IDS } from '@fieldops/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import * as Network from 'expo-network';
 
 jest.mock('expo-router', () => require('@/test-utils/expo-router-mock'));
 
@@ -8,9 +9,14 @@ import NonConformitiesScreen from '../app/(protected)/inspections/[inspectionId]
 import { resetRouterMock, routerMock, setSearchParams } from '@/test-utils/expo-router-mock';
 import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/test-utils/render';
 import { configureApi, getMockDatabase, resetApiConfig, resetMockDatabase } from '@/services';
+import { getPendingEntries } from '@/services/local-db';
 import type { InspectionItemSnapshot, InspectionStatus } from '@/models';
 
 const TECHNICIAN_ID = USER_IDS.technician;
+
+function asMock<T>(fn: T): jest.Mock {
+  return fn as unknown as jest.Mock;
+}
 
 beforeEach(() => {
   resetRouterMock();
@@ -168,6 +174,34 @@ describe('FE-M09 — Resumo e conclusão', () => {
     expect(inspecao?.completedAtDevice).toEqual(expect.any(String));
   });
 
+  it('sem conexão, guarda a conclusão no outbox e volta ao detalhe (offline-first)', async () => {
+    const id = inspectionWith('IN_PROGRESS');
+    answerEverything(id);
+    await renderSummary(id);
+    asMock(Network.getNetworkStateAsync).mockResolvedValue({
+      isConnected: false,
+      isInternetReachable: false,
+    });
+
+    await fireEvent.press(screen.getByTestId('resumo-concluir'));
+
+    await waitFor(() =>
+      expect(routerMock.replace).toHaveBeenCalledWith({
+        pathname: '/inspections/[inspectionId]',
+        params: { inspectionId: id },
+      }),
+    );
+    const pendentes = await getPendingEntries(id);
+    const conclusao = pendentes.find((entry) => entry.entity_type === 'INSPECTION');
+    expect(JSON.parse(conclusao?.payload ?? '{}')).toMatchObject({
+      status: 'SUBMITTED',
+      completedAtDevice: expect.any(String),
+    });
+    expect(getMockDatabase().inspections.find((entry) => entry.id === id)?.status).toBe(
+      'IN_PROGRESS',
+    );
+  });
+
   it('recusa concluir fora do estado de execução', async () => {
     await renderSummary(inspectionWith('APPROVED'));
 
@@ -270,6 +304,56 @@ describe('FE-M10 — Não conformidades', () => {
     await waitFor(() => expect(screen.queryByTestId('nc-formulario')).toBeNull());
 
     expect(getMockDatabase().nonConformities[0]?.title).toBe('Obstrução corrigida parcialmente');
+  });
+
+  it('sem conexão, registra a NC no aparelho e já a mostra na lista (offline-first)', async () => {
+    const id = inspectionWith('IN_PROGRESS');
+    const antes = getMockDatabase().nonConformities.length;
+    await renderNonConformities(id);
+    asMock(Network.getNetworkStateAsync).mockResolvedValue({
+      isConnected: false,
+      isInternetReachable: false,
+    });
+
+    await fireEvent.press(screen.getByTestId('nc-nova'));
+    await fireEvent.changeText(screen.getByTestId('nc-titulo'), 'Cabo exposto');
+    await fireEvent.changeText(screen.getByTestId('nc-descricao'), 'Isolamento rompido no painel.');
+    await fireEvent.press(screen.getByTestId('nc-salvar'));
+
+    await waitFor(() => expect(screen.queryByTestId('nc-formulario')).toBeNull());
+
+    const [pendente] = await getPendingEntries(id);
+    expect(pendente).toMatchObject({ entity_type: 'NON_CONFORMITY' });
+    expect(JSON.parse(pendente?.payload ?? '{}')).toMatchObject({
+      inspectionId: id,
+      title: 'Cabo exposto',
+      description: 'Isolamento rompido no painel.',
+      severity: expect.any(String),
+    });
+    expect(screen.getByTestId(`nc-item-${pendente?.entity_id}`)).toHaveTextContent(/Cabo exposto/);
+    expect(getMockDatabase().nonConformities).toHaveLength(antes);
+  });
+
+  it('sem conexão, a edição fica no aparelho e aparece na lista (offline-first)', async () => {
+    const id = inspectionWith('IN_PROGRESS');
+    const nc = getMockDatabase().nonConformities[0];
+    const tituloOriginal = nc?.title;
+    await renderNonConformities(id);
+    asMock(Network.getNetworkStateAsync).mockResolvedValue({
+      isConnected: false,
+      isInternetReachable: false,
+    });
+
+    await fireEvent.press(screen.getByTestId(`nc-editar-${nc?.id}`));
+    await fireEvent.changeText(screen.getByTestId('nc-titulo'), 'Título ajustado offline');
+    await fireEvent.press(screen.getByTestId('nc-salvar'));
+
+    await waitFor(() => expect(screen.queryByTestId('nc-formulario')).toBeNull());
+
+    expect(screen.getByTestId(`nc-item-${nc?.id}`)).toHaveTextContent(/Título ajustado offline/);
+    const [pendente] = await getPendingEntries(id);
+    expect(pendente).toMatchObject({ entity_type: 'NON_CONFORMITY', entity_id: nc?.id });
+    expect(getMockDatabase().nonConformities[0]?.title).toBe(tituloOriginal);
   });
 
   it('leva à captura de evidência com a NC vinculada', async () => {

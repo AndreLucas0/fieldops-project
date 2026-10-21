@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { EmptyState } from '@/components';
 import { Button, colors, Feedback, Field, spacing, Text } from '@/design-system';
+import { stashCapture } from '@/features/evidence/pending-capture';
 
 /**
  * FE-M12 — Captura de evidência.
@@ -40,7 +41,8 @@ export default function EvidenceCaptureScreen() {
       pathname: '/evidence/preview',
       params: {
         ...params,
-        uri,
+        // A URI fica fora da rota: o expo-router decodificaria o caminho do Expo Go.
+        captureId: stashCapture(uri),
         ...(description.trim() ? { description: description.trim() } : {}),
       },
     });

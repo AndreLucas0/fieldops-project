@@ -27,6 +27,127 @@ ACTIVE / SUPERSEDED
 
 ---
 
+### [2026-10-20] — Transições de inspeção e NC no outbox: sem baseVersion; recusa definitiva sai do outbox
+
+Context:
+O backend recusa como conflito `baseVersion` diferente da versão atual. Iniciar e concluir offline em sequência
+mudariam a versão da inspeção entre as duas operações; NC criada no aparelho não tem versão conhecida.
+
+Decision:
+- `INSPECTION` e `NON_CONFORMITY` vão no push com `baseVersion: null` (`VERSIONLESS_ENTITY_TYPES`, `sync-service.ts`).
+  Transições já são validadas pela máquina de estados; edição de NC (PEND-06, fora do MVP) fica com a última gravação.
+- Telas de iniciar/concluir/NC gravam no outbox e tentam sincronizar (`settleQueuedOperation`): recusa do servidor
+  (FAILED/CONFLICT com mensagem) remove a operação do outbox e aparece na tela; falha de rede deixa pendente e a tela segue.
+- A mensagem de recusa do push passa a ser gravada em `last_error`.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-10-20] — SYNC-OUTBOX-EVIDENCE: evidência entra no outbox e sobe pelo endpoint multipart existente
+
+Context:
+Contrato §10.8/§11.3 e RN-047: capturar evidência é operação offline e o arquivo fica no aparelho até o upload
+ser confirmado. A pendência dizia "requer backend" (entityType EVIDENCE no sync push).
+
+Decision:
+- Sem mudança no backend: a entrada EVIDENCE do outbox guarda `localUri` + metadados; o sync refaz o
+  `POST /inspections/{id}/evidence` multipart com a mesma `idempotencyKey` (= id da entrada).
+- Foto copiada para `Paths.document/evidence-pending/` (o cache pode ser limpo pelo sistema); apagada só após sucesso.
+- Ordem: push JSON primeiro, evidências depois (vínculo com resposta/NC já existe no servidor).
+- 409 `EVIDENCE_ALREADY_PROCESSED` = sucesso (o backend responde assim a chave repetida, não 200).
+- A prévia não mostra mais rejeição do servidor; ela aparece na aba Sincronização.
+
+Reason:
+Endpoint já idempotente por chave (RN-068); multipart não cabe no push JSON. Menor mudança que cumpre a spec.
+
+Alternatives considered:
+- `entityType: EVIDENCE` no `/mobile/sync/push` com arquivo em base64: payload enorme e mudança de contrato.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-10-20] — TECH-PLACE-READ: técnico lê cliente/local/equipamento por id, só no próprio escopo
+
+Context:
+Contra a API real, o detalhe e a lista de inspeções do mobile mostravam 403 em
+`GET /clients/{id}`, `/sites/{id}` e `/equipment/{id}` para o técnico. Divergência
+documental: `aplicativo-mobile.md` exige exibir cliente, local e equipamento ao técnico,
+mas `contrato-backend-frontend.md` §3.4 restringia a leitura a ADMIN/SUPERVISOR e
+`InspectionDetail` só traz os ids. O mock não checava perfil e escondia o problema.
+
+Decision (escolha do dono do projeto entre duas opções apresentadas):
+- Os três `GET /{id}` aceitam TECHNICIAN; o service devolve 403 (`AccessDeniedException`)
+  se não existir inspeção atribuída ao técnico que referencie aquele registro
+  (`InspectionRepository.existsByTechnicianIdAnd{Client,Site,Equipment}Id`), em qualquer estado.
+- Equipamento: escopo pelo `equipment_id` da inspeção, não pelo local (mais estrito que o
+  `by-qr`, que usa o local e só estados não terminais).
+- Listagens e combos encadeados continuam só ADMIN/SUPERVISOR.
+
+Reason:
+RN-004 (técnico consulta só o que é das inspeções atribuídas a ele). Mudança mínima: o mobile
+já chamava esses endpoints e não precisou mudar.
+
+Alternatives considered:
+- Embutir resumo (nome do cliente, local com endereço, equipamento) em `/mobile/inspections`
+  e `/mobile/inspections/{id}`: uma requisição só e melhor para offline, mas exige mudar
+  contrato, `shared/`, backend e mobile. Não escolhida; continua sendo a evolução natural se
+  o N+1 de requisições pesar.
+
+Impact:
+`contrato-backend-frontend.md` §3.4 e `openapi.yaml` atualizados. O mobile continua fazendo
+uma requisição por cliente/local/equipamento (pendência "nomes buscados um a um" permanece).
+
+Status:
+ACTIVE
+
+---
+
+### [2026-10-20] — CORS-CONFIG: backend aceita só origens de `CORS_ALLOWED_ORIGINS`
+
+Context:
+O preview web do mobile (`expo start --web`, origem `http://localhost:8081`) era
+bloqueado pelo navegador ao chamar a API real (8090): o backend não tinha CORS.
+O proxy do `ng serve` (INT-011) resolvia só o web, e só em dev.
+
+Decision:
+- `SecurityConfig` habilita `.cors()` com um `CorsConfigurationSource` alimentado por
+  `CorsProperties` (`fieldops.security.cors.allowed-origins` ← `CORS_ALLOWED_ORIGINS`,
+  lista separada por vírgula). Padrão de dev: `http://localhost:4200,http://localhost:8081`.
+- Métodos GET/POST/PUT/PATCH/DELETE/OPTIONS; cabeçalhos `Authorization`, `Content-Type`,
+  `Accept`; **sem** `allowCredentials` (autenticação é Bearer, não cookie); `maxAge` 3600 s.
+- Origem fora da lista: preflight recebe 403 e nenhum `Access-Control-Allow-Origin`.
+
+Reason:
+Cumpre `arquitetura.md` §11.10 ("CORS somente para origens autorizadas") e
+`plano-implementacao-backend.md` §5.5, que já previam exatamente essa variável.
+
+Alternatives considered:
+- Proxy no Metro/Expo: não existe mecanismo equivalente ao do `ng serve` sem config extra, e
+  não resolve produção.
+- `allowedOrigins("*")`: viola §11.10.
+
+Impact:
+O proxy do web (INT-011) continua funcionando e não é mais obrigatório. Em produção, defina
+`CORS_ALLOWED_ORIGINS` com a origem publicada do web. App nativo não é afetado (CORS é só do navegador).
+Supersede parcialmente a alternativa descartada "CORS no backend" da decisão INT-011 de 2026-10-05.
+
+Status:
+ACTIVE
+
+Update (2026-10-20, a pedido do dono do projeto — "libere o CORS para qualquer ip"):
+- No perfil `local`, `fieldops.security.cors.allowed-origins` passa a `${CORS_ALLOWED_ORIGINS:*}`
+  (`application-local.yml`): qualquer origem é aceita em desenvolvimento, inclusive IPs da rede.
+- `SecurityConfig` usa `setAllowedOriginPatterns` (aceita `*` e padrões como `http://192.168.*:*`;
+  ecoa a origem em vez de devolver `*`). Sem credenciais, então `*` não expõe cookies.
+- Fora do perfil local continua a lista restrita de `application.yml` (§11.10), coberta por
+  `RestrictedCorsConfigurationIT`. Antes de qualquer deploy, não ative o perfil `local`.
+
+---
+
 ### [2026-10-13] — Mobile em dev usa `.env` com IP da máquina; DB_PORT=5433 (não 5432)
 
 Context:

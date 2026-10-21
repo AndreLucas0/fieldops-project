@@ -120,6 +120,61 @@ jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: [] })),
 }));
 
+// expo-file-system é nativo. `__files` guarda as URIs criadas por cópia;
+// `__missing` simula arquivos de origem que sumiram (copy lança erro).
+jest.mock('expo-file-system', () => {
+  const files = new Set();
+  const missing = new Set();
+  const join = (...parts) =>
+    parts
+      .map((part) => (typeof part === 'string' ? part : part.uri))
+      .map((segment, index) =>
+        index === 0 ? segment.replace(/\/+$/, '') : segment.replace(/^\/+|\/+$/g, ''),
+      )
+      .join('/');
+
+  class Directory {
+    constructor(...parts) {
+      this.uri = join(...parts);
+    }
+    create() {}
+  }
+
+  class File {
+    constructor(...parts) {
+      this.uri = join(...parts);
+    }
+    get exists() {
+      return files.has(this.uri);
+    }
+    copy(destination) {
+      if (missing.has(this.uri)) throw new Error(`File not found: ${this.uri}`);
+      files.add(destination.uri);
+    }
+    delete() {
+      files.delete(this.uri);
+    }
+  }
+
+  return {
+    __files: files,
+    __missing: missing,
+    File,
+    Directory,
+    Paths: {
+      get document() {
+        return new Directory('file:///document');
+      },
+    },
+  };
+});
+
+beforeEach(() => {
+  const FileSystem = require('expo-file-system');
+  FileSystem.__files.clear();
+  FileSystem.__missing.clear();
+});
+
 // expo-network não existe no ambiente de teste. Por padrão o dispositivo está
 // online; cada teste pode sobrescrever com mockResolvedValueOnce.
 jest.mock('expo-network', () => ({
@@ -135,13 +190,20 @@ jest.mock('expo-network', () => ({
 jest.mock('expo-sqlite', () => {
   const store = new Map();
   const metaStore = new Map();
+  const cacheStore = new Map();
   const db = {
     execAsync: jest.fn(),
     runAsync: jest.fn(),
     getAllAsync: jest.fn(),
     getFirstAsync: jest.fn(),
   };
-  return { __store: store, __metaStore: metaStore, __db: db, openDatabaseAsync: jest.fn(async () => db) };
+  return {
+    __store: store,
+    __metaStore: metaStore,
+    __cacheStore: cacheStore,
+    __db: db,
+    openDatabaseAsync: jest.fn(async () => db),
+  };
 });
 
 beforeEach(() => {
@@ -154,8 +216,10 @@ beforeEach(() => {
   const SQLite = require('expo-sqlite');
   SQLite.__store.clear();
   SQLite.__metaStore.clear();
+  SQLite.__cacheStore.clear();
   const store = SQLite.__store;
   const metaStore = SQLite.__metaStore;
+  const cacheStore = SQLite.__cacheStore;
   const db = SQLite.__db;
 
   db.execAsync.mockReset().mockResolvedValue(undefined);
@@ -187,6 +251,11 @@ beforeEach(() => {
       const [status, last_error, rowId] = params;
       const row = store.get(rowId);
       if (row) store.set(rowId, { ...row, error_count: row.error_count + 1, status, last_error });
+    } else if (/DELETE FROM outbox WHERE id/i.test(sql)) {
+      store.delete(params[0]);
+    } else if (/INSERT OR REPLACE INTO read_cache/i.test(sql)) {
+      const [key, value] = params;
+      cacheStore.set(key, value);
     } else if (/INSERT OR REPLACE INTO sync_metadata/i.test(sql)) {
       const [key, value] = params;
       metaStore.set(key, value);
@@ -205,6 +274,10 @@ beforeEach(() => {
   db.getFirstAsync.mockReset().mockImplementation(async (sql, params) => {
     if (/COUNT\(\*\)/i.test(sql)) {
       return { count: [...store.values()].filter((r) => r.synced === 0).length };
+    }
+    if (/read_cache/i.test(sql)) {
+      const key = params && params[0];
+      return cacheStore.has(key) ? { value: cacheStore.get(key) } : null;
     }
     if (/sync_metadata/i.test(sql)) {
       const key = params && params[0];

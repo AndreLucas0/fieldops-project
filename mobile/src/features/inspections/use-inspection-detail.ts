@@ -20,6 +20,10 @@ import {
   type InspectionSite,
 } from '@/models';
 import { apiClient, type ApiClient } from '@/services';
+import { getPendingEntries } from '@/services/local-db';
+import { cachedGet } from '@/services/offline-cache';
+
+import { applyPendingToDetail } from './pending-overlay';
 
 export interface InspectionPlaces {
   clientName: string | null;
@@ -38,6 +42,8 @@ export interface UseInspectionDetailResult {
   progress: InspectionProgress;
   loading: boolean;
   error: ApiError | null;
+  /** Alterações desta inspeção salvas no aparelho e ainda não enviadas (§13.8). */
+  pendingCount: number;
   reload: () => void;
 }
 
@@ -60,6 +66,7 @@ export function useInspectionDetail(
   const [places, setPlaces] = useState<InspectionPlaces>(NO_PLACES);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -77,20 +84,26 @@ export function useInspectionDetail(
       }
 
       try {
-        const detail = await client.get<InspectionDetail>(
+        // Offline-first: sem rede, a cópia da última leitura; por cima dela, o
+        // que ainda está no outbox (iniciar, respostas, NCs).
+        const fetched = await cachedGet<InspectionDetail>(
+          client,
           `/mobile/inspections/${inspectionId}`,
         );
+        const pending = await getPendingEntries(inspectionId).catch(() => []);
+        const detail = applyPendingToDetail(fetched, pending);
         if (!active) return;
         setInspection(detail);
+        setPendingCount(pending.length);
         setError(null);
 
         // Os nomes chegam depois do detalhe de propósito: a tela já pode
         // renderizar sem eles.
         const [clientName, siteName, equipmentName] = await Promise.all([
-          nameOf(() => client.get<Client>(`/clients/${detail.clientId}`)),
-          nameOf(() => client.get<InspectionSite>(`/sites/${detail.siteId}`)),
+          nameOf(() => cachedGet<Client>(client, `/clients/${detail.clientId}`)),
+          nameOf(() => cachedGet<InspectionSite>(client, `/sites/${detail.siteId}`)),
           detail.equipmentId
-            ? nameOf(() => client.get<Equipment>(`/equipment/${detail.equipmentId}`))
+            ? nameOf(() => cachedGet<Equipment>(client, `/equipment/${detail.equipmentId}`))
             : Promise.resolve(null),
         ]);
 
@@ -123,6 +136,7 @@ export function useInspectionDetail(
     progress: { answered: countAnswered(items, responses), total: items.length },
     loading,
     error,
+    pendingCount,
     reload,
   };
 }

@@ -718,7 +718,17 @@ pelo campo correto conforme schema V14 (`inspection_item_snapshot_id` ou equival
 
 ## CORS-CONFIG — Backend não tem configuração CORS
 
-Status: PENDING
+Status: DONE (2026-10-20, branch `task/cors-config`)
+
+Implementation (2026-10-20):
+- `shared/security/CorsProperties.java` (novo) + `.cors()` e bean `corsConfigurationSource` em `SecurityConfig.java`.
+- `application.yml`: `fieldops.security.cors.allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:8081}`.
+- `.env.example`: `CORS_ALLOWED_ORIGINS` passa a incluir `http://localhost:8081` (preview web do mobile).
+- Teste: `security/CorsConfigurationIT.java` (4 testes, RED → GREEN): preflight aceito para 8081 e 4200,
+  401 carregando `Access-Control-Allow-Origin`, preflight de origem desconhecida → 403 sem o cabeçalho.
+- Decisão em `decisions.md` [2026-10-20] — CORS-CONFIG. Não implementado: valor de produção (depende do deploy).
+
+Histórico (descrição original, mantida):
 
 Description:
 Nenhuma configuração CORS existe em `SecurityConfig.java`. Em produção ou em qualquer ambiente onde
@@ -1044,7 +1054,9 @@ Scope: frontend-only.
 
 ### SYNC-OUTBOX-INSPECTION — INSPECTION não passa pelo outbox
 
-Status: PENDING (requer backend)
+Status: DONE (2026-10-20, commit e9fa3b7, branch `task/sync-outbox-inspection`) — frontend apenas; o backend já suportava (ver OFFLINE-FIRST-FINDINGS-2026-10-20 #1)
+
+Histórico (status original): PENDING (requer backend)
 
 Problema: `start.tsx` chama `apiClient.post('/inspections/{id}/start')` diretamente. `summary.tsx` chama `apiClient.post('/inspections/{id}/submit')` diretamente. Ambas falham silenciosamente quando offline — o técnico vê um erro de rede em vez de "salvo no dispositivo".
 
@@ -1064,7 +1076,9 @@ Scope: requer mudanças em backend + frontend.
 
 ### SYNC-OUTBOX-NC — NON_CONFORMITY não passa pelo outbox
 
-Status: PENDING (requer backend)
+Status: DONE (2026-10-20, commit 711f32d, branch `task/sync-outbox-nc`) — frontend apenas; o backend já suportava
+
+Histórico (status original): PENDING (requer backend)
 
 Problema: `useNonConformities` (`features/non-conformities/use-non-conformities.ts`) faz chamadas diretas à API para criar e atualizar NCs. Offline → falha com erro de rede.
 
@@ -1079,6 +1093,16 @@ Scope: requer mudanças em backend + frontend.
 
 ### SYNC-OUTBOX-EVIDENCE — EVIDENCE não passa pelo outbox
 
+Status: DONE (2026-10-20, branch `task/sync-outbox-evidence`) — sem mudança no backend
+
+Implementation (2026-10-20): `src/features/evidence/evidence-outbox.ts` — `queueEvidence` copia a foto para
+`Paths.document/evidence-pending/<idempotencyKey>.jpg` e grava `EVIDENCE` no outbox (payload JSON com `localUri`,
+`idempotencyKey`, `capturedAtDevice`, vínculos e `location`); `syncPending` separa as evidências e, depois do push
+JSON, faz o upload multipart pelo endpoint existente; sucesso (ou 409 `EVIDENCE_ALREADY_PROCESSED`) marca
+sincronizada e apaga a cópia; falha mantém PENDING/FAILED e o arquivo (RN-047). A prévia (FE-M13) grava
+localmente e depois tenta sincronizar. "Requer backend" não se confirmou: o endpoint já é idempotente por chave.
+
+Histórico (status original):
 Status: PENDING (requer backend, caso especial)
 
 Problema: evidências (fotos) são enviadas diretamente via multipart/form-data para `POST /inspections/{id}/evidence`. Offline → falha.
@@ -1096,7 +1120,9 @@ Scope: requer mudanças em backend + frontend. Maior complexidade do conjunto.
 
 ### SYNC-PULL — GET /mobile/sync/pull não implementado
 
-Status: PENDING (requer backend)
+Status: IMPLEMENTED, NOT COMMITTED (2026-10-20) — código e testes no working tree da branch `task/sync-outbox-nc`; o endpoint já existia no backend. Ver OFFLINE-FIRST-FINDINGS-2026-10-20.
+
+Histórico (status original): PENDING (requer backend)
 
 Problema: a spec define um ciclo completo de sync (`telas-frontend.md` §7.6): PUSH → PULL. A fase PULL (`GET /mobile/sync/pull?cursor=...`) traz as mudanças do servidor (rejeições de supervisores, aprovações, etc.) para o SQLite local. Sem isso, o técnico não vê supervisor rejeitar/aprovar a inspeção.
 
@@ -1159,3 +1185,100 @@ Além disso, o setUp de `InspectionTemplateControllerIT` foi atualizado (em `755
 para usar `TRUNCATE TABLE inspection_template_versions CASCADE` via `JdbcTemplate`,
 eliminando o risco de violação de FK quando ITs que criam inspeções executam antes
 desta classe em `./mvnw verify`.
+
+---
+
+## EVIDENCE-ACCESS-URL-HOST — `accessUrl` da evidência aponta para `localhost`, inacessível no celular
+
+Status: PENDING
+
+Description:
+Ao enviar uma evidência, a API devolve `accessUrl` assinada no formato
+`http://fieldops-evidence.localhost:9000/evidence/...` (estilo virtual-host do SDK S3 +
+`EVIDENCE_STORAGE_ENDPOINT=http://localhost:9000`). No aparelho, esse host não resolve para o PC,
+então as miniaturas de `EvidenceThumbnailGrid` (que usa `accessUrl` direto) não carregam.
+
+Source:
+Verificado por HTTP real em 2026-10-20 (upload 201 numa instância de teste; registro e objeto
+de teste removidos em seguida). Encontrado ao investigar "erro de conexão ao confirmar evidência
+no celular" — não é a causa desse erro (o erro acontece no próprio upload), mas afeta o passo seguinte.
+
+Possible directions (decidir antes de implementar):
+- endpoint público separado do endpoint interno do storage (ex.: `EVIDENCE_STORAGE_PUBLIC_ENDPOINT`
+  com o IP do PC) + path-style access no presigner;
+- ou a API servir o arquivo (proxy) em vez de devolver URL direta do storage.
+
+---
+
+## MOBILE-PREEXISTING-CHECKS — typecheck/lint com erros e teste instável (pré-existentes)
+
+Status: PENDING
+
+Description (observado em 2026-10-20, durante EVIDENCE-URI-EXPO-GO; nenhum destes arquivos foi tocado):
+- `npm run typecheck`: erros TS em `src/features/sync/use-sync.ts` (1) e
+  `src/services/mock/mock-server.test.ts` (2 — `MockRequest` exige `accessToken`).
+- `npm run lint`: 2 erros `react-hooks` ("setState synchronously within an effect") em
+  `app/(protected)/(tabs)/sync.tsx:40` e `app/(protected)/sync/details.tsx:24`; 6 warnings.
+- `__tests__/inspections-screen.test.tsx` › "mostra erro com nova tentativa quando a busca falha":
+  falhou 1 vez na suíte completa e passou 11/11 isolada duas vezes — instável sob carga.
+
+Classificação: dívida técnica; tarefa dedicada.
+
+---
+
+## OFFLINE-FIRST-FINDINGS-2026-10-20 — inconsistências encontradas ao completar o offline-first
+
+Status: PENDING (somente documentado, por pedido do dono do projeto — nada abaixo foi corrigido)
+
+Contexto: implementação de SYNC-OUTBOX-EVIDENCE, -INSPECTION, -NC e SYNC-PULL (cache de leitura) em 2026-10-20.
+A implementação foi interrompida no ponto em que as inconsistências 2 e 3 foram encontradas.
+
+### 1. Pendências marcadas "requer backend" estavam desatualizadas — Classificação: documentação
+`SynchronizationService` já aplica `INSPECTION` (status IN_PROGRESS/SUBMITTED) e `NON_CONFORMITY`
+(cria com id do aparelho ou edita se o id existe) no push, e `GET /mobile/sync/pull` já existe
+(`SynchronizationController`, coberto por `SyncPullControllerIT`). `CLAUDE.md` §2 e `ESTADO-DO-PROJETO.md`
+§5/§10 ainda dizem que o pull "não está implementado". Nenhum desses textos foi corrigido.
+
+### 2. Evidência de resposta ainda não sincronizada fica sem vínculo ou com vínculo inválido — Classificação: bug (alto)
+- O checklist passa `responseId = checklist.responses.get(item.id)?.id` para a captura
+  (`app/(protected)/inspections/[inspectionId]/checklist.tsx:115`). O mapa `responses` só tem respostas vindas do
+  servidor (`indexResponses`, `use-checklist.ts:80`); salvar localmente não lhe dá id.
+- Item respondido e ainda não sincronizado → evidência sobe **sem** `responseId` (só vinculada à inspeção) →
+  o resumo não a conta para o item (`completion.ts:69-93` casa `evidence.responseId` com `response.id`) e a regra de
+  evidência obrigatória continua bloqueando.
+- Com o cache de leitura (não commitado), a resposta pendente sobreposta recebe id sintético `local-<snapshotId>`
+  (`pending-overlay.ts`, `mergeResponse`). Se o detalhe for recarregado antes do sync, a captura passaria
+  `responseId=local-…`; o backend procura a resposta por id (`EvidenceService.java:90-91`) e responde
+  `RESPONSE_NOT_FOUND` → a evidência fica FAILED no outbox para sempre (é retentada a cada sync).
+- Raiz: o contrato identifica a resposta no sync pelo **snapshotId** (`entityId` de INSPECTION_RESPONSE), mas o upload
+  de evidência exige o **id da resposta no servidor**, que o aparelho só conhece depois do sync.
+- Decisão necessária (não tomada): aceitar `snapshotId` no upload de evidência (backend) **ou** resolver o
+  `responseId` no momento do sync da evidência (mobile, após o push das respostas).
+
+### 3. Evidência pendente não conta no resumo/conclusão — Classificação: bug (médio)
+`useEvidences` lê só a lista do servidor (agora com cópia local). Fotos ainda no outbox (`EVIDENCE`) não entram em
+`evaluateCompletion`, então um item com evidência obrigatória bloqueia a conclusão offline mesmo com a foto tirada.
+Depende da decisão do item 2 (a evidência pendente precisa saber a qual resposta pertence).
+
+### 4. Backend responde 409 a `idempotencyKey` repetida, em vez de devolver o registro — Classificação: divergência de contrato (baixo)
+`EvidenceService.java:80-82` lança `EVIDENCE_ALREADY_PROCESSED` (409). RN-068 ("reenvio idêntico nunca cria dois
+registros") é cumprida, mas o reenvio não é tratado como sucesso. Contornado no mobile (`evidence-outbox.ts` trata o
+409 como enviado); registrar se o contrato deve mudar.
+
+### 5. Recusas definitivas de RESPONSE e EVIDENCE são retentadas indefinidamente — Classificação: comportamento (médio)
+INSPECTION e NC iniciados pelas telas descartam a operação recusada (`settleQueuedOperation`). Respostas do checklist e
+evidências recusadas (ex.: inspeção aprovada, 413, 415, RESPONSE_NOT_FOUND) ficam FAILED e voltam a ser enviadas a cada
+sincronização, aparecendo só na aba Sincronização. Falta política de descarte/ação do usuário.
+
+### 6. Mock de sync parcial — Classificação: fidelidade de teste (baixo)
+O push do mock aplica INSPECTION e NON_CONFORMITY, mas `INSPECTION_RESPONSE` continua respondido como APPLIED sem
+efeito (já era assim). O pull do mock sempre responde "nada mudou". Testes em modo mock não exercitam o caminho
+de respostas via push nem mudanças vindas do pull.
+
+### 7. Código do cache de leitura + pull não commitado — Classificação: estado do repositório
+Implementado e verde, **não commitado**, no working tree da branch `task/sync-outbox-nc`:
+`services/offline-cache.ts`, `services/offline-data.ts`, `features/inspections/pending-overlay.ts`, tabela
+`read_cache` (`local-db.ts`), hooks de lista/detalhe/nomes/evidências usando `cachedGet` + sobreposição das
+pendências, aviso `detalhe-pendente`, pull na sincronização geral (`syncPendingIfOnline` sem `inspectionId`), rota de
+pull no mock e 5 arquivos de teste. Validação no momento da interrupção: `npx jest` **412/412, 35 suítes**; typecheck e
+lint só com os erros pré-existentes (MOBILE-PREEXISTING-CHECKS). Afetado pelo item 2 (ids `local-…`).

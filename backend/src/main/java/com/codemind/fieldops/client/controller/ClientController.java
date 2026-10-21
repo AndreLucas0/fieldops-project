@@ -10,6 +10,7 @@ import com.codemind.fieldops.client.dto.ClientUpdateRequest;
 import com.codemind.fieldops.client.mapper.ClientMapper;
 import com.codemind.fieldops.shared.pagination.PageResponse;
 import com.codemind.fieldops.shared.pagination.SortFieldValidator;
+import com.codemind.fieldops.shared.security.JwtClaims;
 import com.codemind.fieldops.site.application.SiteService;
 import com.codemind.fieldops.site.domain.InspectionSite;
 import com.codemind.fieldops.site.domain.SiteStatus;
@@ -23,6 +24,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -72,9 +75,11 @@ public class ClientController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
-    public ClientResponse get(@PathVariable UUID id) {
-        return clientMapper.toResponse(clientService.getById(id));
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','TECHNICIAN')")
+    public ClientResponse get(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        UUID userId = UUID.fromString(jwt.getSubject());
+        boolean isTechnician = "TECHNICIAN".equals(jwt.getClaimAsString(JwtClaims.ROLE));
+        return clientMapper.toResponse(clientService.getById(id, userId, isTechnician));
     }
 
     @PutMapping("/{id}")

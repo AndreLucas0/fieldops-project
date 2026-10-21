@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { Client, Inspection, InspectionSite } from '@/models';
 import { apiClient, type ApiClient } from '@/services';
+import { cachedGet } from '@/services/offline-cache';
 
 export interface PlaceNames {
   clients: ReadonlyMap<string, string>;
@@ -54,8 +55,8 @@ export function usePlaceNames(
 
     (async () => {
       const [clientEntries, siteEntries] = await Promise.all([
-        resolveAll(clientIds, (id) => client.get<Client>(`/clients/${id}`)),
-        resolveAll(siteIds, (id) => client.get<InspectionSite>(`/sites/${id}`)),
+        resolveAll(clientIds, (id) => cachedGet<Client>(client, `/clients/${id}`)),
+        resolveAll(siteIds, (id) => cachedGet<InspectionSite>(client, `/sites/${id}`)),
       ]);
 
       if (!active) return;

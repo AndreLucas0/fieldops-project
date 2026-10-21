@@ -3,9 +3,12 @@ import { Image, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Button, colors, Feedback, spacing, Text } from '@/design-system';
-import { uploadEvidence } from '@/features/evidence/evidence-upload';
+import { queueEvidence } from '@/features/evidence/evidence-outbox';
+import { readCapture, releaseCapture } from '@/features/evidence/pending-capture';
 import { captureLocation } from '@/features/inspections/location';
 import { toApiError, type GeoLocation } from '@/models';
+import { apiClient } from '@/services/api-client';
+import { syncPendingIfOnline } from '@/services/sync-service';
 
 /**
  * FE-M13 — Prévia da evidência.
@@ -15,16 +18,17 @@ import { toApiError, type GeoLocation } from '@/models';
  */
 export default function EvidencePreviewScreen() {
   const router = useRouter();
-  const { inspectionId, uri, description, origin, responseId, nonConformityId } =
+  const { inspectionId, captureId, description, origin, responseId, nonConformityId } =
     useLocalSearchParams<{
       inspectionId: string;
-      uri: string;
+      captureId: string;
       description?: string;
       origin?: string;
       inspectionItemId?: string;
       responseId?: string;
       nonConformityId?: string;
     }>();
+  const uri = readCapture(captureId);
 
   const [sending, setSending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -40,14 +44,25 @@ export default function EvidencePreviewScreen() {
       const outcome = await captureLocation();
       const location: GeoLocation | null = outcome.status === 'captured' ? outcome.location : null;
 
-      await uploadEvidence({
-        inspectionId,
-        fileUri: uri,
-        description,
-        responseId,
-        nonConformityId,
-        location,
-      });
+      // Offline-first: a evidência é guardada no aparelho antes de qualquer rede.
+      try {
+        await queueEvidence({
+          inspectionId,
+          fileUri: uri,
+          description,
+          responseId,
+          nonConformityId,
+          location,
+        });
+      } catch {
+        setFailure('Não foi possível guardar a foto no aparelho. Fotografe novamente.');
+        return;
+      }
+      releaseCapture(captureId);
+
+      // Com rede, já tenta enviar; sem rede (ou se o servidor recusar), a evidência
+      // fica pendente e aparece na aba Sincronização.
+      await syncPendingIfOnline(apiClient, inspectionId).catch(() => undefined);
 
       // Volta à tela que pediu a evidência, descartando captura e prévia.
       if (origin === 'non-conformities') {

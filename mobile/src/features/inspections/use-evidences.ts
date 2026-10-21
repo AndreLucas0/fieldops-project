@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { toApiError, type ApiError, type Evidence } from '@/models';
 import { apiClient, type ApiClient } from '@/services';
+import { cachedGet } from '@/services/offline-cache';
 
 export interface UseEvidencesResult {
   evidences: Evidence[];
@@ -38,7 +39,7 @@ export function useEvidences(
       }
 
       try {
-        const list = await client.get<Evidence[]>(`/inspections/${inspectionId}/evidence`);
+        const list = await cachedGet<Evidence[]>(client, `/inspections/${inspectionId}/evidence`);
         if (!active) return;
         setEvidences(Array.isArray(list) ? list : []);
         setError(null);

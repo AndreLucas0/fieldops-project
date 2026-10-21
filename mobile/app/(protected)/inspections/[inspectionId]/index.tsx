@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { ErrorState, LoadingSpinner, ProgressBar, StatusBadge, formatDateTime, parseIsoDate } from '@/components';
-import { Button, colors, Panel, Screen, spacing, Text } from '@/design-system';
+import { Button, colors, Feedback, Panel, Screen, spacing, Text } from '@/design-system';
 import {
   latestRejection,
   primaryAction,
@@ -20,7 +20,8 @@ import { useInspectionDetail } from '@/features/inspections/use-inspection-detai
 export default function InspectionDetailScreen() {
   const router = useRouter();
   const { inspectionId } = useLocalSearchParams<{ inspectionId: string }>();
-  const { inspection, places, progress, loading, error, reload } = useInspectionDetail(inspectionId);
+  const { inspection, places, progress, loading, error, pendingCount, reload } =
+    useInspectionDetail(inspectionId);
 
   if (loading) {
     return <LoadingSpinner testID="detalhe-loading" message="Carregando a inspeção…" />;
@@ -78,6 +79,19 @@ export default function InspectionDetailScreen() {
           <StatusBadge value={detail.priority} context="priority" />
         </View>
       </View>
+
+      {pendingCount > 0 ? (
+        // §13.8: o estado "aguardando envio" fica visível, não só num aviso passageiro.
+        <Feedback
+          testID="detalhe-pendente"
+          tone="info"
+          message={
+            pendingCount === 1
+              ? '1 alteração salva no dispositivo, aguardando envio.'
+              : `${pendingCount} alterações salvas no dispositivo, aguardando envio.`
+          }
+        />
+      ) : null}
 
       <Panel testID="detalhe-local" style={styles.panel}>
         <Field label="Cliente" value={places.clientName} />

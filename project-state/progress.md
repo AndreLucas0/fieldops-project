@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-20 (SYNC-OUTBOX-EVIDENCE — evidência offline-first)
+Last updated: 2026-10-20 (OFFLINE-FIRST-REST — interrompido; inconsistências documentadas)
 
 ## Current State
 
@@ -19,6 +19,24 @@ Data: 2026-10-20. Branch: `task/technician-read-place-data`. Pedido: "libere o C
 **Testes:** `CorsConfigurationIT` reescrito (4; novo caso de IP da rede — RED 403 → GREEN) e
 `RestrictedCorsConfigurationIT` novo (2, lista explícita). `./mvnw verify`: **50 unit + 304 IT, BUILD SUCCESS**.
 Não executado: teste pelo navegador (requer reiniciar o backend do usuário).
+
+### OFFLINE-FIRST-REST-2026-10-20 — iniciar/concluir, NC e leitura offline (interrompido para documentação)
+
+Data: 2026-10-20. Tipo: feature (TDD). Interrompido a pedido do dono: "documente as inconsistências encontradas apenas, não implemente mais nada".
+
+**Commitado:**
+- `e9fa3b7` (`task/sync-outbox-inspection`) — SYNC-OUTBOX-INSPECTION: iniciar/concluir via outbox + `settleQueuedOperation`; jest 386/386.
+- `711f32d` (`task/sync-outbox-nc`) — SYNC-OUTBOX-NC: criar/editar NC via outbox com id do aparelho; jest 388/388.
+
+**Implementado e NÃO commitado** (working tree de `task/sync-outbox-nc`): cache de leitura (`read_cache`, `cachedGet`),
+sobreposição das pendências em lista/detalhe, aviso de pendência no detalhe, SYNC-PULL na sincronização geral.
+`npx jest` 412/412 (35 suítes) no momento da interrupção.
+
+**Inconsistências encontradas (só documentadas):** `pending-features.md` → OFFLINE-FIRST-FINDINGS-2026-10-20
+(pendências "requer backend" desatualizadas; vínculo evidência↔resposta não sincronizada; evidência pendente fora do
+resumo; 409 em idempotencyKey repetida; recusas retentadas para sempre; mock de sync parcial; código não commitado).
+
+**Não executado:** teste em aparelho; regressão do backend (sem mudança no backend).
 
 ### SYNC-OUTBOX-EVIDENCE-2026-10-20 — evidência offline-first (outbox SQLite)
 

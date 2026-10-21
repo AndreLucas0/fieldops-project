@@ -6,7 +6,9 @@ jest.mock('expo-router', () => require('@/test-utils/expo-router-mock'));
 import InspectionsScreen from '../app/(protected)/(tabs)/inspections';
 import { resetRouterMock, routerMock } from '@/test-utils/expo-router-mock';
 import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/test-utils/render';
-import { getMockDatabase, resetMockDatabase } from '@/services';
+import { queueInspectionTransition } from '@/features/inspections/inspection-outbox';
+import { ApiError, CLIENT_ERROR_CODES } from '@/models';
+import { apiClient, getMockDatabase, resetMockDatabase } from '@/services';
 
 const TECHNICIAN_ID = USER_IDS.technician;
 
@@ -195,5 +197,32 @@ describe('FE-M03 — Lista de inspeções', () => {
 
     await waitFor(() => expect(screen.getByTestId('inspections-error')).toBeOnTheScreen());
     expect(screen.getByTestId('inspections-error-retry')).toBeOnTheScreen();
+  });
+});
+
+describe('Offline-first — lista sem rede', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('sem rede, mostra a lista da última sincronização com o estado pendente', async () => {
+    const alvo = getMockDatabase().inspections.find((entry) => entry.status === 'ASSIGNED');
+    const online = await renderList();
+    await waitFor(() =>
+      expect(screen.getByTestId(`inspections-card-${alvo?.id}`)).toBeOnTheScreen(),
+    );
+    online.unmount();
+
+    jest
+      .spyOn(apiClient, 'get')
+      .mockRejectedValue(ApiError.client(CLIENT_ERROR_CODES.NETWORK_UNAVAILABLE, 'Sem conexão.'));
+    await queueInspectionTransition(alvo?.id ?? '', {
+      status: 'IN_PROGRESS',
+      startedAtDevice: '2026-10-20T12:00:00Z',
+    });
+    await renderList();
+
+    await waitFor(() =>
+      expect(screen.getByTestId(`inspections-card-${alvo?.id}`)).toHaveTextContent(/Em andamento/),
+    );
+    expect(screen.queryByTestId('inspections-error')).toBeNull();
   });
 });

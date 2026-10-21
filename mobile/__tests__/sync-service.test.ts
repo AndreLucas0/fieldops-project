@@ -379,6 +379,47 @@ describe('BF-007 — sync-service + outbox', () => {
     });
   });
 
+  describe('SYNC-PULL — a sincronização geral também baixa os dados para uso offline', () => {
+    function clientWithPull() {
+      const post = jest.fn(async () => ({ results: [] }));
+      const get = jest.fn(async (path: string) =>
+        path === '/mobile/sync/pull'
+          ? { changes: [], nextCursor: 'cursor-1', serverTime: '2026-10-20T12:00:00Z' }
+          : { content: [] },
+      );
+      return { client: { post, get } as unknown as ApiClient, get };
+    }
+
+    it('sem inspectionId (primeiro plano, reconexão, aba Sincronização), faz o pull', async () => {
+      const { client, get } = clientWithPull();
+
+      await syncPendingIfOnline(client);
+
+      expect(get).toHaveBeenCalledWith('/mobile/sync/pull', expect.anything());
+      expect(await getSyncMetadata('last_pull_cursor')).toBe('cursor-1');
+    });
+
+    it('com inspectionId (cada resposta do checklist), só envia', async () => {
+      const { client, get } = clientWithPull();
+
+      await syncPendingIfOnline(client, INSPECTION_A);
+
+      expect(get).not.toHaveBeenCalled();
+    });
+
+    it('offline, nem envia nem baixa', async () => {
+      jest.mocked(Network.getNetworkStateAsync).mockResolvedValueOnce({
+        isConnected: false,
+        isInternetReachable: false,
+      } as Network.NetworkState);
+      const { client, get } = clientWithPull();
+
+      await syncPendingIfOnline(client);
+
+      expect(get).not.toHaveBeenCalled();
+    });
+  });
+
   describe('isOnline', () => {
     it('só considera online quando a internet está alcançável', async () => {
       jest.mocked(Network.getNetworkStateAsync).mockResolvedValueOnce({

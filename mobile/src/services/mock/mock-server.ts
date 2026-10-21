@@ -750,6 +750,13 @@ const routes: Route[] = [
       return ok({ results: operations.map((op) => applySyncOperation(ctx, op)) });
     },
   },
+  {
+    method: 'GET',
+    pattern: '/mobile/sync/pull',
+    // O mock não registra histórico de mudanças: responde "nada mudou" com um
+    // cursor novo. As telas leem o próprio mock direto, então não perdem nada.
+    handle: () => ok({ changes: [], nextCursor: `mock-cursor-${Date.now()}`, serverTime: nowIso() }),
+  },
 ];
 
 interface MockSyncOperation {

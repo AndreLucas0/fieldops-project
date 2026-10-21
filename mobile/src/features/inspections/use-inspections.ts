@@ -10,7 +10,11 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { calendarDaysBetween, parseIsoDate } from '@/components';
 import { apiClient, type ApiClient } from '@/services';
+import { getPendingEntries } from '@/services/local-db';
+import { cachedGet } from '@/services/offline-cache';
 import { toApiError, type ApiError, type Inspection, type Page } from '@/models';
+
+import { applyPendingToList } from './pending-overlay';
 
 /** Estados em que ainda se espera trabalho do técnico. */
 export const OPEN_STATUSES: readonly Inspection['status'][] = [
@@ -92,11 +96,14 @@ export function useInspections({
     // uma tela desmontada ainda tentaria escrever no estado.
     (async () => {
       try {
-        const page = await client.get<Page<Inspection>>('/mobile/inspections', {
+        // Offline-first: sem rede, a cópia da última leitura; por cima dela, os
+        // inícios e conclusões ainda no outbox.
+        const page = await cachedGet<Page<Inspection>>(client, '/mobile/inspections', {
           query: { page: 0, size },
         });
+        const pending = await getPendingEntries().catch(() => []);
         if (!active) return;
-        setInspections(page.content ?? []);
+        setInspections(applyPendingToList(page.content ?? [], pending));
         setError(null);
       } catch (thrown) {
         if (!active) return;

@@ -27,6 +27,24 @@ ACTIVE / SUPERSEDED
 
 ---
 
+### [2026-10-20] — Transições de inspeção e NC no outbox: sem baseVersion; recusa definitiva sai do outbox
+
+Context:
+O backend recusa como conflito `baseVersion` diferente da versão atual. Iniciar e concluir offline em sequência
+mudariam a versão da inspeção entre as duas operações; NC criada no aparelho não tem versão conhecida.
+
+Decision:
+- `INSPECTION` e `NON_CONFORMITY` vão no push com `baseVersion: null` (`VERSIONLESS_ENTITY_TYPES`, `sync-service.ts`).
+  Transições já são validadas pela máquina de estados; edição de NC (PEND-06, fora do MVP) fica com a última gravação.
+- Telas de iniciar/concluir/NC gravam no outbox e tentam sincronizar (`settleQueuedOperation`): recusa do servidor
+  (FAILED/CONFLICT com mensagem) remove a operação do outbox e aparece na tela; falha de rede deixa pendente e a tela segue.
+- A mensagem de recusa do push passa a ser gravada em `last_error`.
+
+Status:
+ACTIVE
+
+---
+
 ### [2026-10-20] — SYNC-OUTBOX-EVIDENCE: evidência entra no outbox e sobe pelo endpoint multipart existente
 
 Context:

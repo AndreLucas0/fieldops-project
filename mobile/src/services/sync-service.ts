@@ -6,6 +6,7 @@ import { EVIDENCE_ENTITY_TYPE, syncEvidenceEntries } from '@/features/evidence/e
 
 import type { ApiClient } from './api-client';
 import { getPendingEntries, markEntryFailed, markEntriesSynced, saveSyncMetadata } from './local-db';
+import { refreshOfflineData } from './offline-data';
 
 const DEVICE_ID_KEY = 'fieldops_device_id';
 const SYNC_BATCH_SIZE = 50;
@@ -168,5 +169,12 @@ export async function syncPendingIfOnline(
 ): Promise<SyncResult> {
   const online = await isOnline();
   if (!online) return { synced: 0, failed: 0 };
-  return syncPending(client, inspectionId);
+  const result = await syncPending(client, inspectionId);
+
+  // Sincronização geral (primeiro plano, reconexão, aba Sincronização): depois
+  // de enviar, baixa o que mudou para abrir offline. Com `inspectionId` (cada
+  // resposta do checklist), só envia — o download não precisa rodar a cada toque.
+  if (!inspectionId) await refreshOfflineData(client);
+
+  return result;
 }

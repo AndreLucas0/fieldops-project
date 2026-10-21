@@ -10,20 +10,14 @@ import com.codemind.fieldops.client.dto.ClientUpdateRequest;
 import com.codemind.fieldops.client.mapper.ClientMapper;
 import com.codemind.fieldops.shared.pagination.PageResponse;
 import com.codemind.fieldops.shared.pagination.SortFieldValidator;
-<<<<<<< Updated upstream
-=======
 import com.codemind.fieldops.site.application.SiteService;
 import com.codemind.fieldops.site.domain.InspectionSite;
 import com.codemind.fieldops.site.domain.SiteStatus;
 import com.codemind.fieldops.site.dto.SiteResponse;
 import com.codemind.fieldops.site.mapper.SiteMapper;
-
->>>>>>> Stashed changes
 import jakarta.validation.Valid;
-
 import java.util.Set;
 import java.util.UUID;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -44,24 +38,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/clients")
 public class ClientController {
 
-    private static final Set<String> SORTABLE_FIELDS =
-            Set.of("name", "status", "createdAt");
+    private static final Set<String> SORTABLE_FIELDS = Set.of("name", "status", "createdAt");
 
     private final ClientService clientService;
     private final ClientMapper clientMapper;
+    private final SiteService siteService;
+    private final SiteMapper siteMapper;
 
-<<<<<<< Updated upstream
-    public ClientController(ClientService clientService, ClientMapper clientMapper) {
-=======
     public ClientController(
             ClientService clientService,
             ClientMapper clientMapper,
             SiteService siteService,
             SiteMapper siteMapper) {
-
->>>>>>> Stashed changes
         this.clientService = clientService;
         this.clientMapper = clientMapper;
+        this.siteService = siteService;
+        this.siteMapper = siteMapper;
     }
 
     @GetMapping
@@ -123,9 +115,6 @@ public class ClientController {
         );
     }
 
-<<<<<<< Updated upstream
-}
-=======
     @GetMapping("/{clientId}/sites")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public PageResponse<SiteResponse> listClientSites(
@@ -134,17 +123,7 @@ public class ClientController {
             @PageableDefault(size = 20) Pageable pageable) {
 
         clientService.getById(clientId);
-
-        Page<InspectionSite> sites = siteService.list(
-                clientId,
-                null,
-                status,
-                pageable
-        );
-
-        return PageResponse.from(
-                sites.map(siteMapper::toResponse)
-        );
+        Page<InspectionSite> sites = siteService.list(clientId, null, status, pageable);
+        return PageResponse.from(sites.map(siteMapper::toResponse));
     }
 }
->>>>>>> Stashed changes

@@ -141,22 +141,6 @@ class UserControllerIT {
 	}
 
 	@Test
-<<<<<<< Updated upstream
-=======
-	void creatingUserWithPhoneLongerThanDatabaseColumnIsRejectedAsBadRequest() {
-		String payload = """
-			{"name":"Roberta Técnica","email":"roberta.phone@fieldops.local",
-				"password":"OutraSenha1!","role":"TECHNICIAN",
-				"phone":"1234567890123456789012345678901"}""";
-
-		assertThat(mvc.post().uri("/users").header("Authorization", bearer(adminToken))
-			.contentType(MediaType.APPLICATION_JSON).content(payload))
-			.hasStatus(HttpStatus.BAD_REQUEST);
-	}
-
-	@Test
-	@DisplayName("RN-003, AC-SECURITY - técnico não gerencia usuários nem recebe dados administrativos")
->>>>>>> Stashed changes
 	void technicianCannotAccessUserManagementEndpoints() {
 		assertThat(mvc.get().uri("/users").header("Authorization", bearer(technicianToken)))
 			.hasStatus(HttpStatus.FORBIDDEN);

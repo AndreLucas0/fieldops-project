@@ -1,12 +1,10 @@
 package com.codemind.fieldops.dashboard.controller;
 
-import com.codemind.fieldops.dashboard.DashboardService;
+import com.codemind.fieldops.dashboard.application.DashboardService;
 import com.codemind.fieldops.dashboard.dto.DashboardSummaryDto;
 import com.codemind.fieldops.dashboard.dto.SeverityCountDto;
 import com.codemind.fieldops.dashboard.dto.StatusCountDto;
-
 import java.util.List;
-
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

@@ -139,6 +139,23 @@ export async function getOutboxEntry(id: string): Promise<OutboxRow | null> {
   return database.getFirstAsync<OutboxRow>('SELECT * FROM outbox WHERE id = ?', [id]);
 }
 
+/**
+ * Refaz a base de uma entrada depois de um CONFLICT: novo id (o servidor já
+ * gravou o resultado do antigo e o repetiria), nova `base_version`, volta a
+ * PENDING. Mantém `created_at`, para a ordem de envio não mudar.
+ */
+export async function rebaseOutboxEntry(
+  id: string,
+  newId: string,
+  baseVersion: number,
+): Promise<void> {
+  const database = await getDb();
+  await database.runAsync(
+    "UPDATE outbox SET id = ?, base_version = ?, status = 'PENDING', last_error = NULL WHERE id = ?",
+    [newId, baseVersion, id],
+  );
+}
+
 /** Remove uma entrada — usado quando o servidor a recusa de forma definitiva. */
 export async function deleteOutboxEntry(id: string): Promise<void> {
   const database = await getDb();

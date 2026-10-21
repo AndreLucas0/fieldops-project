@@ -9,6 +9,33 @@ Frontend ↔ Backend contract + screen audit completed (2026-10-02, see `docs/au
 Auditoria completa do código 2026-10-13 concluída; inventários de telas criados em `project-state/pending-web.md` e `project-state/pending-mobile.md`.
 Integração incremental Frontend ↔ Backend com TDD em andamento.
 
+### CONFLICT-REBASE-2026-10-21 — toda alteração e evidência presas em FAILED/CONFLICT
+
+Data: 2026-10-21. Branch: `task/sync-evidence-response-link`. Tipo: bugfix (TDD).
+Relato do dono: "todas as alterações estão retornando failed/conflict e todas as evidencias estão retornando failed".
+
+**Diagnóstico (banco real, `sync_operations`, somente leitura):** só 3 operações chegaram ao servidor — START
+APPLIED, 1ª resposta do item `46182fe2…` APPLIED (versão 0) e, 0,5 s depois, a 2ª edição do mesmo item CONFLICT
+(app mandou base 1). Causa: criar a resposta **não** incrementa a versão no servidor, mas o app somava 1. Efeito em
+cascata: `SynchronizationService.push` devolve `DEPENDENCY_FAILED` (não gravado) para o resto da inspeção depois de
+um CONFLICT, e a entrada em conflito é a mais antiga → todo envio seguinte da inspeção falha; as evidências esperam
+as respostas ("Aguardando…") e ficam FAILED.
+
+**Implementado (mobile):**
+- `use-checklist.ts`: item sem resposta segue 0, 0, 1, 2… (antes 0, 1, 2…); `pending-overlay.ts`: resposta nova
+  pendente nasce na versão 0.
+- `sync-service.ts` + `rebaseOutboxEntry` (`local-db.ts`): CONFLICT de INSPECTION_RESPONSE → lê a versão atual
+  (`GET /mobile/inspections/{id}`), refaz em ordem a base de todas as edições pendentes do item (novo operationId,
+  mesmo `created_at`) e reenvia uma vez na mesma sincronização. Destrava sozinho o que já está preso no aparelho.
+
+**Testes:** `__tests__/sync-conflict-rebase.test.ts` novo (6, servidor fictício com as regras do backend), +1 em
+`pending-overlay`; ajustadas 3 expectativas que codificavam a premissa errada (2ª edição de item novo com base 1;
+resposta nova pendente com versão 1). RED visto antes da implementação. `npx jest` **441/441, 37 suítes**;
+typecheck/lint só com os pré-existentes. Mock do SQLite passou a ordenar por `created_at` e a suportar o rebase.
+
+**Não executado:** confirmação no aparelho/backend real de que a entrada presa se recupera (próxima sincronização
+com o app atualizado). Nenhum dado do banco foi alterado no diagnóstico.
+
 ### SYNC-EVIDENCE-LINK-2026-10-21 — vínculo da evidência, recusas definitivas e ordem da conclusão
 
 Data: 2026-10-21. Branch: `task/sync-evidence-response-link` (a partir de `task/sync-outbox-nc`). Tipo: bugfix (TDD).

@@ -7,6 +7,7 @@ import {
   EVIDENCE_ENTITY_TYPE,
   syncEvidenceEntries,
 } from '@/features/evidence/evidence-outbox';
+import type { InspectionDetail } from '@/models';
 
 import type { ApiClient } from './api-client';
 import {
@@ -14,6 +15,7 @@ import {
   getPendingEntries,
   markEntryFailed,
   markEntriesSynced,
+  rebaseOutboxEntry,
   saveSyncMetadata,
   type OutboxRow,
 } from './local-db';
@@ -99,7 +101,17 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
   const submissions = json.filter(isSubmission);
   const others = json.filter((row) => !isSubmission(row));
 
-  const pushed = await pushEntries(client, others);
+  let pushed = await pushEntries(client, others);
+  // Resposta em CONFLICT trava o resto da inspeção (o servidor devolve
+  // DEPENDENCY_FAILED). Refaz a base sobre a versão atual e reenvia uma vez.
+  if (pushed.conflicts.length > 0 && (await rebaseConflicts(client, pushed.conflicts))) {
+    const retry = (await getPendingEntries(inspectionId)).filter(
+      (row) => row.entity_type !== EVIDENCE_ENTITY_TYPE && !isSubmission(row),
+    );
+    const again = await pushEntries(client, retry);
+    // Tudo que ficou pendente foi reenviado; só as recusas do 1º envio continuam contando.
+    pushed = { ...again, synced: pushed.synced + again.synced, failed: pushed.rejected + again.failed };
+  }
   const uploaded = await syncEvidenceEntries(client, evidence);
 
   const evidenceLeft = new Set(
@@ -131,10 +143,20 @@ export async function discardOutboxEntry(row: OutboxRow): Promise<void> {
   await deleteOutboxEntry(row.id);
 }
 
-async function pushEntries(client: ApiClient, pending: OutboxRow[]): Promise<SyncResult> {
+interface PushOutcome extends SyncResult {
+  /** Recusas definitivas (REJECTED): não voltam a ser enviadas. */
+  rejected: number;
+  /** Respostas do checklist que voltaram CONFLICT. */
+  conflicts: OutboxRow[];
+}
+
+async function pushEntries(client: ApiClient, pending: OutboxRow[]): Promise<PushOutcome> {
   let synced = 0;
   let failed = 0;
-  if (pending.length === 0) return { synced, failed };
+  let rejected = 0;
+  const conflicts: OutboxRow[] = [];
+  if (pending.length === 0) return { synced, failed, rejected, conflicts };
+  const rowsById = new Map(pending.map((row) => [row.id, row]));
 
   const deviceId = await getOrCreateDeviceId();
 
@@ -196,6 +218,11 @@ async function pushEntries(client: ApiClient, pending: OutboxRow[]): Promise<Syn
         const failStatus = failureStatus(result.status);
         await markEntryFailed(result.operationId, failStatus, result.error?.message ?? undefined);
         failed += 1;
+        if (failStatus === 'REJECTED') rejected += 1;
+        const row = rowsById.get(result.operationId);
+        if (failStatus === 'CONFLICT' && row?.entity_type === 'INSPECTION_RESPONSE') {
+          conflicts.push(row);
+        }
       }
     }
 
@@ -213,7 +240,48 @@ async function pushEntries(client: ApiClient, pending: OutboxRow[]): Promise<Syn
     }
   }
 
-  return { synced, failed };
+  return { synced, failed, rejected, conflicts };
+}
+
+/**
+ * Política de conflito das respostas (decisão do dono, 2026-10-21): a última
+ * edição do técnico vale. Lê a versão atual de cada item em conflito e refaz,
+ * em ordem, a base de todas as edições pendentes dele — criar deixa a resposta
+ * na versão 0 e cada atualização soma 1. Inspeção aprovada continua recusando
+ * a edição no servidor (RN-076). Devolve `true` se refez alguma.
+ */
+async function rebaseConflicts(client: ApiClient, conflicts: OutboxRow[]): Promise<boolean> {
+  let rebased = false;
+  const byInspection = new Map<string, Set<string>>();
+  for (const row of conflicts) {
+    const items = byInspection.get(row.inspection_id) ?? new Set<string>();
+    items.add(row.entity_id);
+    byInspection.set(row.inspection_id, items);
+  }
+
+  for (const [inspectionId, items] of byInspection) {
+    let detail: InspectionDetail;
+    try {
+      detail = await client.get<InspectionDetail>(`/mobile/inspections/${inspectionId}`);
+    } catch {
+      continue; // Sem a versão atual não há como refazer: fica CONFLICT para a próxima.
+    }
+    const pending = await getPendingEntries(inspectionId);
+
+    for (const itemId of items) {
+      let version = detail.responses?.find((r) => r.inspectionItemId === itemId)?.version;
+      const edits = pending.filter(
+        (row) => row.entity_type === 'INSPECTION_RESPONSE' && row.entity_id === itemId,
+      );
+      for (const edit of edits) {
+        await rebaseOutboxEntry(edit.id, randomUUID(), version ?? 0);
+        version = version === undefined ? 0 : version + 1;
+        rebased = true;
+      }
+    }
+  }
+
+  return rebased;
 }
 
 /**

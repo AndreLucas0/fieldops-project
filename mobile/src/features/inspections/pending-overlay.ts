@@ -175,7 +175,8 @@ function mergeResponse(
       (asString(payload.conformity) as InspectionResponse['conformity']) ?? existing?.conformity,
     answeredAtDevice: existing?.answeredAtDevice ?? row.created_at,
     updatedAt: row.created_at,
-    version: row.base_version + 1,
+    // Criar não incrementa no servidor: a resposta nova nasce na versão 0.
+    version: existing ? row.base_version + 1 : 0,
   } as InspectionResponse;
 
   return existing

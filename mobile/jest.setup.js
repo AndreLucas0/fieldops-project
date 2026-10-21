@@ -251,6 +251,14 @@ beforeEach(() => {
       const [status, last_error, rowId] = params;
       const row = store.get(rowId);
       if (row) store.set(rowId, { ...row, error_count: row.error_count + 1, status, last_error });
+    } else if (/UPDATE outbox SET id = \?/i.test(sql)) {
+      // rebaseOutboxEntry: params = [newId, base_version, id]
+      const [newId, base_version, rowId] = params;
+      const row = store.get(rowId);
+      if (row) {
+        store.delete(rowId);
+        store.set(newId, { ...row, id: newId, base_version, status: 'PENDING', last_error: null });
+      }
     } else if (/DELETE FROM outbox WHERE id/i.test(sql)) {
       store.delete(params[0]);
     } else if (/INSERT OR REPLACE INTO read_cache/i.test(sql)) {
@@ -268,7 +276,10 @@ beforeEach(() => {
       );
     }
     // Pendentes: não sincronizadas e não recusadas de vez pelo servidor.
-    const rows = [...store.values()].filter((r) => r.synced === 0 && r.status !== 'REJECTED');
+    // ORDER BY created_at, como no SQL (sort estável: empates mantêm a inserção).
+    const rows = [...store.values()]
+      .filter((r) => r.synced === 0 && r.status !== 'REJECTED')
+      .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
     if (params && params.length > 0 && params[0]) {
       return rows.filter((r) => r.inspection_id === params[0]);
     }

@@ -1265,7 +1265,7 @@ Depende da decisão do item 2 (a evidência pendente precisa saber a qual respos
 registros") é cumprida, mas o reenvio não é tratado como sucesso. Contornado no mobile (`evidence-outbox.ts` trata o
 409 como enviado); registrar se o contrato deve mudar.
 
-### 5. Recusas definitivas de RESPONSE e EVIDENCE são retentadas indefinidamente — Classificação: comportamento (médio) — **RESOLVIDO 2026-10-21** (status REJECTED + "Descartar" na aba Sincronização; CONFLICT segue reenviado)
+### 5. Recusas definitivas de RESPONSE e EVIDENCE são retentadas indefinidamente — Classificação: comportamento (médio) — **RESOLVIDO 2026-10-21** (status REJECTED + "Descartar" na aba Sincronização). CONFLICT de resposta: refeito sobre a versão atual e reenviado — CONFLICT-REBASE 2026-10-21
 INSPECTION e NC iniciados pelas telas descartam a operação recusada (`settleQueuedOperation`). Respostas do checklist e
 evidências recusadas (ex.: inspeção aprovada, 413, 415, RESPONSE_NOT_FOUND) ficam FAILED e voltam a ser enviadas a cada
 sincronização, aparecendo só na aba Sincronização. Falta política de descarte/ação do usuário.

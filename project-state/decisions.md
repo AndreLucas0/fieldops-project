@@ -27,6 +27,30 @@ ACTIVE / SUPERSEDED
 
 ---
 
+### [2026-10-21] — CONFLICT-REBASE: conflito de resposta do checklist — a última edição do técnico vale
+
+Context:
+CONFLICT numa resposta trava a inspeção inteira (o servidor responde DEPENDENCY_FAILED ao resto do lote) e era
+reenviado igual para sempre. A causa observada no banco real foi a conta de versão do app (criar não incrementa).
+
+Decision (escolhida pelo dono em 2026-10-21):
+- Versão: resposta criada nasce em 0; só atualizações somam 1 (app e sobreposição local seguem isso).
+- CONFLICT de INSPECTION_RESPONSE: o app lê a versão atual no servidor, refaz em ordem a base das edições pendentes
+  do item com novo operationId e reenvia **uma vez** na mesma sincronização. Se conflitar de novo, ou se não der
+  para ler a versão, fica CONFLICT para a próxima. RN-076 continua no servidor (inspeção aprovada recusa a edição).
+
+Alternatives considered:
+- CONFLICT com "Descartar" na aba Sincronização (perderia a edição do técnico).
+- Só corrigir a conta de versão (o aparelho com entrada presa precisaria limpar os dados).
+
+Impact:
+Última gravação vence também contra edições de outro aparelho/supervisor no mesmo item — aceito para o MVP.
+
+Status:
+ACTIVE
+
+---
+
 ### [2026-10-21] — SYNC-EVIDENCE-LINK: vínculo evidência↔resposta resolvido no mobile; recusa definitiva vira REJECTED
 
 Context:

@@ -110,9 +110,22 @@ describe('applyPendingToDetail', () => {
       row('INSPECTION_RESPONSE', 'item-b', { valueBoolean: true, conformity: 'CONFORMING' }),
     ]);
 
+    // Criar não incrementa a versão no servidor: a resposta nasce na versão 0.
     expect(result.responses?.find((r) => r.inspectionItemId === 'item-b')).toMatchObject({
       valueBoolean: true,
       conformity: 'CONFORMING',
+      version: 0,
+    });
+  });
+
+  it('item novo com duas edições pendentes: criação (v0) + uma atualização = versão 1', () => {
+    const result = applyPendingToDetail(detail(), [
+      row('INSPECTION_RESPONSE', 'item-b', { valueText: 'primeira' }, 0),
+      row('INSPECTION_RESPONSE', 'item-b', { valueText: 'correção' }, 0),
+    ]);
+
+    expect(result.responses?.find((r) => r.inspectionItemId === 'item-b')).toMatchObject({
+      valueText: 'correção',
       version: 1,
     });
   });

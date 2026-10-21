@@ -158,11 +158,34 @@ class UserControllerIT {
 	}
 
 	@Test
-	void adminCanListAndFilterUsersWithPagination() {
-		assertThat(mvc.get().uri("/users?role=TECHNICIAN&page=0&size=10").header("Authorization", bearer(adminToken)))
+	void adminCanFilterUsersByNameRoleAndStatus() {
+		technicianUser.setStatus(UserStatus.INACTIVE);
+		userRepository.save(technicianUser);
+
+		assertThat(mvc.get().uri("/users?name=cArLoS&role=TECHNICIAN&status=INACTIVE")
+			.header("Authorization", bearer(adminToken)))
 			.hasStatusOk()
 			.bodyJson()
-			.extractingPath("$.content[0].role").asString().isEqualTo("TECHNICIAN");
+			.extractingPath("$.content[0].id").asString().isEqualTo(technicianUser.getId().toString());
+	}
+
+	@Test
+	void adminCanPaginateUsersAndReceivePageMetadata() {
+		var firstPage = mvc.get().uri("/users?page=0&size=2&sort=name,asc")
+			.header("Authorization", bearer(adminToken)).exchange();
+
+		assertThat(firstPage).hasStatusOk();
+		assertThat(firstPage).bodyJson().extractingPath("$.page").asNumber().isEqualTo(0);
+		assertThat(firstPage).bodyJson().extractingPath("$.size").asNumber().isEqualTo(2);
+		assertThat(firstPage).bodyJson().extractingPath("$.totalElements").asNumber().isEqualTo(3);
+		assertThat(firstPage).bodyJson().extractingPath("$.totalPages").asNumber().isEqualTo(2);
+		assertThat(firstPage).bodyJson().extractingPath("$.content[0].name").asString().isEqualTo("Ana Administradora");
+		assertThat(firstPage).bodyJson().extractingPath("$.content[1].name").asString().isEqualTo("Carlos Técnico");
+
+		assertThat(mvc.get().uri("/users?page=1&size=2&sort=name,asc").header("Authorization", bearer(adminToken)))
+			.hasStatusOk()
+			.bodyJson()
+			.extractingPath("$.content[0].name").asString().isEqualTo("Marina Supervisora");
 	}
 
 	@Test

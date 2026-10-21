@@ -263,7 +263,7 @@ class InspectionExecutionControllerIT {
 
         assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/start")
             .header("Authorization", bearer(adminToken)))
-            .hasStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+            .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT);
     }
 
     @Test
@@ -337,7 +337,7 @@ class InspectionExecutionControllerIT {
 
         assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/submit")
             .header("Authorization", bearer(adminToken)))
-            .hasStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+            .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT);
     }
 
     @Test
@@ -346,7 +346,7 @@ class InspectionExecutionControllerIT {
 
         assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/submit")
             .header("Authorization", bearer(adminToken)))
-            .hasStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+            .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT);
     }
 
     @Test

@@ -29,8 +29,8 @@ import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.domain.UserRole;
 import com.codemind.fieldops.user.domain.UserStatus;
 import com.codemind.fieldops.user.repository.UserRepository;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import java.time.Instant;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -177,7 +177,7 @@ class SyncPullControllerIT {
             .header("Authorization", bearer(technicianToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$.changes").asList().hasSize(1);
+            .extractingPath("$.changes").asInstanceOf(InstanceOfAssertFactories.LIST).hasSize(1);
     }
 
     @Test
@@ -188,7 +188,7 @@ class SyncPullControllerIT {
             .header("Authorization", bearer(technicianToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$.changes").asList().isEmpty();
+            .extractingPath("$.changes").asInstanceOf(InstanceOfAssertFactories.LIST).isEmpty();
     }
 
     @Test
@@ -205,7 +205,7 @@ class SyncPullControllerIT {
             .header("Authorization", bearer(technicianToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$.changes").asList().isEmpty();
+            .extractingPath("$.changes").asInstanceOf(InstanceOfAssertFactories.LIST).isEmpty();
     }
 
     @Test
@@ -216,13 +216,13 @@ class SyncPullControllerIT {
             .header("Authorization", bearer(technicianToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$.changes").asList().hasSize(1);
+            .extractingPath("$.changes").asInstanceOf(InstanceOfAssertFactories.LIST).hasSize(1);
 
         assertThat(mvc.get().uri("/mobile/sync/pull")
             .header("Authorization", bearer(technicianToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$.changes").asList().hasSize(1);
+            .extractingPath("$.changes").asInstanceOf(InstanceOfAssertFactories.LIST).hasSize(1);
     }
 
     @Test
@@ -242,7 +242,7 @@ class SyncPullControllerIT {
     void invalidCursorFormatIsRejected() {
         assertThat(mvc.get().uri("/mobile/sync/pull?cursor=not-a-valid-instant")
             .header("Authorization", bearer(technicianToken)))
-            .hasStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+            .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT);
     }
 
 }

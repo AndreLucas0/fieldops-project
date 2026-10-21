@@ -3,7 +3,6 @@ package com.codemind.fieldops.synchronization.application;
 import com.codemind.fieldops.inspection.application.InspectionExecutionService;
 import com.codemind.fieldops.inspection.domain.Inspection;
 import com.codemind.fieldops.inspection.domain.InspectionResponse;
-import com.codemind.fieldops.inspection.domain.InspectionStatus;
 import com.codemind.fieldops.inspection.dto.InspectionResponseCreateRequest;
 import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
@@ -66,7 +65,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SynchronizationService {
 
-    private static final String UNSUPPORTED_ENTITY_TYPE_CODE = "SYNC_UNSUPPORTED_ENTITY_TYPE";
     private static final String EVIDENCE_NOT_SUPPORTED_CODE = "SYNC_EVIDENCE_NOT_SUPPORTED";
     private static final String DELETE_NOT_SUPPORTED_CODE = "SYNC_DELETE_NOT_SUPPORTED";
     private static final String INVALID_PAYLOAD_CODE = "SYNC_INVALID_PAYLOAD";

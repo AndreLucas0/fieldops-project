@@ -30,6 +30,7 @@ import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.domain.UserRole;
 import com.codemind.fieldops.user.domain.UserStatus;
 import com.codemind.fieldops.user.repository.UserRepository;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -44,7 +45,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -274,7 +274,7 @@ class EvidenceControllerIT {
             .header("Authorization", bearer(adminToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$").asList().isNotEmpty();
+            .extractingPath("$").asInstanceOf(InstanceOfAssertFactories.LIST).isNotEmpty();
     }
 
     @Test

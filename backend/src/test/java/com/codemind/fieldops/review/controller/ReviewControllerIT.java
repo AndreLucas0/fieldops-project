@@ -30,7 +30,7 @@ import com.codemind.fieldops.user.domain.UserRole;
 import com.codemind.fieldops.user.domain.UserStatus;
 import com.codemind.fieldops.user.repository.UserRepository;
 import java.time.Instant;
-import java.util.UUID;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -187,7 +187,7 @@ class ReviewControllerIT {
 
         assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/begin-review")
             .header("Authorization", bearer(supervisorToken)))
-            .hasStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+            .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT);
     }
 
     @Test
@@ -233,7 +233,7 @@ class ReviewControllerIT {
 
         assertThat(mvc.post().uri("/inspections/" + inspection.getId() + "/approve")
             .header("Authorization", bearer(supervisorToken)))
-            .hasStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+            .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT);
     }
 
     // ---- reject ----
@@ -272,7 +272,7 @@ class ReviewControllerIT {
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"reason": "reason"}"""))
-            .hasStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+            .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT);
     }
 
     // ---- reopen after rejection (fluxo-geral.md 7.7) ----
@@ -317,13 +317,15 @@ class ReviewControllerIT {
             .header("Authorization", bearer(supervisorToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$[*].decision").asList().containsExactly("REJECTED", "APPROVED");
+            .extractingPath("$[*].decision").asInstanceOf(InstanceOfAssertFactories.LIST)
+            .containsExactly("REJECTED", "APPROVED");
 
         assertThat(mvc.get().uri("/inspections/" + inspection.getId() + "/reviews")
             .header("Authorization", bearer(supervisorToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$[*].reviewCycle").asList().containsExactly(1, 2);
+            .extractingPath("$[*].reviewCycle").asInstanceOf(InstanceOfAssertFactories.LIST)
+            .containsExactly(1, 2);
     }
 
     @Test

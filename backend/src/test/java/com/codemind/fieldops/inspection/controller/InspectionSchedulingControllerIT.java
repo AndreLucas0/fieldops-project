@@ -27,6 +27,7 @@ import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.domain.UserRole;
 import com.codemind.fieldops.user.domain.UserStatus;
 import com.codemind.fieldops.user.repository.UserRepository;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -263,7 +264,7 @@ class InspectionSchedulingControllerIT {
 
         assertThat(mvc.post().uri("/inspections").header("Authorization", bearer(adminToken))
             .contentType(MediaType.APPLICATION_JSON).content(payload))
-            .hasStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+            .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT);
     }
 
     @Test
@@ -274,7 +275,7 @@ class InspectionSchedulingControllerIT {
         assertThat(mvc.get().uri("/inspections").header("Authorization", bearer(adminToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$.content").asList().isNotEmpty();
+            .extractingPath("$.content").asInstanceOf(InstanceOfAssertFactories.LIST).isNotEmpty();
     }
 
     @Test
@@ -391,7 +392,7 @@ class InspectionSchedulingControllerIT {
         assertThat(mvc.get().uri("/inspections?status=DRAFT").header("Authorization", bearer(adminToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$.content[*].status").asList().containsOnly("DRAFT");
+            .extractingPath("$.content[*].status").asInstanceOf(InstanceOfAssertFactories.LIST).containsOnly("DRAFT");
     }
 
 }

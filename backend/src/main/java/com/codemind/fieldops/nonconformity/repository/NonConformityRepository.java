@@ -2,7 +2,6 @@ package com.codemind.fieldops.nonconformity.repository;
 
 import com.codemind.fieldops.dashboard.dto.SeverityCountDto;
 import com.codemind.fieldops.nonconformity.domain.NonConformity;
-import com.codemind.fieldops.nonconformity.domain.NonConformitySeverity;
 import com.codemind.fieldops.nonconformity.domain.NonConformityStatus;
 import java.util.List;
 import java.util.UUID;

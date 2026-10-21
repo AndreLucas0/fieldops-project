@@ -57,23 +57,23 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(BusinessRuleViolationException.class)
 	ResponseEntity<ErrorResponse> handleBusinessRule(BusinessRuleViolationException ex, HttpServletRequest request) {
 		ErrorResponse body =
-			ErrorResponseFactory.create(request, HttpStatus.UNPROCESSABLE_ENTITY, ex.getCode(), ex.getMessage());
-		return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);
+			ErrorResponseFactory.create(request, HttpStatus.UNPROCESSABLE_CONTENT, ex.getCode(), ex.getMessage());
+		return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(body);
 	}
 
 	@ExceptionHandler(PayloadTooLargeException.class)
 	ResponseEntity<ErrorResponse> handlePayloadTooLarge(PayloadTooLargeException ex, HttpServletRequest request) {
 		ErrorResponse body =
-			ErrorResponseFactory.create(request, HttpStatus.PAYLOAD_TOO_LARGE, ex.getCode(), ex.getMessage());
-		return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(body);
+			ErrorResponseFactory.create(request, HttpStatus.CONTENT_TOO_LARGE, ex.getCode(), ex.getMessage());
+		return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body(body);
 	}
 
 	@ExceptionHandler(MaxUploadSizeExceededException.class)
 	ResponseEntity<ErrorResponse> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex,
 			HttpServletRequest request) {
-		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.PAYLOAD_TOO_LARGE,
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.CONTENT_TOO_LARGE,
 			"EVIDENCE_UPLOAD_TOO_LARGE", "Uploaded file exceeds the maximum allowed size");
-		return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(body);
+		return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body(body);
 	}
 
 	@ExceptionHandler(UnsupportedMediaTypeException.class)

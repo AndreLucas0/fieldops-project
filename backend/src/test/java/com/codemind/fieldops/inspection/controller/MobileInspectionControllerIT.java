@@ -31,6 +31,7 @@ import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.domain.UserRole;
 import com.codemind.fieldops.user.domain.UserStatus;
 import com.codemind.fieldops.user.repository.UserRepository;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -75,7 +76,6 @@ class MobileInspectionControllerIT {
     private User otherTechnicianUser;
     private String supervisorToken;
     private String technicianToken;
-    private String otherTechnicianToken;
     private Client testClient;
     private InspectionSite testSite;
     private TemplateVersion activeTemplateVersion;
@@ -99,7 +99,6 @@ class MobileInspectionControllerIT {
         otherTechnicianUser = userRepository.save(newUser("Other Tech", "other.tech.mobile@fieldops.local", UserRole.TECHNICIAN));
         supervisorToken = mintAccessToken(supervisorUser);
         technicianToken = mintAccessToken(technicianUser);
-        otherTechnicianToken = mintAccessToken(otherTechnicianUser);
 
         testClient = clientRepository.save(Client.builder().name("Mobile Client").status(ClientStatus.ACTIVE).build());
         testSite = siteRepository.save(InspectionSite.builder().client(testClient).name("Mobile Site").status(SiteStatus.ACTIVE).build());
@@ -213,14 +212,14 @@ class MobileInspectionControllerIT {
             .header("Authorization", bearer(technicianToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$.content").asList().hasSizeGreaterThanOrEqualTo(1);
+            .extractingPath("$.content").asInstanceOf(InstanceOfAssertFactories.LIST).hasSizeGreaterThanOrEqualTo(1);
 
         // Also verify the content only has the technician's inspection
         assertThat(mvc.get().uri("/mobile/inspections")
             .header("Authorization", bearer(technicianToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$.content[*].technicianId").asList()
+            .extractingPath("$.content[*].technicianId").asInstanceOf(InstanceOfAssertFactories.LIST)
             .containsOnly(technicianUser.getId().toString());
     }
 
@@ -264,7 +263,7 @@ class MobileInspectionControllerIT {
             .header("Authorization", bearer(technicianToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$.snapshots").asList().isNotEmpty();
+            .extractingPath("$.snapshots").asInstanceOf(InstanceOfAssertFactories.LIST).isNotEmpty();
     }
 
     @Test

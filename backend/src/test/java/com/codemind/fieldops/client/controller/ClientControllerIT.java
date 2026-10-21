@@ -12,6 +12,7 @@ import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.domain.UserRole;
 import com.codemind.fieldops.user.domain.UserStatus;
 import com.codemind.fieldops.user.repository.UserRepository;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -162,7 +163,7 @@ class ClientControllerIT {
         assertThat(mvc.get().uri("/clients").header("Authorization", bearer(adminToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$.content").asList().hasSizeGreaterThanOrEqualTo(2);
+            .extractingPath("$.content").asInstanceOf(InstanceOfAssertFactories.LIST).hasSizeGreaterThanOrEqualTo(2);
     }
 
     @Test
@@ -220,7 +221,7 @@ class ClientControllerIT {
         assertThat(mvc.get().uri("/clients?status=ACTIVE").header("Authorization", bearer(adminToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$.content[*].status").asList().containsOnly("ACTIVE");
+            .extractingPath("$.content[*].status").asInstanceOf(InstanceOfAssertFactories.LIST).containsOnly("ACTIVE");
     }
 
     @Test

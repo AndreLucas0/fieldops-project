@@ -104,12 +104,16 @@ PATCH  /api/v1/users/{id}/status
 POST   /api/v1/users/{id}/reset-password
 ```
 
-### Filtros sugeridos
+### Consulta, filtros e paginação
 
-- `name`
-- `email`
-- `role`
-- `status`
+`GET /api/v1/users` aceita `page` (padrão `0`), `size` (padrão `20`) e `sort` (`campo,direção`). A resposta usa o envelope paginado padrão (`page`, `size`, `totalElements`, `totalPages`, `content`).
+
+Filtros opcionais:
+
+- `name`: busca parcial, sem diferenciar maiúsculas e minúsculas.
+- `role`: perfil do usuário (`ADMIN`, `SUPERVISOR`, `TECHNICIAN` ou `CLIENT_VIEWER`).
+- `status`: situação (`ACTIVE`, `INACTIVE` ou `BLOCKED`).
+- `email`: busca parcial.
 
 ---
 

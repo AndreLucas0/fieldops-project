@@ -5,13 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.codemind.fieldops.FieldopsApplication;
 import com.codemind.fieldops.TestcontainersConfiguration;
 import com.codemind.fieldops.shared.security.JwtClaims;
-import com.codemind.fieldops.template.domain.InspectionTemplate;
-import com.codemind.fieldops.template.domain.TemplateStatus;
 import com.codemind.fieldops.template.repository.InspectionTemplateRepository;
 import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.domain.UserRole;
 import com.codemind.fieldops.user.domain.UserStatus;
 import com.codemind.fieldops.user.repository.UserRepository;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -151,7 +150,7 @@ class InspectionTemplateControllerIT {
         assertThat(mvc.get().uri("/templates").header("Authorization", bearer(adminToken)))
             .hasStatusOk()
             .bodyJson()
-            .extractingPath("$.content").asList().hasSizeGreaterThanOrEqualTo(2);
+            .extractingPath("$.content").asInstanceOf(InstanceOfAssertFactories.LIST).hasSizeGreaterThanOrEqualTo(2);
     }
 
     @Test

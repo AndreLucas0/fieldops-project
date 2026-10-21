@@ -1,5 +1,6 @@
 import { USER_IDS } from '@fieldops/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import * as Network from 'expo-network';
 
 jest.mock('expo-router', () => require('@/test-utils/expo-router-mock'));
 
@@ -8,9 +9,14 @@ import NonConformitiesScreen from '../app/(protected)/inspections/[inspectionId]
 import { resetRouterMock, routerMock, setSearchParams } from '@/test-utils/expo-router-mock';
 import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/test-utils/render';
 import { configureApi, getMockDatabase, resetApiConfig, resetMockDatabase } from '@/services';
+import { getPendingEntries } from '@/services/local-db';
 import type { InspectionItemSnapshot, InspectionStatus } from '@/models';
 
 const TECHNICIAN_ID = USER_IDS.technician;
+
+function asMock<T>(fn: T): jest.Mock {
+  return fn as unknown as jest.Mock;
+}
 
 beforeEach(() => {
   resetRouterMock();
@@ -166,6 +172,34 @@ describe('FE-M09 — Resumo e conclusão', () => {
     const inspecao = getMockDatabase().inspections.find((entry) => entry.id === id);
     expect(inspecao?.status).toBe('SUBMITTED');
     expect(inspecao?.completedAtDevice).toEqual(expect.any(String));
+  });
+
+  it('sem conexão, guarda a conclusão no outbox e volta ao detalhe (offline-first)', async () => {
+    const id = inspectionWith('IN_PROGRESS');
+    answerEverything(id);
+    await renderSummary(id);
+    asMock(Network.getNetworkStateAsync).mockResolvedValue({
+      isConnected: false,
+      isInternetReachable: false,
+    });
+
+    await fireEvent.press(screen.getByTestId('resumo-concluir'));
+
+    await waitFor(() =>
+      expect(routerMock.replace).toHaveBeenCalledWith({
+        pathname: '/inspections/[inspectionId]',
+        params: { inspectionId: id },
+      }),
+    );
+    const pendentes = await getPendingEntries(id);
+    const conclusao = pendentes.find((entry) => entry.entity_type === 'INSPECTION');
+    expect(JSON.parse(conclusao?.payload ?? '{}')).toMatchObject({
+      status: 'SUBMITTED',
+      completedAtDevice: expect.any(String),
+    });
+    expect(getMockDatabase().inspections.find((entry) => entry.id === id)?.status).toBe(
+      'IN_PROGRESS',
+    );
   });
 
   it('recusa concluir fora do estado de execução', async () => {

@@ -242,6 +242,8 @@ beforeEach(() => {
       const [status, last_error, rowId] = params;
       const row = store.get(rowId);
       if (row) store.set(rowId, { ...row, error_count: row.error_count + 1, status, last_error });
+    } else if (/DELETE FROM outbox WHERE id/i.test(sql)) {
+      store.delete(params[0]);
     } else if (/INSERT OR REPLACE INTO sync_metadata/i.test(sql)) {
       const [key, value] = params;
       metaStore.set(key, value);

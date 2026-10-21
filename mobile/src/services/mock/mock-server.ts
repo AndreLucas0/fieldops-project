@@ -744,18 +744,73 @@ const routes: Route[] = [
     handle: (ctx) => {
       const body = asRecord(ctx.body);
       const operations = Array.isArray(body.operations)
-        ? (body.operations as Array<{ operationId: string }>)
+        ? (body.operations as MockSyncOperation[])
         : [];
 
-      const results = operations.map((op) => ({
-        operationId: op.operationId,
-        status: 'APPLIED' as const,
-      }));
-
-      return ok({ results });
+      return ok({ results: operations.map((op) => applySyncOperation(ctx, op)) });
     },
   },
 ];
+
+interface MockSyncOperation {
+  operationId: string;
+  entityType?: string;
+  entityId?: string;
+  payload?: Record<string, unknown>;
+}
+
+/**
+ * Aplica uma operação do push como o backend faz. `INSPECTION` reaproveita as
+ * rotas de início e conclusão (mesmas regras e mesmas recusas); os demais tipos
+ * seguem aceitos sem efeito, como antes.
+ */
+function applySyncOperation(ctx: MockContext, op: MockSyncOperation) {
+  if (op.entityType !== 'INSPECTION') {
+    return { operationId: op.operationId, status: 'APPLIED' as const };
+  }
+
+  const status = op.payload?.status;
+  const action = status === 'IN_PROGRESS' ? 'start' : status === 'SUBMITTED' ? 'submit' : null;
+  if (!action) {
+    return {
+      operationId: op.operationId,
+      status: 'REJECTED' as const,
+      error: {
+        code: 'SYNC_UNSUPPORTED_INSPECTION_TRANSITION',
+        message: 'A sincronização só inicia ou conclui inspeções.',
+      },
+    };
+  }
+
+  return toSyncResult(
+    op.operationId,
+    dispatchRoute(ctx, 'POST', `/inspections/${op.entityId ?? ''}/${action}`, op.payload ?? {}),
+  );
+}
+
+function dispatchRoute(ctx: MockContext, method: string, path: string, body: unknown): HttpResponse {
+  for (const route of routes) {
+    if (route.method !== method) continue;
+    const params = matchPattern(route.pattern, path);
+    if (params) return route.handle({ ...ctx, params, body, path });
+  }
+  return fail(404, 'NOT_FOUND', 'Recurso não encontrado.', path);
+}
+
+function toSyncResult(operationId: string, response: HttpResponse) {
+  if (response.status >= 200 && response.status < 300) {
+    return { operationId, status: 'APPLIED' as const };
+  }
+  const error = asRecord(response.body);
+  return {
+    operationId,
+    status: 'REJECTED' as const,
+    error: {
+      code: typeof error.code === 'string' ? error.code : 'REJECTED',
+      message: typeof error.message === 'string' ? error.message : 'Operação recusada.',
+    },
+  };
+}
 
 interface UpsertResult {
   response: InspectionResponse;

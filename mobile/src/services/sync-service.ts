@@ -44,7 +44,15 @@ interface SyncOperationRequest {
 interface SyncOperationResult {
   operationId: string;
   status: 'APPLIED' | 'ALREADY_APPLIED' | 'REJECTED' | 'CONFLICT' | 'DEPENDENCY_FAILED';
+  error?: { code?: string; message?: string } | null;
 }
+
+/**
+ * Transições de inspeção (iniciar/concluir) não usam controle de versão: o
+ * servidor já as valida pela máquina de estados, e iniciar e concluir offline
+ * em sequência mudaria a versão entre uma operação e outra.
+ */
+const VERSIONLESS_ENTITY_TYPES = new Set(['INSPECTION']);
 
 interface SyncPushResponse {
   results: SyncOperationResult[];
@@ -84,7 +92,9 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
         entityType: row.entity_type,
         entityId: row.entity_id,
         operationType: row.operation_type,
-        baseVersion: row.base_version ?? null,
+        baseVersion: VERSIONLESS_ENTITY_TYPES.has(row.entity_type)
+          ? null
+          : (row.base_version ?? null),
         payload: parsed,
       });
     }
@@ -120,7 +130,7 @@ export async function syncPending(client: ApiClient, inspectionId?: string): Pro
         syncedIds.push(result.operationId);
       } else {
         const failStatus = result.status === 'CONFLICT' ? 'CONFLICT' : 'FAILED';
-        await markEntryFailed(result.operationId, failStatus);
+        await markEntryFailed(result.operationId, failStatus, result.error?.message ?? undefined);
         failed += 1;
       }
     }

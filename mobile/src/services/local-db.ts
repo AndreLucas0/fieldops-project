@@ -123,6 +123,12 @@ export async function markEntriesSynced(ids: string[]): Promise<void> {
   );
 }
 
+/** Remove uma entrada — usado quando o servidor a recusa de forma definitiva. */
+export async function deleteOutboxEntry(id: string): Promise<void> {
+  const database = await getDb();
+  await database.runAsync('DELETE FROM outbox WHERE id = ?', [id]);
+}
+
 /** Retorna entradas com status FAILED ou CONFLICT (visíveis na tela de sync). */
 export async function getFailedEntries(): Promise<OutboxRow[]> {
   const database = await getDb();

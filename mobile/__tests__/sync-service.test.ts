@@ -337,6 +337,48 @@ describe('BF-007 — sync-service + outbox', () => {
     });
   });
 
+  describe('SYNC-OUTBOX-INSPECTION — transições de estado da inspeção', () => {
+    it('operações INSPECTION vão sem baseVersion (o servidor valida pela máquina de estados)', async () => {
+      await upsertOutboxEntry({
+        id: 'transicao-1',
+        inspectionId: INSPECTION_A,
+        entityType: 'INSPECTION',
+        entityId: INSPECTION_A,
+        operationType: 'UPSERT',
+        baseVersion: 0,
+        payload: JSON.stringify({ status: 'IN_PROGRESS', startedAtDevice: '2026-10-20T12:00:00Z' }),
+      });
+      await addEntry('resposta-1', INSPECTION_A, 3);
+      const { client, post } = fakeClient(allWith('APPLIED'));
+
+      await syncPending(client);
+
+      const body = post.mock.calls[0]?.[1] as PushBody;
+      const transicao = body.operations.find((op) => op.operationId === 'transicao-1');
+      const resposta = body.operations.find((op) => op.operationId === 'resposta-1');
+      expect(transicao?.baseVersion).toBeNull();
+      expect(resposta?.baseVersion).toBe(3);
+    });
+
+    it('guarda em last_error a mensagem da recusa do servidor', async () => {
+      await addEntry('recusada-1');
+      const { client } = fakeClient((body) => ({
+        results: body.operations.map((op) => ({
+          operationId: op.operationId,
+          status: 'REJECTED',
+          error: { code: 'INSPECTION_INVALID_STATE', message: 'Inspeção não está em andamento.' },
+        })),
+      }));
+
+      await syncPending(client);
+
+      expect(outboxRow('recusada-1')).toMatchObject({
+        status: 'FAILED',
+        last_error: 'Inspeção não está em andamento.',
+      });
+    });
+  });
+
   describe('isOnline', () => {
     it('só considera online quando a internet está alcançável', async () => {
       jest.mocked(Network.getNetworkStateAsync).mockResolvedValueOnce({

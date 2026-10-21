@@ -70,10 +70,11 @@ public class UserService {
 		User user = getById(id);
 		String normalizedEmail = normalizeEmail(request.email());
 		requireEmailAvailable(normalizedEmail, id);
-		user.setName(normalizeName(request.name()));
-		user.setEmail(normalizedEmail);
-		user.setRole(request.role());
-		user.setPhone(normalizePhone(request.phone()));
+		user.updateProfile(
+			normalizeName(request.name()),
+			normalizedEmail,
+			request.role(),
+			normalizePhone(request.phone()));
 		return userRepository.save(user);
 	}
 

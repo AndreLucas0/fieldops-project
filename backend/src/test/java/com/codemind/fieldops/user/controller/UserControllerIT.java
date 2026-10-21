@@ -159,7 +159,7 @@ class UserControllerIT {
 
 	@Test
 	void adminCanFilterUsersByNameRoleAndStatus() {
-		technicianUser.setStatus(UserStatus.INACTIVE);
+		technicianUser.changeStatus(UserStatus.INACTIVE);
 		userRepository.save(technicianUser);
 
 		assertThat(mvc.get().uri("/users?name=cArLoS&role=TECHNICIAN&status=INACTIVE")

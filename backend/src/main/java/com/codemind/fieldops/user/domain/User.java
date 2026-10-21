@@ -11,19 +11,19 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
+import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Entity
 @Table(name = "users")
 @Getter
-@Setter
 @NoArgsConstructor
-@AllArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PACKAGE)
 @Builder
 public class User {
 
@@ -82,14 +82,25 @@ public class User {
 	}
 
 	public void changeStatus(UserStatus newStatus) {
+		Objects.requireNonNull(newStatus, "newStatus must not be null");
 		this.status = newStatus;
 		if (newStatus == UserStatus.BLOCKED) {
 			invalidateSessions();
 		}
 	}
 
+	public void updateProfile(String name, String email, UserRole role, String phone) {
+		String requiredName = Objects.requireNonNull(name, "name must not be null");
+		String requiredEmail = Objects.requireNonNull(email, "email must not be null");
+		UserRole requiredRole = Objects.requireNonNull(role, "role must not be null");
+		this.name = requiredName;
+		this.email = requiredEmail;
+		this.role = requiredRole;
+		this.phone = phone;
+	}
+
 	public void changePassword(String newPasswordHash) {
-		this.passwordHash = newPasswordHash;
+		this.passwordHash = Objects.requireNonNull(newPasswordHash, "newPasswordHash must not be null");
 		invalidateSessions();
 	}
 

@@ -1,6 +1,7 @@
 package com.codemind.fieldops.user.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -81,6 +82,40 @@ class UserStatusTransitionTest {
 
 		assertThat(user.getPasswordHash()).isEqualTo("new-hash");
 		assertThat(user.getSessionValidAfter()).isAfter(before);
+	}
+
+	@Test
+	void updatingProfileChangesEditableFieldsWithoutChangingCredentialsOrStatus() {
+		User user = newActiveUser();
+		String originalPasswordHash = user.getPasswordHash();
+
+		user.updateProfile("Maria Técnica", "maria@fieldops.local", UserRole.SUPERVISOR, null);
+
+		assertThat(user.getName()).isEqualTo("Maria Técnica");
+		assertThat(user.getEmail()).isEqualTo("maria@fieldops.local");
+		assertThat(user.getRole()).isEqualTo(UserRole.SUPERVISOR);
+		assertThat(user.getPhone()).isNull();
+		assertThat(user.getPasswordHash()).isEqualTo(originalPasswordHash);
+		assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
+	}
+
+	@Test
+	void profileCannotBeUpdatedWithMissingRequiredFields() {
+		User user = newActiveUser();
+
+		assertThatNullPointerException()
+			.isThrownBy(() -> user.updateProfile(null, "maria@fieldops.local", UserRole.SUPERVISOR, null));
+		assertThatNullPointerException()
+			.isThrownBy(() -> user.updateProfile("Maria", null, UserRole.SUPERVISOR, null));
+		assertThatNullPointerException()
+			.isThrownBy(() -> user.updateProfile("Maria", "maria@fieldops.local", null, null));
+	}
+
+	@Test
+	void changingPasswordRequiresAHash() {
+		User user = newActiveUser();
+
+		assertThatNullPointerException().isThrownBy(() -> user.changePassword(null));
 	}
 
 }

@@ -765,6 +765,7 @@ interface MockSyncOperation {
  * seguem aceitos sem efeito, como antes.
  */
 function applySyncOperation(ctx: MockContext, op: MockSyncOperation) {
+  if (op.entityType === 'NON_CONFORMITY') return applyNonConformitySync(ctx, op);
   if (op.entityType !== 'INSPECTION') {
     return { operationId: op.operationId, status: 'APPLIED' as const };
   }
@@ -786,6 +787,31 @@ function applySyncOperation(ctx: MockContext, op: MockSyncOperation) {
     op.operationId,
     dispatchRoute(ctx, 'POST', `/inspections/${op.entityId ?? ''}/${action}`, op.payload ?? {}),
   );
+}
+
+/**
+ * Como o backend: id já existente edita; id novo cria aceitando o id gerado no
+ * aparelho, para a NC mostrada offline ser a mesma depois de sincronizar.
+ */
+function applyNonConformitySync(ctx: MockContext, op: MockSyncOperation) {
+  const payload = op.payload ?? {};
+  const id = op.entityId ?? '';
+
+  if (ctx.db.nonConformities.some((item) => item.id === id)) {
+    return toSyncResult(op.operationId, dispatchRoute(ctx, 'PUT', `/non-conformities/${id}`, payload));
+  }
+
+  const inspectionId = typeof payload.inspectionId === 'string' ? payload.inspectionId : '';
+  const response = dispatchRoute(
+    ctx,
+    'POST',
+    `/inspections/${inspectionId}/non-conformities`,
+    payload,
+  );
+  if (response.status >= 200 && response.status < 300) {
+    (response.body as NonConformity).id = id;
+  }
+  return toSyncResult(op.operationId, response);
 }
 
 function dispatchRoute(ctx: MockContext, method: string, path: string, body: unknown): HttpResponse {

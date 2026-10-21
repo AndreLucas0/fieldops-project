@@ -48,11 +48,13 @@ interface SyncOperationResult {
 }
 
 /**
- * Transições de inspeção (iniciar/concluir) não usam controle de versão: o
- * servidor já as valida pela máquina de estados, e iniciar e concluir offline
- * em sequência mudaria a versão entre uma operação e outra.
+ * Tipos enviados sem controle de versão. Transições de inspeção (iniciar/
+ * concluir): o servidor já as valida pela máquina de estados, e iniciar e
+ * concluir offline em sequência mudaria a versão entre uma operação e outra.
+ * Não conformidade: criada com id do aparelho, sem versão conhecida até o
+ * servidor aplicar; a edição (PEND-06, fora do MVP) fica com a última gravação.
  */
-const VERSIONLESS_ENTITY_TYPES = new Set(['INSPECTION']);
+const VERSIONLESS_ENTITY_TYPES = new Set(['INSPECTION', 'NON_CONFORMITY']);
 
 interface SyncPushResponse {
   results: SyncOperationResult[];

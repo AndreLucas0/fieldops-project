@@ -306,6 +306,56 @@ describe('FE-M10 — Não conformidades', () => {
     expect(getMockDatabase().nonConformities[0]?.title).toBe('Obstrução corrigida parcialmente');
   });
 
+  it('sem conexão, registra a NC no aparelho e já a mostra na lista (offline-first)', async () => {
+    const id = inspectionWith('IN_PROGRESS');
+    const antes = getMockDatabase().nonConformities.length;
+    await renderNonConformities(id);
+    asMock(Network.getNetworkStateAsync).mockResolvedValue({
+      isConnected: false,
+      isInternetReachable: false,
+    });
+
+    await fireEvent.press(screen.getByTestId('nc-nova'));
+    await fireEvent.changeText(screen.getByTestId('nc-titulo'), 'Cabo exposto');
+    await fireEvent.changeText(screen.getByTestId('nc-descricao'), 'Isolamento rompido no painel.');
+    await fireEvent.press(screen.getByTestId('nc-salvar'));
+
+    await waitFor(() => expect(screen.queryByTestId('nc-formulario')).toBeNull());
+
+    const [pendente] = await getPendingEntries(id);
+    expect(pendente).toMatchObject({ entity_type: 'NON_CONFORMITY' });
+    expect(JSON.parse(pendente?.payload ?? '{}')).toMatchObject({
+      inspectionId: id,
+      title: 'Cabo exposto',
+      description: 'Isolamento rompido no painel.',
+      severity: expect.any(String),
+    });
+    expect(screen.getByTestId(`nc-item-${pendente?.entity_id}`)).toHaveTextContent(/Cabo exposto/);
+    expect(getMockDatabase().nonConformities).toHaveLength(antes);
+  });
+
+  it('sem conexão, a edição fica no aparelho e aparece na lista (offline-first)', async () => {
+    const id = inspectionWith('IN_PROGRESS');
+    const nc = getMockDatabase().nonConformities[0];
+    const tituloOriginal = nc?.title;
+    await renderNonConformities(id);
+    asMock(Network.getNetworkStateAsync).mockResolvedValue({
+      isConnected: false,
+      isInternetReachable: false,
+    });
+
+    await fireEvent.press(screen.getByTestId(`nc-editar-${nc?.id}`));
+    await fireEvent.changeText(screen.getByTestId('nc-titulo'), 'Título ajustado offline');
+    await fireEvent.press(screen.getByTestId('nc-salvar'));
+
+    await waitFor(() => expect(screen.queryByTestId('nc-formulario')).toBeNull());
+
+    expect(screen.getByTestId(`nc-item-${nc?.id}`)).toHaveTextContent(/Título ajustado offline/);
+    const [pendente] = await getPendingEntries(id);
+    expect(pendente).toMatchObject({ entity_type: 'NON_CONFORMITY', entity_id: nc?.id });
+    expect(getMockDatabase().nonConformities[0]?.title).toBe(tituloOriginal);
+  });
+
   it('leva à captura de evidência com a NC vinculada', async () => {
     const id = inspectionWith('IN_PROGRESS');
     const nc = getMockDatabase().nonConformities[0];

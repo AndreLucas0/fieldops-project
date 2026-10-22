@@ -1,5 +1,6 @@
 import * as Network from 'expo-network';
 
+import { ApiError } from '@/models';
 import type { ApiClient } from '@/services/api-client';
 import {
   countPendingEntries,
@@ -133,6 +134,36 @@ describe('BF-007 — sync-service + outbox', () => {
     expect(result).toEqual({ synced: 0, failed: 2 });
     expect(outboxRow('op-1')).toMatchObject({ synced: 0, error_count: 1 });
     expect(outboxRow('op-2')).toMatchObject({ synced: 0, error_count: 1 });
+  });
+
+  it('push recusado pelo servidor (HTTP): guarda status, código e mensagem em last_error', async () => {
+    await addEntry('op-1');
+    const { client } = fakeClient(() => {
+      throw new ApiError({
+        timestamp: '2026-10-21T12:00:00Z',
+        status: 400,
+        code: 'VALIDATION_ERROR',
+        message: 'Request payload failed validation',
+        fieldErrors: [{ field: 'operations[0].entityId', message: 'must not be null' }],
+      });
+    });
+
+    await syncPending(client);
+
+    expect(outboxRow('op-1').last_error).toBe(
+      'Envio recusado (HTTP 400 VALIDATION_ERROR): Request payload failed validation — operations[0].entityId: must not be null',
+    );
+  });
+
+  it('push sem resposta (rede): guarda a mensagem do erro em last_error', async () => {
+    await addEntry('op-1');
+    const { client } = fakeClient(() => {
+      throw new Error('Network request failed');
+    });
+
+    await syncPending(client);
+
+    expect(outboxRow('op-1').last_error).toBe('Falha no envio: Network request failed');
   });
 
   it('envia em lotes de 50 operações', async () => {

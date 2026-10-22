@@ -7,7 +7,7 @@ import {
   EVIDENCE_ENTITY_TYPE,
   syncEvidenceEntries,
 } from '@/features/evidence/evidence-outbox';
-import type { InspectionDetail } from '@/models';
+import { ApiError, type InspectionDetail } from '@/models';
 
 import type { ApiClient } from './api-client';
 import {
@@ -194,9 +194,12 @@ async function pushEntries(client: ApiClient, pending: OutboxRow[]): Promise<Pus
         lastPullCursor: null,
         operations,
       });
-    } catch {
+    } catch (error) {
+      // O lote inteiro falhou antes de qualquer operação ser processada: o
+      // motivo vai para cada entrada, visível em "Detalhes de sincronização".
+      const reason = describePushFailure(error);
       for (const op of operations) {
-        await markEntryFailed(op.operationId, 'FAILED');
+        await markEntryFailed(op.operationId, 'FAILED', reason);
       }
       failed += operations.length;
       continue;
@@ -204,7 +207,7 @@ async function pushEntries(client: ApiClient, pending: OutboxRow[]): Promise<Pus
 
     if (!Array.isArray(response.results)) {
       for (const op of operations) {
-        await markEntryFailed(op.operationId, 'FAILED');
+        await markEntryFailed(op.operationId, 'FAILED', 'Resposta inesperada do servidor ao envio.');
       }
       failed += operations.length;
       continue;
@@ -282,6 +285,16 @@ async function rebaseConflicts(client: ApiClient, conflicts: OutboxRow[]): Promi
   }
 
   return rebased;
+}
+
+/** Status HTTP, código e mensagem (com os campos inválidos) — o que diagnostica o envio. */
+function describePushFailure(error: unknown): string {
+  if (error instanceof ApiError && error.status > 0) {
+    const fields = (error.fieldErrors ?? []).map((field) => `${field.field}: ${field.message}`);
+    const detail = fields.length > 0 ? ` — ${fields.join('; ')}` : '';
+    return `Envio recusado (HTTP ${error.status} ${error.code}): ${error.message}${detail}`;
+  }
+  return `Falha no envio: ${error instanceof Error ? error.message : String(error)}`;
 }
 
 /**

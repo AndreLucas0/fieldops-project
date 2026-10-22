@@ -9,6 +9,28 @@ Frontend ↔ Backend contract + screen audit completed (2026-10-02, see `docs/au
 Auditoria completa do código 2026-10-13 concluída; inventários de telas criados em `project-state/pending-web.md` e `project-state/pending-mobile.md`.
 Integração incremental Frontend ↔ Backend com TDD em andamento.
 
+### EVIDENCE-EXPO-FETCH-2026-10-21 — foto nunca saía do aparelho ("Sem conexão com o servidor")
+
+Data: 2026-10-21. Branch: `task/sync-evidence-response-link`. Tipo: bugfix (TDD).
+Relato do dono: todas as entradas pendentes eram EVIDENCE, FAILED, ~30 tentativas, "Sem conexão com o servidor".
+
+**Diagnóstico:** monitor da porta 8090 mostrou o celular (`10.109.3.47`) conectando, mas nenhuma evidência nem
+operação de sync gravada. Causa no código do Expo 57: `expo/src/winter/runtime.native.ts` troca o `fetch` global
+pelo `expo/fetch` (salvo `EXPO_PUBLIC_USE_RN_FETCH`), cujo `convertFormDataAsync` só aceita parte string, `Blob` ou
+objeto com `bytes()`. O `{ uri, name, type }` do React Native lança `Unsupported FormDataPart implementation` antes
+de abrir a conexão, e o `ApiClient` traduz como `NETWORK_UNAVAILABLE`. Por isso o upload de foto **nunca** funcionou
+no aparelho — EVIDENCE-URI-EXPO-GO e SYNC-OUTBOX-EVIDENCE não tinham sido testados no celular.
+
+**Implementado:** `ApiClient.upload` (nativo) anexa `{ name, type, bytes: () => new File(uri).bytes() }`
+(`expo-file-system` 57); web inalterado. Também: falha do push grava o motivo em `last_error` (commit `e9020e4`).
+
+**Testes:** novo em `src/services/api-client.test.ts` usando o `convertFormDataAsync` real do Expo — RED com a mesma
+mensagem do aparelho, GREEN após a correção. Mock de `expo-file-system` ganhou `bytes()`. `npx jest` **444/444**;
+typecheck/lint só com os pré-existentes. `inspection-detail-screen` › "ASSIGNED oferece iniciar…" falhou 1 vez na
+suíte completa e passou isolado 2× (mesma instabilidade de MOBILE-PREEXISTING-CHECKS).
+
+**Não executado:** confirmação no aparelho (precisa recarregar o app).
+
 ### CONFLICT-REBASE-2026-10-21 — toda alteração e evidência presas em FAILED/CONFLICT
 
 Data: 2026-10-21. Branch: `task/sync-evidence-response-link`. Tipo: bugfix (TDD).

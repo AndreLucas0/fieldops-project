@@ -154,6 +154,11 @@ jest.mock('expo-file-system', () => {
     delete() {
       files.delete(this.uri);
     }
+    // Conteúdo fictício derivado da URI: basta para conferir que o upload lê o arquivo.
+    async bytes() {
+      if (!files.has(this.uri)) throw new Error(`File not found: ${this.uri}`);
+      return new TextEncoder().encode(`conteudo:${this.uri}`);
+    }
   }
 
   return {

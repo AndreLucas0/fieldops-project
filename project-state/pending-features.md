@@ -1219,6 +1219,7 @@ Description (observado em 2026-10-20, durante EVIDENCE-URI-EXPO-GO; nenhum deste
   `src/services/mock/mock-server.test.ts` (2 — `MockRequest` exige `accessToken`).
 - `npm run lint`: 2 erros `react-hooks` ("setState synchronously within an effect") em
   `app/(protected)/(tabs)/sync.tsx:40` e `app/(protected)/sync/details.tsx:24`; 6 warnings.
+- `__tests__/inspection-detail-screen.test.tsx` › "ASSIGNED oferece iniciar e navega para a confirmação": falhou 1 vez na suíte completa em 2026-10-21 e passou isolado 2× — mesma instabilidade sob carga.
 - `__tests__/inspections-screen.test.tsx` › "mostra erro com nova tentativa quando a busca falha":
   falhou 1 vez na suíte completa e passou 11/11 isolada duas vezes — instável sob carga.
 

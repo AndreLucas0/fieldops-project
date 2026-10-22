@@ -84,19 +84,23 @@ espera as variáveis de conexão no ambiente do processo:
 ```bash
 cd backend
 
-# bash
-export SPRING_PROFILES_ACTIVE=local
-export DB_URL=jdbc:postgresql://localhost:5432/fieldops
-export DB_USER=fieldops
-export DB_PASSWORD=fieldops
+# bash / Git Bash — carrega o .env da raiz (tr remove CRLF do Windows)
+set -a; source <(tr -d '\r' < ../.env); set +a
 
-# PowerShell
-#   $env:SPRING_PROFILES_ACTIVE='local'
-#   $env:DB_URL='jdbc:postgresql://localhost:5432/fieldops'
-#   $env:DB_USER='fieldops'; $env:DB_PASSWORD='fieldops'
+# PowerShell — ver o bloco equivalente em ESTADO-DO-PROJETO.md §8
 
 ./mvnw spring-boot:run
+
+$env:SPRING_PROFILES_ACTIVE='local'
+$env:DB_URL='jdbc:postgresql://localhost:5433/fieldops'
+$env:DB_USER='fieldops'
+$env:DB_PASSWORD='fieldops'
 ```
+
+A porta do banco em `DB_URL` precisa ser a do seu `.env` (`DB_PORT`: `5432` no
+exemplo, `5433` em vários `.env` locais). Passo a passo, variáveis obrigatórias e
+opcionais e erros comuns: `ESTADO-DO-PROJETO.md` §8, "Backend em dev — variáveis
+de ambiente".
 
 Sobe em `http://localhost:8090/api/v1`. O Flyway aplica as migrações no
 startup. Swagger em `http://localhost:8090/api/v1/swagger-ui.html`.

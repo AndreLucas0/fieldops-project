@@ -50,6 +50,12 @@ public class UserService {
 			.orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND_CODE, "User not found"));
 	}
 
+	@Transactional(readOnly = true)
+	public User getByEmail(String email) {
+		return userRepository.findByEmailIgnoreCase(normalizeEmail(email))
+			.orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND_CODE, "User not found"));
+	}
+
 	@Transactional
 	public User create(UserCreateRequest request) {
 		String normalizedEmail = normalizeEmail(request.email());

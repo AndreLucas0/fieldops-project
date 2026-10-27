@@ -9,7 +9,7 @@ import NonConformitiesScreen from '../app/(protected)/inspections/[inspectionId]
 import { resetRouterMock, routerMock, setSearchParams } from '@/test-utils/expo-router-mock';
 import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/test-utils/render';
 import { configureApi, getMockDatabase, resetApiConfig, resetMockDatabase } from '@/services';
-import { getPendingEntries } from '@/services/local-db';
+import { getPendingEntries, upsertOutboxEntry } from '@/services/local-db';
 import type { InspectionItemSnapshot, InspectionStatus } from '@/models';
 
 const TECHNICIAN_ID = USER_IDS.technician;
@@ -144,6 +144,45 @@ describe('FE-M09 — Resumo e conclusão', () => {
       pathname: '/inspections/[inspectionId]/checklist',
       params: { inspectionId: id, focus: pendente?.id },
     });
+  });
+
+  it('foto ainda no outbox cumpre a evidência obrigatória do item (offline-first, achado 3)', async () => {
+    const id = inspectionWith('IN_PROGRESS');
+    answerEverything(id);
+    const item = itemsOf(id).find((entry) => entry.responseType === 'CONFORMITY');
+    if (!item) throw new Error('Sem item de conformidade no conjunto fictício');
+    item.rulesJson = { ...(item.rulesJson ?? {}), evidenceRequiredOnFailure: true };
+    const response = getMockDatabase().responses[id]?.find(
+      (entry) => entry.inspectionItemId === item.id,
+    );
+    if (response) {
+      response.conformity = 'NON_CONFORMING';
+      response.observation = 'Vazamento na conexão';
+    }
+    await upsertOutboxEntry({
+      id: 'foto-pendente',
+      inspectionId: id,
+      entityType: 'EVIDENCE',
+      entityId: 'foto-pendente',
+      operationType: 'CREATE',
+      baseVersion: 0,
+      payload: JSON.stringify({
+        localUri: 'file:///document/evidence-pending/foto-pendente.jpg',
+        idempotencyKey: 'foto-pendente',
+        capturedAtDevice: '2026-10-21T12:00:00Z',
+        inspectionItemId: item.id,
+      }),
+    });
+    // Sem rede: a foto não sobe, e mesmo assim não deve travar a conclusão.
+    asMock(Network.getNetworkStateAsync).mockResolvedValue({
+      isConnected: false,
+      isInternetReachable: false,
+    });
+
+    await renderSummary(id);
+
+    expect(screen.queryByTestId(`resumo-pendencia-${item.itemCode}`)).toBeNull();
+    expect(screen.getByTestId('resumo-pronto')).toBeOnTheScreen();
   });
 
   it('libera a conclusão quando nada mais trava', async () => {

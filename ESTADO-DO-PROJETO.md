@@ -83,6 +83,7 @@ Server (JWT) · Flyway · MapStruct · AWS SDK S3.
 - Swagger em `/swagger-ui.html`.
 - Perfil `local` exige `DB_URL`, `DB_USER` e `DB_PASSWORD` **no ambiente do
   processo** — o Spring **não lê o `.env`**, que serve ao Docker Compose.
+  Como configurar: §8 "Backend em dev — variáveis de ambiente".
 - Flyway aplica V1–V14 no startup.
 - 16 controllers; `TemplateController` tem mapeamento duplo
   (`/templates/*` e `/inspection-templates/*`).
@@ -178,15 +179,10 @@ cabeçalho de navegação) e consumo de 6 dos 8 serviços HTTP, que estão órf�
 cp .env.example .env
 docker compose up -d db evidence-storage     # Postgres 16 + s3mock
 
-# 2. backend (o Spring NÃO lê o .env)
+# 2. backend — variáveis de ambiente: ver "Backend em dev" logo abaixo
 cd backend
-export SPRING_PROFILES_ACTIVE=local
-export DB_URL=jdbc:postgresql://localhost:5432/fieldops
-export DB_USER=fieldops
-export DB_PASSWORD=fieldops
+set -a; source <(tr -d '\r' < ../.env); set +a
 ./mvnw spring-boot:run                       # http://localhost:8090/api/v1
-
-# PowerShell: $env:SPRING_PROFILES_ACTIVE='local'  (etc.)
 
 # 3. dados de demonstração
 docker compose exec -T db psql -U fieldops -d fieldops < db/seed.sql
@@ -194,6 +190,72 @@ docker compose exec -T db psql -U fieldops -d fieldops < db/seed.sql
 # 4. web contra a API real
 cd web && npm run start:api                  # http://localhost:4200
 ```
+
+### Backend em dev — variáveis de ambiente (validado em 21/10)
+
+O Spring **não lê o `.env`**: ele alimenta só o Docker Compose. As variáveis
+precisam estar no ambiente do processo que roda o `mvnw`. A forma mais simples é
+carregar o próprio `.env` da raiz no terminal antes de subir o backend — assim
+porta, usuário e senha do banco são sempre os mesmos que o Compose usou.
+
+**Obrigatórias** (perfil `local`, `application-local.yml` — sem elas o startup falha):
+
+| Variável | Valor em dev | Observação |
+|---|---|---|
+| `SPRING_PROFILES_ACTIVE` | `local` | ativa `application-local.yml` |
+| `DB_URL` | `jdbc:postgresql://localhost:<DB_PORT>/fieldops` | `<DB_PORT>` = o `DB_PORT` do seu `.env` (o `.env.example` usa `5432`; vários `.env` locais usam `5433`). Confira com `docker compose ps` |
+| `DB_USER` / `DB_PASSWORD` | os do `.env` (`fieldops` / `fieldops` no exemplo) | |
+
+**Opcionais** (têm padrão em `application.yml`): `SERVER_PORT` (8090), `JWT_SECRET`,
+`JWT_ACCESS_TOKEN_EXPIRATION_SECONDS`, `JWT_REFRESH_TOKEN_EXPIRATION_SECONDS`,
+`CORS_ALLOWED_ORIGINS`, `EVIDENCE_STORAGE_ENDPOINT` (`http://localhost:9000`),
+`EVIDENCE_STORAGE_REGION`, `EVIDENCE_STORAGE_BUCKET`, `EVIDENCE_STORAGE_ACCESS_KEY`,
+`EVIDENCE_STORAGE_SECRET_KEY`, `EVIDENCE_MAX_UPLOAD_SIZE_BYTES`.
+
+**PowerShell** (a partir de `backend/`; vale para a janela atual do terminal):
+
+```powershell
+Get-Content ..\.env | Where-Object { $_ -match '^\s*[A-Za-z_][A-Za-z0-9_]*=' } | ForEach-Object {
+  $name, $value = $_ -split '=', 2
+  Set-Item -Path "env:$($name.Trim())" -Value $value.Trim()
+}
+# O PowerShell não expande ${DB_HOST} etc. que o .env usa em DB_URL:
+$env:DB_URL = "jdbc:postgresql://$($env:DB_HOST):$($env:DB_PORT)/$($env:DB_NAME)"
+# Opcional: o .env restringe o CORS a localhost:4200; sem a variável, o perfil local aceita qualquer origem.
+Remove-Item env:CORS_ALLOWED_ORIGINS -ErrorAction SilentlyContinue
+.\mvnw.cmd spring-boot:run
+```
+
+**Bash / Git Bash** (a partir de `backend/`; `tr` remove o CRLF de um `.env` salvo no Windows):
+
+```bash
+set -a; source <(tr -d '\r' < ../.env); set +a   # expande ${DB_HOST}… em DB_URL
+unset CORS_ALLOWED_ORIGINS                         # opcional, mesmo motivo acima
+./mvnw spring-boot:run
+```
+
+**Sem `.env`** (valores literais; troque `5432` pela porta do seu container):
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE='local'
+$env:DB_URL='jdbc:postgresql://localhost:5432/fieldops'
+$env:DB_USER='fieldops'; $env:DB_PASSWORD='fieldops'
+.\mvnw.cmd spring-boot:run
+```
+
+**Conferir que subiu:** o log mostra `Successfully validated 14 migrations`,
+`Tomcat started on port 8090 (http) with context path '/api/v1'` e
+`Started FieldopsApplication`. Depois:
+`curl http://localhost:8090/api/v1/v3/api-docs` → 200, e login com
+`tecnico@fieldops.local` / `FieldOps@2026` (após aplicar o `db/seed.sql`).
+
+**Erros comuns:**
+- `Could not resolve placeholder 'DB_URL'` (ou `DB_USER`/`DB_PASSWORD`): as
+  variáveis não estão no terminal atual — cada janela nova precisa carregá-las de novo.
+- `password authentication failed` / `Connection refused`: porta errada em
+  `DB_URL` (5432 × 5433) ou container `db` parado — `docker compose ps`.
+- `Port 8090 was already in use`: outro backend rodando — encerre-o ou defina `SERVER_PORT`.
+- `java -version` mostrando 1.8 não impede: o `mvnw` usa o `JAVA_HOME` (JDK 21).
 
 ### Testes
 

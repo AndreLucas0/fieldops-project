@@ -159,10 +159,10 @@ export function useChecklist(
           payload: JSON.stringify(syncPayload),
         });
 
-        versionsRef.current.versions.set(
-          item.id,
-          (versionsRef.current.versions.get(item.id) ?? 0) + 1,
-        );
+        // Criar a resposta não incrementa a versão no servidor (nasce em 0); só
+        // as atualizações somam 1. Item ainda sem resposta: 0, 0, 1, 2…
+        const current = versionsRef.current.versions.get(item.id);
+        versionsRef.current.versions.set(item.id, current === undefined ? 0 : current + 1);
         setSaveState(item.id, { status: 'saved' });
         void syncPendingIfOnline(client, inspection.id);
       } catch {

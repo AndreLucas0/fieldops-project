@@ -1,6 +1,6 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-20 (OFFLINE-FIRST-REST — interrompido; inconsistências documentadas)
+Last updated: 2026-10-21 (SYNC-EVIDENCE-LINK — achados 2, 3 e 5 do offline-first resolvidos)
 
 ## Current State
 
@@ -8,6 +8,85 @@ Backend audit (2026-09-22): superseded — ver re-auditoria 2026-10-13 em `proje
 Frontend ↔ Backend contract + screen audit completed (2026-10-02, see `docs/auditoria-frontend-backend.md`).
 Auditoria completa do código 2026-10-13 concluída; inventários de telas criados em `project-state/pending-web.md` e `project-state/pending-mobile.md`.
 Integração incremental Frontend ↔ Backend com TDD em andamento.
+
+### EVIDENCE-EXPO-FETCH-2026-10-21 — foto nunca saía do aparelho ("Sem conexão com o servidor")
+
+Data: 2026-10-21. Branch: `task/sync-evidence-response-link`. Tipo: bugfix (TDD).
+Relato do dono: todas as entradas pendentes eram EVIDENCE, FAILED, ~30 tentativas, "Sem conexão com o servidor".
+
+**Diagnóstico:** monitor da porta 8090 mostrou o celular (`10.109.3.47`) conectando, mas nenhuma evidência nem
+operação de sync gravada. Causa no código do Expo 57: `expo/src/winter/runtime.native.ts` troca o `fetch` global
+pelo `expo/fetch` (salvo `EXPO_PUBLIC_USE_RN_FETCH`), cujo `convertFormDataAsync` só aceita parte string, `Blob` ou
+objeto com `bytes()`. O `{ uri, name, type }` do React Native lança `Unsupported FormDataPart implementation` antes
+de abrir a conexão, e o `ApiClient` traduz como `NETWORK_UNAVAILABLE`. Por isso o upload de foto **nunca** funcionou
+no aparelho — EVIDENCE-URI-EXPO-GO e SYNC-OUTBOX-EVIDENCE não tinham sido testados no celular.
+
+**Implementado:** `ApiClient.upload` (nativo) anexa `{ name, type, bytes: () => new File(uri).bytes() }`
+(`expo-file-system` 57); web inalterado. Também: falha do push grava o motivo em `last_error` (commit `e9020e4`).
+
+**Testes:** novo em `src/services/api-client.test.ts` usando o `convertFormDataAsync` real do Expo — RED com a mesma
+mensagem do aparelho, GREEN após a correção. Mock de `expo-file-system` ganhou `bytes()`. `npx jest` **444/444**;
+typecheck/lint só com os pré-existentes. `inspection-detail-screen` › "ASSIGNED oferece iniciar…" falhou 1 vez na
+suíte completa e passou isolado 2× (mesma instabilidade de MOBILE-PREEXISTING-CHECKS).
+
+**Não executado:** confirmação no aparelho (precisa recarregar o app).
+
+### CONFLICT-REBASE-2026-10-21 — toda alteração e evidência presas em FAILED/CONFLICT
+
+Data: 2026-10-21. Branch: `task/sync-evidence-response-link`. Tipo: bugfix (TDD).
+Relato do dono: "todas as alterações estão retornando failed/conflict e todas as evidencias estão retornando failed".
+
+**Diagnóstico (banco real, `sync_operations`, somente leitura):** só 3 operações chegaram ao servidor — START
+APPLIED, 1ª resposta do item `46182fe2…` APPLIED (versão 0) e, 0,5 s depois, a 2ª edição do mesmo item CONFLICT
+(app mandou base 1). Causa: criar a resposta **não** incrementa a versão no servidor, mas o app somava 1. Efeito em
+cascata: `SynchronizationService.push` devolve `DEPENDENCY_FAILED` (não gravado) para o resto da inspeção depois de
+um CONFLICT, e a entrada em conflito é a mais antiga → todo envio seguinte da inspeção falha; as evidências esperam
+as respostas ("Aguardando…") e ficam FAILED.
+
+**Implementado (mobile):**
+- `use-checklist.ts`: item sem resposta segue 0, 0, 1, 2… (antes 0, 1, 2…); `pending-overlay.ts`: resposta nova
+  pendente nasce na versão 0.
+- `sync-service.ts` + `rebaseOutboxEntry` (`local-db.ts`): CONFLICT de INSPECTION_RESPONSE → lê a versão atual
+  (`GET /mobile/inspections/{id}`), refaz em ordem a base de todas as edições pendentes do item (novo operationId,
+  mesmo `created_at`) e reenvia uma vez na mesma sincronização. Destrava sozinho o que já está preso no aparelho.
+
+**Testes:** `__tests__/sync-conflict-rebase.test.ts` novo (6, servidor fictício com as regras do backend), +1 em
+`pending-overlay`; ajustadas 3 expectativas que codificavam a premissa errada (2ª edição de item novo com base 1;
+resposta nova pendente com versão 1). RED visto antes da implementação. `npx jest` **441/441, 37 suítes**;
+typecheck/lint só com os pré-existentes. Mock do SQLite passou a ordenar por `created_at` e a suportar o rebase.
+
+**Não executado:** confirmação no aparelho/backend real de que a entrada presa se recupera (próxima sincronização
+com o app atualizado). Nenhum dado do banco foi alterado no diagnóstico.
+
+### SYNC-EVIDENCE-LINK-2026-10-21 — vínculo da evidência, recusas definitivas e ordem da conclusão
+
+Data: 2026-10-21. Branch: `task/sync-evidence-response-link` (a partir de `task/sync-outbox-nc`). Tipo: bugfix (TDD).
+Pedido: "continue a implementação da feature de offline first". Decisões do dono: vínculo resolvido no mobile;
+recusa definitiva vira REJECTED com descarte manual (ver `decisions.md` 2026-10-21).
+
+**Implementado (só mobile, API inalterada):**
+- Achado 2: `queueEvidence` guarda `inspectionItemId` e ignora `responseId` `local-…`; `syncEvidenceEntries` resolve
+  o id da resposta via `GET /mobile/inspections/{id}` depois do push e espera resposta/NC ainda no outbox.
+  `preview.tsx` passa `inspectionItemId`.
+- Achado 3: `useEvidences` expõe as fotos do outbox (`pending`); o resumo usa `withPendingEvidences`
+  (`pending-overlay.ts`) na avaliação de conclusão.
+- Achado 5: status `REJECTED` (`local-db.ts`); push REJECTED e upload 4xx definitivo param de ser reenviados; aba
+  Sincronização lista cada recusa com motivo e "Descartar" (`discardOutboxEntry`, apaga a foto).
+- Encontrado na tarefa: o backend exige a evidência para concluir; `syncPending` agora envia conclusões (SUBMITTED)
+  depois do upload das fotos, e segura a conclusão se ainda houver foto da inspeção no aparelho.
+- `settleQueuedOperation` lê a entrada por id (`getOutboxEntry`) para enxergar REJECTED.
+
+**Testes:** `__tests__/sync-evidence-link.test.ts` novo (21 casos) + 1 em `summary-nc-screens` + 1 em `sync-screen`,
+todos vistos falhando antes da implementação. 4 testes existentes ajustados porque descreviam o comportamento
+antigo que o dono mandou mudar (REJECTED → FAILED/continuava na fila). `npx jest`: **434/434, 36 suítes**.
+`npm run typecheck` e `npm run lint`: só os erros pré-existentes (MOBILE-PREEXISTING-CHECKS); o erro de lint de
+`sync.tsx` mudou de linha (40 → 52) por causa dos imports novos, mesma causa.
+
+**Não executado:** teste ponta a ponta no aparelho com backend real (offline → reconectar → foto vinculada →
+conclusão aceita). Backend não alterado, então `./mvnw verify` não foi rodado.
+
+**Não implementado (fora do escopo):** UI de resolução de CONFLICT; achado 1 (textos desatualizados em
+`CLAUDE.md`/`ESTADO-DO-PROJETO.md`), achados 4 e 6.
 
 ### CORS-ANY-ORIGIN-LOCAL-2026-10-20 — perfil local aceita qualquer origem
 

@@ -18,16 +18,23 @@ import { syncPendingIfOnline } from '@/services/sync-service';
  */
 export default function EvidencePreviewScreen() {
   const router = useRouter();
-  const { inspectionId, captureId, description, origin, responseId, nonConformityId } =
-    useLocalSearchParams<{
-      inspectionId: string;
-      captureId: string;
-      description?: string;
-      origin?: string;
-      inspectionItemId?: string;
-      responseId?: string;
-      nonConformityId?: string;
-    }>();
+  const {
+    inspectionId,
+    captureId,
+    description,
+    origin,
+    inspectionItemId,
+    responseId,
+    nonConformityId,
+  } = useLocalSearchParams<{
+    inspectionId: string;
+    captureId: string;
+    description?: string;
+    origin?: string;
+    inspectionItemId?: string;
+    responseId?: string;
+    nonConformityId?: string;
+  }>();
   const uri = readCapture(captureId);
 
   const [sending, setSending] = useState(false);
@@ -50,6 +57,7 @@ export default function EvidencePreviewScreen() {
           inspectionId,
           fileUri: uri,
           description,
+          inspectionItemId,
           responseId,
           nonConformityId,
           location,
@@ -85,7 +93,7 @@ export default function EvidencePreviewScreen() {
 
   const linkLabel = nonConformityId
     ? 'Vinculada à não conformidade'
-    : responseId
+    : responseId || inspectionItemId
       ? 'Vinculada à resposta do item'
       : 'Vinculada à inspeção';
 

@@ -8,6 +8,7 @@
  */
 
 import type {
+  Evidence,
   Inspection,
   InspectionDetail,
   InspectionResponse,
@@ -34,6 +35,54 @@ function inOrder(rows: OutboxRow[]): OutboxRow[] {
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
+}
+
+/** Prefixo do id dado a uma resposta que só existe no outbox. */
+export const LOCAL_RESPONSE_PREFIX = 'local-';
+
+export function isLocalResponseId(id: string): boolean {
+  return id.startsWith(LOCAL_RESPONSE_PREFIX);
+}
+
+/**
+ * Fotos ainda no outbox somadas às evidências do servidor, cada uma ligada à
+ * resposta do seu item (inclusive a resposta `local-…`). Sem isso, um item com
+ * evidência obrigatória bloquearia a conclusão offline mesmo com a foto tirada.
+ */
+export function withPendingEvidences(
+  evidences: readonly Evidence[],
+  rows: OutboxRow[],
+  responses: readonly InspectionResponse[],
+): Evidence[] {
+  const pending = inOrder(rows)
+    .filter((row) => row.entity_type === 'EVIDENCE')
+    .flatMap((row): Evidence[] => {
+      const payload = parse(row);
+      if (!payload) return [];
+      const itemId = asString(payload.inspectionItemId);
+      const responseId =
+        asString(payload.responseId) ??
+        (itemId
+          ? (responses.find((response) => response.inspectionItemId === itemId)?.id ?? null)
+          : null);
+      const capturedAt = asString(payload.capturedAtDevice) ?? row.created_at;
+      return [
+        {
+          id: row.entity_id,
+          inspectionId: row.inspection_id,
+          responseId,
+          nonConformityId: asString(payload.nonConformityId),
+          type: 'PHOTO',
+          mimeType: 'image/jpeg',
+          sizeBytes: 0,
+          description: asString(payload.description),
+          capturedAtDevice: capturedAt,
+          createdAt: capturedAt,
+        },
+      ];
+    });
+
+  return [...evidences, ...pending];
 }
 
 export function applyPendingToDetail(
@@ -112,7 +161,7 @@ function mergeResponse(
 
   const merged: InspectionResponse = {
     ...(existing ?? {
-      id: `local-${itemId}`,
+      id: `${LOCAL_RESPONSE_PREFIX}${itemId}`,
       inspectionItemId: itemId,
       createdAt: row.created_at,
     }),
@@ -126,7 +175,8 @@ function mergeResponse(
       (asString(payload.conformity) as InspectionResponse['conformity']) ?? existing?.conformity,
     answeredAtDevice: existing?.answeredAtDevice ?? row.created_at,
     updatedAt: row.created_at,
-    version: row.base_version + 1,
+    // Criar não incrementa no servidor: a resposta nova nasce na versão 0.
+    version: existing ? row.base_version + 1 : 0,
   } as InspectionResponse;
 
   return existing

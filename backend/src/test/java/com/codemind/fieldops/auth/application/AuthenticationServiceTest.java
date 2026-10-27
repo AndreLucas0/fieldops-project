@@ -72,7 +72,7 @@ class AuthenticationServiceTest {
 	@Test
 	void loginWithValidCredentialsIssuesAccessAndRefreshTokensForActiveUser() {
 		User user = activeUser(UserStatus.ACTIVE);
-		when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+		when(userRepository.findByEmailIgnoreCase(user.getEmail())).thenReturn(Optional.of(user));
 		when(passwordEncoder.matches(RAW_PASSWORD, PASSWORD_HASH)).thenReturn(true);
 		Jwt accessJwt = fakeJwt("access-jwt");
 		Jwt refreshJwt = fakeJwt("refresh-jwt");
@@ -89,7 +89,7 @@ class AuthenticationServiceTest {
 	@Test
 	void loginWithWrongPasswordThrowsBadCredentials() {
 		User user = activeUser(UserStatus.ACTIVE);
-		when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+		when(userRepository.findByEmailIgnoreCase(user.getEmail())).thenReturn(Optional.of(user));
 		when(passwordEncoder.matches(eq("wrong-password"), eq(PASSWORD_HASH))).thenReturn(false);
 
 		assertThatThrownBy(() -> authenticationService.login(user.getEmail(), "wrong-password"))
@@ -98,7 +98,7 @@ class AuthenticationServiceTest {
 
 	@Test
 	void loginWithUnknownEmailThrowsTheSameBadCredentialsAsWrongPassword() {
-		when(userRepository.findByEmail("unknown@fieldops.local")).thenReturn(Optional.empty());
+		when(userRepository.findByEmailIgnoreCase("unknown@fieldops.local")).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> authenticationService.login("unknown@fieldops.local", RAW_PASSWORD))
 			.isInstanceOf(BadCredentialsException.class)
@@ -108,7 +108,7 @@ class AuthenticationServiceTest {
 	@Test
 	void loginWithCorrectPasswordButInactiveUserThrowsDisabledException() {
 		User user = activeUser(UserStatus.INACTIVE);
-		when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+		when(userRepository.findByEmailIgnoreCase(user.getEmail())).thenReturn(Optional.of(user));
 		when(passwordEncoder.matches(RAW_PASSWORD, PASSWORD_HASH)).thenReturn(true);
 
 		assertThatThrownBy(() -> authenticationService.login(user.getEmail(), RAW_PASSWORD))
@@ -118,7 +118,7 @@ class AuthenticationServiceTest {
 	@Test
 	void loginWithCorrectPasswordButBlockedUserThrowsLockedException() {
 		User user = activeUser(UserStatus.BLOCKED);
-		when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+		when(userRepository.findByEmailIgnoreCase(user.getEmail())).thenReturn(Optional.of(user));
 		when(passwordEncoder.matches(RAW_PASSWORD, PASSWORD_HASH)).thenReturn(true);
 
 		assertThatThrownBy(() -> authenticationService.login(user.getEmail(), RAW_PASSWORD))
@@ -141,6 +141,17 @@ class AuthenticationServiceTest {
 		assertThat(result.accessToken()).isEqualTo("new-access-jwt");
 		assertThat(result.refreshToken()).isEqualTo("new-refresh-jwt");
 		assertThat(result.expiresInSeconds()).isEqualTo(900);
+	}
+
+	@Test
+	void refreshWithMalformedSubjectThrowsBadCredentials() {
+		Jwt decodedRefreshToken = mock(Jwt.class);
+		when(decodedRefreshToken.getSubject()).thenReturn("not-a-uuid");
+		when(refreshTokenDecoder.decode("malformed-refresh-token")).thenReturn(decodedRefreshToken);
+
+		assertThatThrownBy(() -> authenticationService.refresh("malformed-refresh-token"))
+			.isInstanceOf(BadCredentialsException.class)
+			.hasMessage(AuthenticationService.INVALID_CREDENTIALS_MESSAGE);
 	}
 
 	@Test

@@ -65,7 +65,12 @@ public class AuthenticationService {
 			throw new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE, ex);
 		}
 
-		UUID userId = UUID.fromString(decoded.getSubject());
+		UUID userId;
+		try {
+			userId = UUID.fromString(decoded.getSubject());
+		} catch (IllegalArgumentException ex) {
+			throw new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE, ex);
+		}
 		User user = userRepository.findById(userId)
 			.orElseThrow(() -> new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE));
 

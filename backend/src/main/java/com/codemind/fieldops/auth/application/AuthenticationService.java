@@ -65,9 +65,14 @@ public class AuthenticationService {
 			throw new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE, ex);
 		}
 
+		String subject = decoded.getSubject();
+		if (subject == null || subject.isBlank()) {
+			throw new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE);
+		}
+
 		UUID userId;
 		try {
-			userId = UUID.fromString(decoded.getSubject());
+			userId = UUID.fromString(subject);
 		} catch (IllegalArgumentException ex) {
 			throw new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE, ex);
 		}

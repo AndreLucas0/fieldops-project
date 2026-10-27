@@ -155,6 +155,16 @@ class AuthenticationServiceTest {
 	}
 
 	@Test
+	void refreshWithoutSubjectThrowsBadCredentials() {
+		Jwt decodedRefreshToken = mock(Jwt.class);
+		when(refreshTokenDecoder.decode("missing-subject-token")).thenReturn(decodedRefreshToken);
+
+		assertThatThrownBy(() -> authenticationService.refresh("missing-subject-token"))
+			.isInstanceOf(BadCredentialsException.class)
+			.hasMessage(AuthenticationService.INVALID_CREDENTIALS_MESSAGE);
+	}
+
+	@Test
 	void logoutInvalidatesAllExistingSessionsForTheUser() {
 		User user = activeUser(UserStatus.ACTIVE);
 		Instant before = user.getSessionValidAfter();

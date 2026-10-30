@@ -9,6 +9,16 @@ Frontend ↔ Backend contract + screen audit completed (2026-10-02, see `docs/au
 Auditoria completa do código 2026-10-13 concluída; inventários de telas criados em `project-state/pending-web.md` e `project-state/pending-mobile.md`.
 Integração incremental Frontend ↔ Backend com TDD em andamento.
 
+### KANBAN-RECONCILE-2026-10-30 — quadro do GitHub Project 16 alinhado ao código
+
+Data: 2026-10-30. Branch: `task/kanban-reconcile`. Tipo: gestão do backlog (sem mudança de código do produto).
+
+**Feito:** 6 issues reabertas por falta de entrega (#1, #6, #7, #8, #23, #78); 125 issues movidas para Done, com a evidência em comentário; 16 títulos corrigidos no quadro e em `github-kanban/backlog.yaml`; #7 passou a citar `Closes #N`; 11 cards novos (US-35, #280–#290) para as pendências sem card; #20 voltou para In Progress.
+
+**Não feito de propósito:** #26 segue aberta porque #28 (perfil de produção) está pendente; #111 segue aberta porque `CancelInspectionRequest.reason` não é obrigatório; #3 e #4 seguem em Done apesar da entrega parcial; #116, #141, #143, #170, #199 e #223 não foram movidas por falta de comprovação; os cards novos ficaram sem iteração porque as 8 do projeto estão concluídas.
+
+**Validação:** consulta ao GitHub depois da execução: 263 itens, status coerente com o estado da issue, títulos iguais aos do YAML, 0 falhas no script. Testes do produto não executados (sem mudança de código). `sync_backlog.py` não foi executado: Python indisponível neste ambiente.
+
 ### EVIDENCE-EXPO-FETCH-2026-10-21 — foto nunca saía do aparelho ("Sem conexão com o servidor")
 
 Data: 2026-10-21. Branch: `task/sync-evidence-response-link`. Tipo: bugfix (TDD).

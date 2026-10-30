@@ -1283,3 +1283,16 @@ Implementado e verde, **não commitado**, no working tree da branch `task/sync-o
 pendências, aviso `detalhe-pendente`, pull na sincronização geral (`syncPendingIfOnline` sem `inspectionId`), rota de
 pull no mock e 5 arquivos de teste. Validação no momento da interrupção: `npx jest` **412/412, 35 suítes**; typecheck e
 lint só com os erros pré-existentes (MOBILE-PREEXISTING-CHECKS). Afetado pelo item 2 (ids `local-…`).
+
+---
+
+## DOCS-STATE-STALE — documentos de estado divergem do código
+
+Status: PENDING
+
+Description (conciliação do quadro, 2026-10-30):
+- `CLAUDE.md` §2, `ESTADO-DO-PROJETO.md` §5/§10 e `pending-mobile.md` ainda descrevem outbox só de respostas; os dois últimos também dizem que não há pull. Este arquivo e o código registram que isso foi entregue.
+- `pending-web.md` FE-W15 diz que publicar modelo funciona, mas `web/src/app/features` não tem ação de publicar (card #98).
+- `pending-web.md` mantém F13–F15 abertas, embora WEB-NESTED-PAGE as tenha resolvido.
+
+Classificação: documentação; tarefa dedicada.

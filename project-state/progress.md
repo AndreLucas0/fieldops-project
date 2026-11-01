@@ -1071,4 +1071,12 @@ não foi adicionada geração de imagem ou etiqueta, ausente do contrato MVP.
 Validação: suíte web completa (244 testes em 25 arquivos), build de produção,
 Prettier e `git diff --check` aprovados.
 
+### WEB-EQUIPMENT-MODEL-COLUMN-2026-11-01 — fabricante e modelo
+
+A listagem de equipamentos também exibe fabricante e modelo, dados existentes
+no contrato e presentes na referência visual. A documentação FE-W11 foi
+atualizada para registrar a coluna composta. Sem mudanças no serviço/API.
+Validação: 14 testes direcionados, suíte web completa (244 testes em 25
+arquivos), build de produção, Prettier e `git diff --check` aprovados.
+
 ---

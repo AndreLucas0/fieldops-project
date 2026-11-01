@@ -206,7 +206,8 @@ describe('CatalogListComponent', () => {
   });
 
   it('filtra não conformidades por criticidade', async () => {
-    const text = await render('non-conformities');
+    const fixture = await setup('non-conformities');
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Não conformidades');
     expect(text).toContain('Criticidade');
     expect(text).toContain('Inspeção Compressor');

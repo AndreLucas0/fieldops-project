@@ -374,6 +374,15 @@ describe('serviços fictícios da web', () => {
       expect(page.totalElements).toBe(1);
       expect(page.content[0].severity).toBe('CRITICAL');
     });
+
+    it('filtra por inspeção relacionada', async () => {
+      const page = await firstValueFrom(
+        TestBed.inject(NonConformitiesService).list({ inspectionId: INSPECTION_IDS.submitted }),
+      );
+
+      expect(page.totalElements).toBe(1);
+      expect(page.content[0].inspectionId).toBe(INSPECTION_IDS.submitted);
+    });
   });
 
   describe('DashboardService', () => {

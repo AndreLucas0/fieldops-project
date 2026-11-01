@@ -24,6 +24,10 @@
   font-weight: 500;
 }
 
+.fo-table__mono {
+  font-family: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', monospace;
+}
+
 /* Tabela larga rola sozinha, sem empurrar a página inteira. */
 .fo-table__viewport {
   width: 100%;

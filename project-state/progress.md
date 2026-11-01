@@ -1063,4 +1063,12 @@ Validação direcionada: 5 testes do componente aprovados; suíte web completa:
 244 testes em 25 arquivos; `npm run build`, Prettier e `git diff --check`
 aprovados.
 
+### WEB-EQUIPMENT-QR-COLUMN-2026-11-01 — código QR visível na lista
+
+A lista FE-W11 agora exibe `qrCode` como coluna monoespaçada, conforme a seção
+10.4 de `docs/telas-frontend.md`. A busca pelo endpoint de QR segue disponível;
+não foi adicionada geração de imagem ou etiqueta, ausente do contrato MVP.
+Validação: suíte web completa (244 testes em 25 arquivos), build de produção,
+Prettier e `git diff --check` aprovados.
+
 ---

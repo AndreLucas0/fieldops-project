@@ -415,6 +415,7 @@ export class CatalogListComponent {
       case 'equipment':
         return [
           { field: 'name', label: 'Equipamento', sortable: true },
+          { field: 'qrCode', label: 'Código QR', monospace: true, width: '9rem' },
           { field: 'assetNumber', label: 'Patrimônio', emptyText: '—' },
           { field: 'serialNumber', label: 'Nº de série', emptyText: '—' },
           {

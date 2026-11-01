@@ -77,6 +77,7 @@ export abstract class UsersService {
   abstract create(input: Partial<User> & { password?: string }): Observable<User>;
   abstract update(id: Uuid, input: Partial<User>): Observable<User>;
   abstract setStatus(id: Uuid, status: UserStatus): Observable<User>;
+  abstract resetPassword(id: Uuid): Observable<{ message: string }>;
 }
 
 export abstract class ClientsService {
@@ -190,6 +191,9 @@ export class HttpUsersService extends UsersService {
   }
   setStatus(id: Uuid, status: UserStatus) {
     return this.api.patch<User>(`/users/${id}/status`, { status });
+  }
+  resetPassword(id: Uuid) {
+    return this.api.post<{ message: string }>(`/users/${id}/reset-password`);
   }
 }
 

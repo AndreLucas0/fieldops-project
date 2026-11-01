@@ -1006,3 +1006,37 @@ direcionados aprovados: 37 do mock/services, 6 de clientes e 10 de locais/listas
 Suíte completa aprovada após este incremento: 225 testes em 22 arquivos.
 
 ---
+
+### WEB-EQUIPMENT-ADMIN-2026-11-01 — cadastro, busca QR e situação
+
+FE-W11/12 agora inclui modal de cadastro/edição. A criação exige local ativo,
+nome e QR Code; a edição mantém `siteId` e QR imutáveis. Conflito de QR (RN-011)
+fica visível no formulário. A lista permite buscar por QR usando o endpoint
+existente e oferece edição, inativação, reativação e descomissionamento com
+confirmação, preservando registros e histórico.
+
+PEND-F01 agora permanece somente para a tela de usuário. Build de produção
+aprovado antes do último ajuste de testes; 12 testes direcionados de catálogo e
+formulário passaram. Suíte completa será repetida ao concluir esta rodada.
+
+---
+
+### WEB-USERS-ADMIN-2026-11-01 — cadastro, edição, status e redefinição
+
+FE-W03/04 agora inclui formulário em modal, validação conforme `UserCreateRequest`
+e `UserUpdateRequest`, permissões ADMIN e coluna de telefone. A senha inicial
+(8–255 caracteres) só é enviada na criação; a edição não a inclui. Ativação,
+inativação e bloqueio exigem confirmação. Redefinição chama
+`POST /users/{id}/reset-password` após confirmação e mostra a mensagem exata da
+API, preservando a pendência contratual sobre como a senha é redefinida.
+
+PEND-F01 foi resolvida também para FE-W04. O tema comum foi alinhado ao esquema
+carvão/âmbar do protótipo e o perfil de usuário passou a usar uma badge localizada.
+Nenhuma dependência ou contrato da API foi alterado; o serviço e o mock existentes
+foram ampliados para o endpoint de redefinição já documentado.
+
+Validação focada: 56 testes em 3 arquivos; suíte completa: 241 testes em 24
+arquivos; build de produção aprovado. A lista de clientes foi conferida em
+viewport móvel de 615 px, com rolagem horizontal confinada à tabela.
+
+---

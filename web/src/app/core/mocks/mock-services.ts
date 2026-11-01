@@ -164,6 +164,13 @@ export class MockUsersService extends MockBase implements UsersService {
   setStatus(id: Uuid, status: UserStatus): Observable<User> {
     return this.update(id, { status });
   }
+
+  resetPassword(id: Uuid): Observable<{ message: string }> {
+    return this.respond(() => {
+      this.require(findById(this.db.users, id), '/users', id);
+      return { message: 'Solicitação de redefinição de senha registrada.' };
+    });
+  }
 }
 
 @Injectable()

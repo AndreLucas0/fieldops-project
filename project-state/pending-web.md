@@ -77,11 +77,11 @@ Ressalva: sem shell, navegação para outras telas é impossível sem digitar UR
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
+| Status | **COMPLETA (2026-11-01)** |
 | Rota documentada | `/users` |
-| Serviço existente | `UsersService` em `resources.ts` (list, get, create, update, changeStatus) |
+| Serviço existente | `UsersService` em `resources.ts` (list, get, create, update, setStatus, resetPassword) |
 
-`UsersService` existe e aponta para `/users`. Nenhuma tela ou componente consome esse serviço. Rota ausente de `app.routes.ts`.
+`CatalogListComponent` implementa listagem, filtros, paginação e ações ADMIN para editar, mudar situação com confirmação e solicitar redefinição de senha.
 
 ---
 
@@ -89,10 +89,10 @@ Ressalva: sem shell, navegação para outras telas é impossível sem digitar UR
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
-| Rota documentada | **[A DEFINIR]** (modal sobre `/users` ou rota própria) |
+| Status | **COMPLETA (2026-11-01)** |
+| Rota documentada | Modal sobre `/users` (PEND-F01 resolvida) |
 
-Não existe componente. Depende de FE-W03.
+`UserFormDialogComponent` valida campos do contrato, exige senha com 8–255 caracteres só na criação e não envia senha ao atualizar. A mensagem da redefinição é apresentada como recebida; o mecanismo real permanece pendente em PEND-01.
 
 ---
 
@@ -365,13 +365,13 @@ Sem endpoint de backend definido (PEND-08 — escopo futuro). Mantida no invent�
 
 ---
 
-## Próximos passos recomendados
+## Próximos passos recomendados (inventário original de 2026-10-14; supersedido para telas já concluídas)
 
 Em ordem de desbloqueio:
 
 1. **WEB-SHELL** — menu lateral, logout, toasts. Desbloqueia navegação para todas as telas.
 2. ~~**WEB-DISPLAYORDER** — incluir `displayOrder` nos payloads do construtor.~~ — **RESOLVIDO 2026-10-14**.
 3. ~~**WEB-MOCK-AUTH** — mock de `/auth` para `npm start`.~~ — **RESOLVIDO 2026-10-14**.
-4. **FE-W03 + FE-W04** (Usuários) — menor dependência; bom ponto de entrada para cadastros.
+4. ~~**FE-W03 + FE-W04** (Usuários)~~ — concluídas em 2026-11-01; ver `progress.md`.
 5. **FE-W05–W12** (Clientes, Locais, Equipamentos) — dependem do shell; podem ser feitas em paralelo.
 6. **FE-W18–W21** (Inspeções e Revisão) — maior complexidade; dependem de cadastros e shell.

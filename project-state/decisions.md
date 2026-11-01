@@ -1142,3 +1142,79 @@ Status:
 ACTIVE
 
 ---
+
+### [2026-11-01] — Formulário de equipamento abre como modal na lista
+
+Context:
+FE-W12 não tinha rota definida no catálogo; FE-W12 precisa manter fixos o
+`siteId` e o `qrCode` após a criação, conforme a normalização do contrato.
+
+Decision:
+FE-W12 abre como modal sobre `/equipment`. Na criação, exige local ativo, nome e
+código QR; na edição, mostra local e QR como somente leitura.
+
+Reason:
+Mantém o padrão visual de FE-W06/09 e preserva o contexto dos equipamentos
+enquanto oferece os campos permitidos pelo DTO de atualização.
+
+Impact:
+PEND-F01 permanece somente para o formulário de usuário (FE-W04). A busca QR
+usa `GET /equipment/by-qr/{qrCode}`; conflitos de unicidade (RN-011) são
+apresentados no próprio formulário.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-11-01] — Formulário de usuário abre como modal e redefine senha via resposta da API
+
+Context:
+FE-W04 era a última tela afetada por PEND-F01. O contrato exige senha inicial
+apenas na criação (mínimo de 8 caracteres); atualização não aceita senha. O
+endpoint de redefinição retorna uma mensagem, mas a política de entrega não está
+definida (PEND-01 do contrato-backend-frontend).
+
+Decision:
+FE-W04 abre como modal sobre `/users`. A lista confirma alterações de situação
+e solicita redefinição antes de chamar a API. Após sucesso, a interface mostra
+exatamente `ResetPasswordResponse.message`, sem alegar um método de entrega ou
+exibir senha temporária.
+
+Reason:
+Mantém a lista como contexto e segue os campos e endpoints definidos sem
+inventar um fluxo de senha não estabelecido nos requisitos.
+
+Impact:
+PEND-F01 resolvida para usuários, clientes, locais e equipamentos. PEND-01
+continua em aberto para a política de redefinição e senha inicial.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-11-01] — Tema administrativo segue a paleta do protótipo
+
+Context:
+As telas de referência usam superfícies carvão, textos claros e ações âmbar.
+O shell e componentes Material existentes usavam superfícies claras e destaque
+azul, reduzindo a fidelidade visual das cinco listas administrativas.
+
+Decision:
+Configurar o tema Angular Material em modo escuro com tons neutros carvão e
+âmbar para ações primárias; aplicar as mesmas superfícies no shell e no fundo
+da aplicação.
+
+Reason:
+Alinha as listas e modais com a paleta visível no protótipo, conservando os
+componentes compartilhados e os pontos de quebra responsivos já existentes.
+
+Impact:
+O tema também se aplica às telas existentes do painel. Nenhuma lógica de
+negócio, dependência ou contrato de API foi alterado.
+
+Status:
+ACTIVE
+
+---

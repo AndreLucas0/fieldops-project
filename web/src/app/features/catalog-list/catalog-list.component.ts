@@ -52,6 +52,8 @@ import {
 } from '../../shared/components';
 import { NotificationService } from '../../core/notifications/notification.service';
 import { SiteFormDialogComponent } from '../sites/site-form-dialog.component';
+import { EquipmentFormDialogComponent } from '../equipment/equipment-form-dialog.component';
+import { UserFormDialogComponent } from '../users/user-form-dialog.component';
 
 type CatalogKey = 'users' | 'sites' | 'equipment' | 'non-conformities';
 type CatalogRow = User | InspectionSite | Equipment | NonConformity;
@@ -106,6 +108,18 @@ const PAGE_CONFIG: Record<
           <button actions matButton="filled" type="button" (click)="openSiteForm()">
             <mat-icon>add</mat-icon>
             Novo local
+          </button>
+        }
+        @if (kind() === 'users' && canWrite('users')) {
+          <button actions matButton="filled" type="button" (click)="openUserForm()">
+            <mat-icon>add</mat-icon>
+            Novo usuário
+          </button>
+        }
+        @if (kind() === 'equipment' && canWrite('equipment')) {
+          <button actions matButton="filled" type="button" (click)="openEquipmentForm()">
+            <mat-icon>add</mat-icon>
+            Novo equipamento
           </button>
         }
       </app-page-header>
@@ -165,6 +179,27 @@ const PAGE_CONFIG: Record<
             </mat-select>
           </mat-form-field>
         }
+        @if (kind() === 'equipment') {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="qr-search">
+            <mat-label>Buscar por QR</mat-label>
+            <input
+              matInput
+              [ngModel]="qrCode()"
+              (ngModelChange)="qrCode.set($event)"
+              (keydown.enter)="$event.preventDefault(); lookupQr()"
+              placeholder="Leia ou digite o código"
+            />
+            <button
+              matSuffix
+              mat-icon-button
+              type="button"
+              aria-label="Buscar equipamento pelo QR Code"
+              (click)="lookupQr()"
+            >
+              <mat-icon>qr_code_scanner</mat-icon>
+            </button>
+          </mat-form-field>
+        }
       </div>
       <app-data-table
         [columns]="columns()"
@@ -181,7 +216,7 @@ const PAGE_CONFIG: Record<
         (sortChange)="onSort($event)"
         (filterChange)="onFilter($event)"
         (rowAction)="onRowAction($event)"
-        (retry)="load()"
+        (retry)="retry()"
       />
     </section>
   `,
@@ -204,6 +239,9 @@ const PAGE_CONFIG: Record<
     .filters mat-form-field {
       flex: 1 1 14rem;
       max-width: 22rem;
+    }
+    .qr-search {
+      flex-basis: 18rem !important;
     }
   `,
 })
@@ -256,6 +294,8 @@ export class CatalogListComponent {
     null,
   );
   protected readonly severity = signal<NonConformityFilters['severity'] | null>(null);
+  protected readonly qrCode = signal('');
+  private readonly qrSearchActive = signal(false);
   private readonly params = signal<PageParams>({ page: 0, size: 20 });
   protected readonly sort = computed<Sort | null>(() => {
     const value = this.params().sort;
@@ -271,7 +311,8 @@ export class CatalogListComponent {
             field: 'role',
             label: 'Perfil',
             sortable: true,
-            format: (value) => roleName(String(value)),
+            type: 'badge',
+            badgeContext: 'userRole',
           },
           {
             field: 'status',
@@ -280,7 +321,46 @@ export class CatalogListComponent {
             badgeContext: 'user',
             align: 'center',
           },
+          { field: 'phone', label: 'Telefone', emptyText: '—' },
           { field: 'createdAt', label: 'Criado em', type: 'date', sortable: true },
+          {
+            field: 'actions',
+            label: 'Ações',
+            type: 'actions',
+            actions: [
+              {
+                id: 'edit-user',
+                label: 'Editar',
+                icon: 'edit',
+                visible: () => this.canWrite('users'),
+              },
+              {
+                id: 'activate-user',
+                label: 'Ativar',
+                icon: 'check_circle',
+                visible: (row) => this.canWrite('users') && (row as User).status !== 'ACTIVE',
+              },
+              {
+                id: 'deactivate-user',
+                label: 'Inativar',
+                icon: 'block',
+                visible: (row) => this.canWrite('users') && (row as User).status === 'ACTIVE',
+              },
+              {
+                id: 'block-user',
+                label: 'Bloquear',
+                icon: 'lock',
+                danger: true,
+                visible: (row) => this.canWrite('users') && (row as User).status !== 'BLOCKED',
+              },
+              {
+                id: 'reset-user-password',
+                label: 'Redefinir senha',
+                icon: 'key',
+                visible: () => this.canWrite('users'),
+              },
+            ],
+          },
         ];
       case 'sites':
         return [
@@ -345,6 +425,41 @@ export class CatalogListComponent {
             badgeContext: 'equipment',
             align: 'center',
           },
+          {
+            field: 'actions',
+            label: 'Ações',
+            type: 'actions',
+            actions: [
+              {
+                id: 'edit-equipment',
+                label: 'Editar',
+                icon: 'edit',
+                visible: () => this.canWrite('equipment'),
+              },
+              {
+                id: 'deactivate-equipment',
+                label: 'Inativar',
+                icon: 'block',
+                visible: (row) =>
+                  this.canWrite('equipment') && (row as Equipment).status === 'ACTIVE',
+              },
+              {
+                id: 'activate-equipment',
+                label: 'Ativar',
+                icon: 'check_circle',
+                visible: (row) =>
+                  this.canWrite('equipment') && (row as Equipment).status === 'INACTIVE',
+              },
+              {
+                id: 'decommission-equipment',
+                label: 'Descomissionar',
+                icon: 'archive',
+                danger: true,
+                visible: (row) =>
+                  this.canWrite('equipment') && (row as Equipment).status !== 'DECOMMISSIONED',
+              },
+            ],
+          },
         ];
       case 'non-conformities':
         return [
@@ -392,6 +507,8 @@ export class CatalogListComponent {
         label: this.kind() === 'sites' ? 'Cliente' : 'Local',
         value: 'Selecionado',
       });
+    if (this.qrSearchActive())
+      filters.push({ key: 'qrCode', label: 'QR Code', value: this.qrCode().trim() });
     return filters;
   });
   protected readonly emptyMessage = computed(() =>
@@ -410,6 +527,8 @@ export class CatalogListComponent {
         this.role.set(null);
         this.status.set(null);
         this.severity.set(null);
+        this.qrCode.set('');
+        this.qrSearchActive.set(false);
         this.params.set({ page: 0, size: 20 });
         this.load();
       });
@@ -417,6 +536,7 @@ export class CatalogListComponent {
   }
 
   protected load(): void {
+    this.qrSearchActive.set(false);
     const key = this.kind();
     this.loading.set(true);
     this.error.set(null);
@@ -531,6 +651,10 @@ export class CatalogListComponent {
     if (!filters.some((filter) => filter.key === 'role')) this.role.set(null);
     if (!filters.some((filter) => filter.key === 'status')) this.status.set(null);
     if (!filters.some((filter) => filter.key === 'severity')) this.severity.set(null);
+    if (!filters.some((filter) => filter.key === 'qrCode')) {
+      this.qrSearchActive.set(false);
+      this.qrCode.set('');
+    }
     const contextKey = this.kind() === 'sites' ? 'clientId' : 'siteId';
     if (this.contextId() && !filters.some((filter) => filter.key === contextKey)) {
       void this.router.navigate([], {
@@ -543,8 +667,24 @@ export class CatalogListComponent {
     this.refreshFirstPage();
   }
 
-  protected canWrite(resource: 'sites' | 'equipment'): boolean {
+  protected canWrite(resource: 'users' | 'sites' | 'equipment'): boolean {
     return canWrite(resource, this.auth.role());
+  }
+
+  protected openUserForm(user?: User): void {
+    if (!this.canWrite('users')) return;
+    this.dialog
+      .open(UserFormDialogComponent, {
+        data: { user: user ?? null },
+        width: '40rem',
+        maxWidth: '95vw',
+        autoFocus: 'first-tabbable',
+        restoreFocus: true,
+      })
+      .afterClosed()
+      .subscribe((saved: boolean | undefined) => {
+        if (saved) this.load();
+      });
   }
 
   protected openSiteForm(site?: InspectionSite): void {
@@ -563,20 +703,158 @@ export class CatalogListComponent {
       });
   }
 
+  protected openEquipmentForm(equipment?: Equipment): void {
+    if (!this.canWrite('equipment')) return;
+    this.dialog
+      .open(EquipmentFormDialogComponent, {
+        data: { equipment: equipment ?? null },
+        width: '48rem',
+        maxWidth: '95vw',
+        autoFocus: 'first-tabbable',
+        restoreFocus: true,
+      })
+      .afterClosed()
+      .subscribe((saved: boolean | undefined) => {
+        if (saved) this.load();
+      });
+  }
+
+  protected lookupQr(): void {
+    if (this.kind() !== 'equipment' || this.loading()) return;
+    const code = this.qrCode().trim();
+    if (!code) return;
+    this.loading.set(true);
+    this.error.set(null);
+    this.equipment
+      .getByQrCode(code)
+      .pipe(
+        catchError((thrown: unknown) => {
+          this.qrSearchActive.set(true);
+          this.error.set(isApiError(thrown) ? thrown : null);
+          if (!isApiError(thrown))
+            this.notifications.error('Não foi possível consultar o QR Code.');
+          return of(null);
+        }),
+        finalize(() => this.loading.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((equipment) => {
+        if (!equipment) return;
+        this.qrSearchActive.set(true);
+        this.data.set({ content: [equipment], totalElements: 1, totalPages: 1, page: 0, size: 1 });
+        this.resolveSites([equipment]);
+      });
+  }
+
+  protected retry(): void {
+    if (this.kind() === 'equipment' && this.qrSearchActive()) this.lookupQr();
+    else this.load();
+  }
+
   protected onRowAction(event: RowActionEvent<CatalogRow>): void {
-    if (this.kind() !== 'sites') return;
-    const site = event.row as InspectionSite;
-    if (event.action === 'view-equipment') {
-      void this.router.navigate(['/equipment'], { queryParams: { siteId: site.id } });
+    if (this.kind() === 'users') {
+      if (!this.canWrite('users')) return;
+      const user = event.row as User;
+      if (event.action === 'edit-user') this.openUserForm(user);
+      else if (event.action === 'reset-user-password') this.confirmPasswordReset(user);
+      else this.confirmUserStatus(user, event.action);
       return;
     }
-    if (!this.canWrite('sites')) return;
-    if (event.action === 'edit-site') {
-      this.openSiteForm(site);
+    if (this.kind() === 'sites') {
+      const site = event.row as InspectionSite;
+      if (event.action === 'view-equipment') {
+        void this.router.navigate(['/equipment'], { queryParams: { siteId: site.id } });
+        return;
+      }
+      if (!this.canWrite('sites')) return;
+      if (event.action === 'edit-site') {
+        this.openSiteForm(site);
+        return;
+      }
+      this.confirmSiteStatus(site, event.action);
+      return;
+    }
+    if (this.kind() !== 'equipment') return;
+    const equipment = event.row as Equipment;
+    if (!this.canWrite('equipment')) return;
+    if (event.action === 'edit-equipment') {
+      this.openEquipmentForm(equipment);
       return;
     }
 
-    const status = event.action === 'deactivate-site' ? 'INACTIVE' : 'ACTIVE';
+    this.confirmEquipmentStatus(equipment, event.action);
+  }
+
+  private confirmUserStatus(user: User, action: string): void {
+    const status =
+      action === 'activate-user'
+        ? 'ACTIVE'
+        : action === 'deactivate-user'
+          ? 'INACTIVE'
+          : action === 'block-user'
+            ? 'BLOCKED'
+            : null;
+    if (!status || status === user.status) return;
+    const label = status === 'ACTIVE' ? 'ativar' : status === 'INACTIVE' ? 'inativar' : 'bloquear';
+    this.confirmation
+      .open({
+        title: `${label[0].toUpperCase()}${label.slice(1)} usuário?`,
+        message:
+          status === 'ACTIVE'
+            ? `${user.name} poderá iniciar novas sessões novamente.`
+            : `${user.name} não poderá iniciar novas sessões. As sessões ativas serão invalidadas.`,
+        confirmLabel: `Sim, ${label}`,
+        variant: status === 'ACTIVE' ? 'primary' : 'warning',
+      })
+      .pipe(
+        filter((result) => result.confirmed),
+        switchMap(() => this.users.setStatus(user.id, status)),
+        catchError((thrown: unknown) => {
+          this.notifications.error(
+            isApiError(thrown) ? thrown.userMessage : 'Não foi possível atualizar o usuário.',
+          );
+          return of(null);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((updated) => {
+        if (!updated) return;
+        this.notifications.success(
+          `Usuário ${status === 'ACTIVE' ? 'ativado' : status === 'INACTIVE' ? 'inativado' : 'bloqueado'}.`,
+        );
+        this.load();
+      });
+  }
+
+  private confirmPasswordReset(user: User): void {
+    this.confirmation
+      .open({
+        title: 'Redefinir senha?',
+        message: `Solicitar redefinição de senha para ${user.name}?`,
+        confirmLabel: 'Solicitar redefinição',
+        variant: 'warning',
+      })
+      .pipe(
+        filter((result) => result.confirmed),
+        switchMap(() => this.users.resetPassword(user.id)),
+        catchError((thrown: unknown) => {
+          this.notifications.error(
+            isApiError(thrown)
+              ? thrown.userMessage
+              : 'Não foi possível solicitar a redefinição de senha.',
+          );
+          return of(null);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((response) => {
+        if (response) this.notifications.success(response.message);
+      });
+  }
+
+  private confirmSiteStatus(site: InspectionSite, action: string): void {
+    if (action !== 'deactivate-site' && action !== 'activate-site') return;
+    const status = action === 'deactivate-site' ? 'INACTIVE' : 'ACTIVE';
     const inactive = status === 'INACTIVE';
     this.confirmation
       .open({
@@ -601,6 +879,62 @@ export class CatalogListComponent {
       .subscribe((updated) => {
         if (!updated) return;
         this.notifications.success(inactive ? 'Local inativado.' : 'Local reativado.');
+        this.load();
+      });
+  }
+
+  private confirmEquipmentStatus(equipment: Equipment, action: string): void {
+    if (!['deactivate-equipment', 'activate-equipment', 'decommission-equipment'].includes(action))
+      return;
+    const status =
+      action === 'activate-equipment'
+        ? 'ACTIVE'
+        : action === 'decommission-equipment'
+          ? 'DECOMMISSIONED'
+          : 'INACTIVE';
+    const title =
+      status === 'DECOMMISSIONED'
+        ? 'Descomissionar equipamento?'
+        : status === 'INACTIVE'
+          ? 'Inativar equipamento?'
+          : 'Reativar equipamento?';
+    const message =
+      status === 'ACTIVE'
+        ? `${equipment.name} poderá voltar a ser selecionado em novas inspeções.`
+        : `${equipment.name} não poderá ser selecionado em novas inspeções. O histórico será preservado.`;
+    this.confirmation
+      .open({
+        title,
+        message,
+        confirmLabel:
+          status === 'ACTIVE'
+            ? 'Sim, reativar'
+            : status === 'INACTIVE'
+              ? 'Sim, inativar'
+              : 'Sim, descomissionar',
+        variant: status === 'ACTIVE' ? 'primary' : 'warning',
+      })
+      .pipe(
+        filter((result) => result.confirmed),
+        switchMap(() => this.equipment.setStatus(equipment.id, status)),
+        catchError((thrown: unknown) => {
+          this.notifications.error(
+            isApiError(thrown) ? thrown.userMessage : 'Não foi possível atualizar o equipamento.',
+          );
+          return of(null);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((updated) => {
+        if (!updated) return;
+        this.notifications.success(
+          status === 'ACTIVE'
+            ? 'Equipamento reativado.'
+            : status === 'INACTIVE'
+              ? 'Equipamento inativado.'
+              : 'Equipamento descomissionado.',
+        );
+        this.qrSearchActive.set(false);
         this.load();
       });
   }

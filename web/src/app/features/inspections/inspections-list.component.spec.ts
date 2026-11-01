@@ -17,6 +17,8 @@ import { InspectionsListComponent } from './inspections-list.component';
 interface ListInternals {
   columns: () => readonly {
     field: string;
+    label: string;
+    format?: (value: unknown, row: Inspection) => string;
     actions?: readonly { id: string; visible?: (row: Inspection) => boolean }[];
   }[];
   setStatus(value: InspectionStatus | null): void;
@@ -77,6 +79,19 @@ describe('InspectionsListComponent', () => {
     expect(text).toContain('Técnico');
     expect(text).toContain('Agendada para');
     expect(text).toContain('Estado');
+  });
+
+  it('identifica na coluna Prazo as inspeções atrasadas', async () => {
+    const { component } = await render();
+    const format = component.columns().find((c) => c.label === 'Prazo')!.format!;
+    const past = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 - 60_000).toISOString();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    expect(format(undefined, { status: 'ASSIGNED', scheduledFor: past } as Inspection)).toContain(
+      'Atrasada há 3 dias',
+    );
+    expect(format(undefined, { status: 'ASSIGNED', scheduledFor: future } as Inspection)).toBe('—');
+    expect(format(undefined, { status: 'APPROVED', scheduledFor: past } as Inspection)).toBe('—');
   });
 
   it('envia o estado ao serviço e volta para a primeira página', async () => {

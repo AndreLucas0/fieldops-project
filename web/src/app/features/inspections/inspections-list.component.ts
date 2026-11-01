@@ -31,6 +31,7 @@ import {
   type TableColumn,
 } from '../../shared/components';
 import { InspectionCancelDialogComponent } from './inspection-cancel-dialog.component';
+import { overdueLabel } from './inspection-overdue';
 
 /** Um item por valor de `INSPECTION_STATUSES` (shared/src/domain/enums.ts). */
 const STATUS_OPTIONS: readonly { value: InspectionStatus; label: string }[] = [
@@ -207,6 +208,8 @@ export class InspectionsListComponent {
   protected readonly from = signal('');
   protected readonly to = signal('');
   private readonly params = signal<PageParams>({ page: 0, size: 20 });
+  /** Instante usado para marcar atrasos; renovado a cada busca, não a cada render. */
+  private readonly now = signal(new Date());
 
   protected readonly sort = computed(() => {
     const sort = this.params().sort;
@@ -229,6 +232,11 @@ export class InspectionsListComponent {
         format: (value) => technicianNames.get(String(value)) ?? '—',
       },
       { field: 'scheduledFor', label: 'Agendada para', type: 'date', sortable: true },
+      {
+        field: 'overdue',
+        label: 'Prazo',
+        format: (_value, row) => overdueLabel(row, this.now()),
+      },
       { field: 'status', label: 'Estado', type: 'badge', badgeContext: 'inspection', align: 'center' },
       {
         field: 'actions',
@@ -284,6 +292,7 @@ export class InspectionsListComponent {
   }
 
   protected load(): void {
+    this.now.set(new Date());
     this.loading.set(true);
     this.error.set(null);
     this.inspections

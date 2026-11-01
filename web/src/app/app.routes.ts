@@ -2,29 +2,32 @@ import type { Route, Routes } from '@angular/router';
 
 import { authGuard, guestGuard } from './core/auth/auth.guard';
 
-function placeholderRoute(path: string, title: string, subtitle: string): Route {
+const ADMIN_FEATURE_ROUTES: Routes = [
+  {
+    path: 'clients',
+    title: 'Clientes — FieldOps',
+    loadComponent: () =>
+      import('./features/clients/clients-list.component').then(
+        (module) => module.ClientsListComponent,
+      ),
+  },
+  catalogRoute('sites', 'Locais'),
+  catalogRoute('equipment', 'Equipamentos'),
+  catalogRoute('users', 'Usuários'),
+  catalogRoute('non-conformities', 'Não conformidades'),
+];
+
+function catalogRoute(path: string, title: string): Route {
   return {
     path,
     title: `${title} — FieldOps`,
-    data: { title, subtitle },
+    data: { catalog: path },
     loadComponent: () =>
-      import('./features/feature-placeholder/feature-placeholder.component').then(
-        (module) => module.FeaturePlaceholderComponent,
+      import('./features/catalog-list/catalog-list.component').then(
+        (module) => module.CatalogListComponent,
       ),
   };
 }
-
-const PLACEHOLDER_ROUTES: Routes = [
-  placeholderRoute('clients', 'Clientes', 'Empresas atendidas e seus locais.'),
-  placeholderRoute('sites', 'Locais', 'Locais vinculados aos clientes.'),
-  placeholderRoute('equipment', 'Equipamentos', 'Equipamentos vinculados aos locais.'),
-  placeholderRoute('users', 'Usuários', 'Acessos administrativos e operacionais.'),
-  placeholderRoute(
-    'non-conformities',
-    'Não conformidades',
-    'Desvios registrados durante as inspeções.',
-  ),
-];
 
 /** Rotas públicas e a área autenticada do painel administrativo. */
 export const routes: Routes = [
@@ -66,7 +69,7 @@ export const routes: Routes = [
             (module) => module.TemplateBuilderComponent,
           ),
       },
-      ...PLACEHOLDER_ROUTES,
+      ...ADMIN_FEATURE_ROUTES,
       { path: '**', redirectTo: 'dashboard' },
     ],
   },

@@ -22,17 +22,20 @@ src/app/
 ├── shared/components/       tabela, badges, diálogos e estados reutilizáveis
 └── features/
     ├── shell/               navegação autenticada e cabeçalho responsivo
-    ├── feature-placeholder/ rotas prontas para implementação paralela
+    ├── catalog-list/        usuários, locais, equipamentos e não conformidades
+    ├── clients/             lista de clientes
+    ├── feature-placeholder/ demais rotas ainda em preparação
     ├── dashboard/           FE-W02
     ├── login/               FE-W01
     └── templates/           FE-W13 e FE-W15
 ```
 
 A área autenticada usa um shell compartilhado. Em telas estreitas, a navegação
-lateral vira um menu recolhível; cada tela deve manter o conteúdo dentro da
-largura disponível. As rotas de clientes, locais, equipamentos, usuários e não
-conformidades já estão registradas e mostram um marcador temporário até serem
-substituídas pelas páginas funcionais.
+lateral vira um menu recolhível e as tabelas mantêm a rolagem horizontal dentro
+da própria área. As listas de clientes, locais, equipamentos, usuários e não
+conformidades estão conectadas aos serviços e mocks existentes, com filtros,
+paginação e estados de carregamento, vazio e erro. Formulários e ações de
+cadastro/edição ainda serão implementados conforme os contratos documentados.
 
 ## Regras para implementar telas
 

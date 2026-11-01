@@ -513,7 +513,7 @@ Formulário detalhado: seção 9.2.
 | Buscar por QR | ADMIN, SUPERVISOR | `GET /equipment/by-qr/{qrCode}` | — |
 | Abrir cadastro | ADMIN, SUPERVISOR | — (navegação/modal) | Abre FE-W12 — **[A DEFINIR]** |
 | Inativar/reativar/descomissionar | ADMIN, SUPERVISOR | `PATCH /equipment/{id}/status` | `EquipmentStatusUpdateRequest{status}` (`ACTIVE\|INACTIVE\|DECOMMISSIONED`) |
-| Ver histórico de inspeções | ADMIN, SUPERVISOR | *(P1 — `interface-admnistrativa-web.md` §14.7)* | — não integrado no MVP |
+| Ver histórico de inspeções | ADMIN, SUPERVISOR | `GET /inspections?equipmentId=&page=&size=&sort=` | Consulta somente leitura paginada; integrada ao diálogo de histórico |
 
 ---
 
@@ -1412,14 +1412,14 @@ Todo componente também renderiza, quando `required=true`, um indicador visual d
 
 | Coluna | Campo da API | Formatação |
 |---|---|---|
-| Nome | `name` | Texto |
-| Local | `siteId` (resolvido) | Texto |
-| Código QR | `qrCode` | Texto monoespaçado |
+| TAG | `name` | Texto |
+| Patrimônio | `assetNumber` | Texto |
+| Nº de série | `serialNumber` | Texto |
 | Fabricante / modelo | `manufacturer`/`model` | Texto |
-| Patrimônio/Nº de série | `assetNumber`/`serialNumber` | Texto |
+| Local | `siteId` (resolvido) | Texto |
 | Situação | `status` | Badge (`DECOMMISSIONED` também deve se distinguir visualmente de `INACTIVE`) |
 
-**Ações por linha:** editar, inativar/reativar/descomissionar, buscar por QR.
+**Ações por linha:** exibir QR Code gerado localmente a partir de `qrCode`, consultar histórico de inspeções, editar, inativar/reativar/descomissionar. Histórico usa `GET /inspections?equipmentId=...`; nenhuma escrita é feita por essas duas consultas.
 
 ## 10.5 FE-W13 — Modelos de inspeção
 

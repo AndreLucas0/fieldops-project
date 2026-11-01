@@ -59,7 +59,7 @@ export class AdminShellComponent {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly isMobile = toSignal(
-    this.breakpoints.observe('(max-width: 760px)').pipe(map((state) => state.matches)),
+    this.breakpoints.observe('(max-width: 1023px)').pipe(map((state) => state.matches)),
     { initialValue: false },
   );
   readonly user = this.authStore.user;

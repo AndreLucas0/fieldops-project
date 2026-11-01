@@ -1398,12 +1398,15 @@ Todo componente também renderiza, quando `required=true`, um indicador visual d
 
 | Coluna | Campo da API | Formatação |
 |---|---|---|
-| Nome | `name` | Texto |
+| Local | `name` | Texto |
 | Cliente | `clientId` (resolvido) | Texto |
-| Cidade/Estado | `city`/`state` | Texto |
+| Endereço | `addressLine`, `city`, `state` | `endereço — cidade/UF` |
+| Coordenadas | `latitude`, `longitude` | Duas casas decimais; `—` quando ausentes |
+| Contato | `contactName`, `contactPhone` | Nome em destaque e telefone abaixo |
+| Equipamentos | `GET /sites/{siteId}/equipment` | Total da página; link para FE-W10 |
 | Situação | `status` | Badge |
 
-**Ações por linha:** editar, inativar/reativar, ver equipamentos.
+**Ações por linha:** editar e inativar/reativar. A contagem de equipamentos abre FE-W10; escrita segue restrita a ADMIN.
 
 ## 10.4 FE-W11 — Equipamentos
 

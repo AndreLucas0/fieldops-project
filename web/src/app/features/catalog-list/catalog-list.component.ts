@@ -128,112 +128,114 @@ const PAGE_CONFIG: Record<
           </button>
         }
       </app-page-header>
-      <div class="filters" [attr.aria-label]="'Filtros de ' + config().title.toLowerCase()">
-        @if (kind() !== 'non-conformities') {
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>{{ kind() === 'users' ? 'Nome' : 'Buscar' }}</mat-label>
-            <input
-              matInput
-              [ngModel]="name()"
-              (ngModelChange)="setName($event)"
-              placeholder="Digite para buscar"
-            />
-          </mat-form-field>
-        }
-        @if (kind() === 'users') {
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>E-mail</mat-label>
-            <input
-              matInput
-              type="email"
-              [ngModel]="email()"
-              (ngModelChange)="setEmail($event)"
-              placeholder="nome@empresa.com"
-            />
-          </mat-form-field>
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Perfil</mat-label>
-            <mat-select [ngModel]="role()" (ngModelChange)="setRole($event)">
-              <mat-option [value]="null">Todos</mat-option>
-              <mat-option value="ADMIN">Administrador</mat-option>
-              <mat-option value="SUPERVISOR">Supervisor</mat-option>
-              <mat-option value="TECHNICIAN">Técnico</mat-option>
-              <mat-option value="CLIENT_VIEWER">Cliente</mat-option>
-            </mat-select>
-          </mat-form-field>
-        }
-        @if (kind() === 'users' || kind() === 'equipment') {
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Situação</mat-label>
-            <mat-select [ngModel]="status()" (ngModelChange)="setStatus($event)">
-              <mat-option [value]="null">Todas</mat-option>
-              @for (option of statusChoices(); track option.value) {
-                <mat-option [value]="option.value">{{ option.label }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-        }
-        @if (kind() === 'non-conformities') {
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Criticidade</mat-label>
-            <mat-select [ngModel]="severity()" (ngModelChange)="setSeverity($event)">
-              <mat-option [value]="null">Todas</mat-option>
-              @for (option of severityChoices; track option.value) {
-                <mat-option [value]="option.value">{{ option.label }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Inspeção</mat-label>
-            <mat-select [ngModel]="inspectionId()" (ngModelChange)="setInspectionId($event)">
-              <mat-option [value]="null">Todas as inspeções</mat-option>
-              @for (inspection of inspectionChoices(); track inspection.id) {
-                <mat-option [value]="inspection.id">
-                  {{ inspection.title || 'Inspeção ' + inspection.id.slice(0, 8) }}
-                </mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-        }
-        @if (kind() === 'equipment') {
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="qr-search">
-            <mat-label>Buscar por QR</mat-label>
-            <input
-              matInput
-              [ngModel]="qrCode()"
-              (ngModelChange)="qrCode.set($event)"
-              (keydown.enter)="$event.preventDefault(); lookupQr()"
-              placeholder="Leia ou digite o código"
-            />
-            <button
-              matSuffix
-              mat-icon-button
-              type="button"
-              aria-label="Buscar equipamento pelo QR Code"
-              (click)="lookupQr()"
-            >
-              <mat-icon>qr_code_scanner</mat-icon>
-            </button>
-          </mat-form-field>
-        }
+      <div class="catalog-card">
+        <div class="filters" [attr.aria-label]="'Filtros de ' + config().title.toLowerCase()">
+          @if (kind() !== 'non-conformities') {
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>{{ kind() === 'users' ? 'Nome' : 'Buscar' }}</mat-label>
+              <input
+                matInput
+                [ngModel]="name()"
+                (ngModelChange)="setName($event)"
+                placeholder="Digite para buscar"
+              />
+            </mat-form-field>
+          }
+          @if (kind() === 'users') {
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>E-mail</mat-label>
+              <input
+                matInput
+                type="email"
+                [ngModel]="email()"
+                (ngModelChange)="setEmail($event)"
+                placeholder="nome@empresa.com"
+              />
+            </mat-form-field>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Perfil</mat-label>
+              <mat-select [ngModel]="role()" (ngModelChange)="setRole($event)">
+                <mat-option [value]="null">Todos</mat-option>
+                <mat-option value="ADMIN">Administrador</mat-option>
+                <mat-option value="SUPERVISOR">Supervisor</mat-option>
+                <mat-option value="TECHNICIAN">Técnico</mat-option>
+                <mat-option value="CLIENT_VIEWER">Cliente</mat-option>
+              </mat-select>
+            </mat-form-field>
+          }
+          @if (kind() === 'users' || kind() === 'equipment') {
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Situação</mat-label>
+              <mat-select [ngModel]="status()" (ngModelChange)="setStatus($event)">
+                <mat-option [value]="null">Todas</mat-option>
+                @for (option of statusChoices(); track option.value) {
+                  <mat-option [value]="option.value">{{ option.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          }
+          @if (kind() === 'non-conformities') {
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Criticidade</mat-label>
+              <mat-select [ngModel]="severity()" (ngModelChange)="setSeverity($event)">
+                <mat-option [value]="null">Todas</mat-option>
+                @for (option of severityChoices; track option.value) {
+                  <mat-option [value]="option.value">{{ option.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Inspeção</mat-label>
+              <mat-select [ngModel]="inspectionId()" (ngModelChange)="setInspectionId($event)">
+                <mat-option [value]="null">Todas as inspeções</mat-option>
+                @for (inspection of inspectionChoices(); track inspection.id) {
+                  <mat-option [value]="inspection.id">
+                    {{ inspection.title || 'Inspeção ' + inspection.id.slice(0, 8) }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          }
+          @if (kind() === 'equipment') {
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="qr-search">
+              <mat-label>Buscar por QR</mat-label>
+              <input
+                matInput
+                [ngModel]="qrCode()"
+                (ngModelChange)="qrCode.set($event)"
+                (keydown.enter)="$event.preventDefault(); lookupQr()"
+                placeholder="Leia ou digite o código"
+              />
+              <button
+                matSuffix
+                mat-icon-button
+                type="button"
+                aria-label="Buscar equipamento pelo QR Code"
+                (click)="lookupQr()"
+              >
+                <mat-icon>qr_code_scanner</mat-icon>
+              </button>
+            </mat-form-field>
+          }
+        </div>
+        <app-data-table
+          [columns]="columns()"
+          [data]="data()"
+          [loading]="loading()"
+          [error]="error()"
+          [activeFilters]="activeFilters()"
+          [sort]="sort()"
+          [ariaLabel]="config().title"
+          [emptyIcon]="config().icon"
+          [emptyTitle]="'Nenhum registro encontrado'"
+          [emptyMessage]="emptyMessage()"
+          (pageChange)="onPage($event)"
+          (sortChange)="onSort($event)"
+          (filterChange)="onFilter($event)"
+          (rowAction)="onRowAction($event)"
+          (retry)="retry()"
+        />
       </div>
-      <app-data-table
-        [columns]="columns()"
-        [data]="data()"
-        [loading]="loading()"
-        [error]="error()"
-        [activeFilters]="activeFilters()"
-        [sort]="sort()"
-        [ariaLabel]="config().title"
-        [emptyIcon]="config().icon"
-        [emptyTitle]="'Nenhum registro encontrado'"
-        [emptyMessage]="emptyMessage()"
-        (pageChange)="onPage($event)"
-        (sortChange)="onSort($event)"
-        (filterChange)="onFilter($event)"
-        (rowAction)="onRowAction($event)"
-        (retry)="retry()"
-      />
     </section>
   `,
   styles: `

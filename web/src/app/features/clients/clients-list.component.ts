@@ -54,43 +54,45 @@ import { ClientFormDialogComponent } from './client-form-dialog.component';
           </button>
         }
       </app-page-header>
-      <div class="filters" aria-label="Filtros de clientes">
-        <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Buscar cliente</mat-label>
-          <input
-            matInput
-            [ngModel]="name()"
-            (ngModelChange)="setName($event)"
-            placeholder="Nome da empresa"
-          />
-          <mat-icon matSuffix aria-hidden="true">search</mat-icon>
-        </mat-form-field>
-        <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Situação</mat-label>
-          <mat-select [ngModel]="status()" (ngModelChange)="setStatus($event)">
-            <mat-option [value]="null">Todas</mat-option>
-            <mat-option value="ACTIVE">Ativos</mat-option>
-            <mat-option value="INACTIVE">Inativos</mat-option>
-          </mat-select>
-        </mat-form-field>
+      <div class="catalog-card">
+        <div class="filters" aria-label="Filtros de clientes">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Buscar cliente</mat-label>
+            <input
+              matInput
+              [ngModel]="name()"
+              (ngModelChange)="setName($event)"
+              placeholder="Nome da empresa"
+            />
+            <mat-icon matSuffix aria-hidden="true">search</mat-icon>
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Situação</mat-label>
+            <mat-select [ngModel]="status()" (ngModelChange)="setStatus($event)">
+              <mat-option [value]="null">Todas</mat-option>
+              <mat-option value="ACTIVE">Ativos</mat-option>
+              <mat-option value="INACTIVE">Inativos</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+        <app-data-table
+          [columns]="columns()"
+          [data]="data()"
+          [loading]="loading()"
+          [error]="error()"
+          [activeFilters]="activeFilters()"
+          [sort]="sort()"
+          ariaLabel="Clientes"
+          emptyIcon="business"
+          emptyTitle="Nenhum cliente encontrado"
+          [emptyMessage]="emptyMessage()"
+          (pageChange)="onPage($event)"
+          (sortChange)="onSort($event)"
+          (filterChange)="onFilter($event)"
+          (rowAction)="onRowAction($event)"
+          (retry)="load()"
+        />
       </div>
-      <app-data-table
-        [columns]="columns()"
-        [data]="data()"
-        [loading]="loading()"
-        [error]="error()"
-        [activeFilters]="activeFilters()"
-        [sort]="sort()"
-        ariaLabel="Clientes"
-        emptyIcon="business"
-        emptyTitle="Nenhum cliente encontrado"
-        [emptyMessage]="emptyMessage()"
-        (pageChange)="onPage($event)"
-        (sortChange)="onSort($event)"
-        (filterChange)="onFilter($event)"
-        (rowAction)="onRowAction($event)"
-        (retry)="load()"
-      />
     </section>
   `,
   styles: `

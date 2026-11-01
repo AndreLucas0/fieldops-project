@@ -57,6 +57,24 @@ body {
   height: 100%;
 }
 
+/* Cartão comum às cinco listas administrativas. */
+.catalog-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #1b232b, #161c22);
+}
+
+.catalog-card > .filters {
+  padding: 1rem;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.catalog-card > .filters mat-form-field {
+  min-width: 0;
+}
+
 body {
   margin: 0;
   background: #101419;

@@ -1268,3 +1268,67 @@ Status:
 ACTIVE
 
 ---
+
+### [2026-11-01] — Alinhamento do protótipo administrativo com dados reais do contrato
+
+Context:
+Revisão das telas FE-W03, FE-W05, FE-W08, FE-W11 e FE-W22 contra o protótipo
+Lovable e os contratos atuais da API. A referência mostra colunas e ações que
+não existem exatamente da mesma forma na tabela genérica atual.
+
+Decision:
+- Nome/e-mail de usuário e contato de local usam campo secundário na mesma célula.
+- A coluna "Último acesso" mostra `—`, pois o modelo `User` e a API não expõem
+  esse dado; `createdAt` não será usado como aproximação.
+- Contagens de locais/equipamentos vêm das rotas aninhadas paginadas existentes;
+  respostas atrasadas de páginas antigas não substituem as contagens atuais.
+- QR Code é codificado localmente a partir de `Equipment.qrCode`; nenhuma
+  informação do ativo é enviada a um gerador externo. O histórico usa a consulta
+  somente leitura `GET /inspections?equipmentId=...`.
+- FE-W22 filtra também por `inspectionId`, parâmetro já implementado pela API,
+  e conta evidências pelo vínculo `nonConformityId`.
+- As cinco telas exibem ações nomeadas na linha; as demais telas continuam com
+  o menu padrão da `DataTableComponent`.
+
+Reason:
+Reproduz a hierarquia visual do protótipo com os dados efetivamente disponíveis,
+sem afirmar um último acesso inexistente, alterar estados de NC ou criar rotas
+de detalhe que ainda não existem.
+
+Impact:
+`web/package.json` e `web/package-lock.json` incluem `qr@0.7.2`, uma biblioteca
+sem dependências de produção para gerar SVG. O `npm audit` antes/depois de sua
+adição reportou 34 vulnerabilidades (21 moderadas, 10 altas e 3 críticas); o
+pacote `qr` não aparece entre os pacotes vulneráveis. Nenhuma correção automática
+de dependências foi executada; atualizar o conjunto é tarefa separada.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-11-01] — Ações de situação preservadas quando o protótipo as omite
+
+Context:
+O protótipo simplifica ações de ativação/inativação em algumas linhas, enquanto
+`docs/telas-frontend.md` exige essas operações para usuários, clientes, locais e
+equipamentos. RN-008 e RN-013 também exigem bloqueio/inativação sem exclusão dos
+registros usados em inspeções.
+
+Decision:
+Manter as ações documentadas de situação, com visibilidade por perfil e diálogo
+de confirmação. A lista de NC continua somente leitura, conforme RN-056/057.
+
+Reason:
+As regras documentadas definem o comportamento de negócio; o protótipo orienta
+a composição visual, mas não substitui os fluxos normativos.
+
+Impact:
+As operações de situação permanecem acessíveis na interface em linha, com
+mensagens que explicam preservação do histórico. Não são adicionadas ações de
+edição ou exclusão de NC.
+
+Status:
+ACTIVE
+
+---

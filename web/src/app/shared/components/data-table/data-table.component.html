@@ -104,7 +104,25 @@
                 }
 
                 @case ('actions') {
-                  @if (visibleActions(column, row).length > 0) {
+                  @if (column.actionsInline) {
+                    <div class="fo-table__inline-actions">
+                      @for (action of visibleActions(column, row); track action.id) {
+                        <button
+                          matButton
+                          type="button"
+                          [disabled]="isActionDisabled(action, row)"
+                          [class.fo-action--danger]="action.danger"
+                          [attr.aria-label]="action.label"
+                          (click)="rowAction.emit({ action: action.id, row })"
+                        >
+                          @if (action.icon) {
+                            <mat-icon>{{ action.icon }}</mat-icon>
+                          }
+                          <span>{{ action.label }}</span>
+                        </button>
+                      }
+                    </div>
+                  } @else if (visibleActions(column, row).length > 0) {
                     <button
                       matIconButton
                       type="button"
@@ -134,7 +152,12 @@
                 }
 
                 @default {
-                  {{ cellText(column, row) }}
+                  @if (column.secondaryField) {
+                    <span class="fo-table__primary">{{ cellText(column, row) }}</span>
+                    <span class="fo-table__secondary">{{ secondaryText(column, row) }}</span>
+                  } @else {
+                    {{ cellText(column, row) }}
+                  }
                 }
               }
             </td>

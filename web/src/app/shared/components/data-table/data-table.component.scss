@@ -58,6 +58,29 @@ td a:focus-visible {
   text-decoration: underline;
 }
 
+.fo-table__primary,
+.fo-table__secondary {
+  display: block;
+}
+
+.fo-table__inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.fo-table__inline-actions button {
+  min-width: 0;
+  padding-inline: 0.5rem;
+}
+
+.fo-table__secondary {
+  margin-top: 0.2rem;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.8125rem;
+}
+
 .fo-table__error {
   display: flex;
   flex-direction: column;

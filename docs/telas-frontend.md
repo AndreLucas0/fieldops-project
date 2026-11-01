@@ -684,7 +684,7 @@ A interface **não permite** editar silenciosamente a resposta original do técn
 | Ação | Perfil | Endpoint | Comportamento da UI |
 |---|---|---|---|
 | Listar/filtrar por criticidade | ADMIN, SUPERVISOR | `GET /non-conformities?severity=&page=&size=&sort=` | — |
-| Consultar item relacionado | ADMIN, SUPERVISOR | — (navegação para FE-W20 da inspeção correspondente) | — |
+| Consultar item relacionado | ADMIN, SUPERVISOR | `GET /non-conformities/{id}`, `GET /inspections/{inspectionId}`, `GET /inspections/{inspectionId}/evidence` | Abre detalhe somente leitura com item do checklist e evidências associadas. FE-W20 ainda não está implementada como rota e segue no backlog. |
 
 O acompanhamento completo de plano de ação é P2 (`interface-admnistrativa-web.md` §14.12) — fora do escopo desta tela no MVP.
 
@@ -1450,10 +1450,12 @@ Todo componente também renderiza, quando `required=true`, um indicador visual d
 | Coluna | Campo da API | Formatação |
 |---|---|---|
 | Título | `title` | Texto |
-| Inspeção | `inspectionId` (resolvido) | Link |
+| Descrição | `description` | Texto |
+| Inspeção relacionada | `inspectionId` (resolvido para título; fallback UUID) | Texto |
 | Criticidade | `severity` | Badge |
 | Situação | `status` | Badge (único valor `OPEN` no MVP) |
 | Criada em | `createdAtDevice` | `dd/MM/yyyy HH:mm` |
+| Ações | — | Consultar inspeção relacionada em detalhe somente leitura |
 
 **Filtros:** `severity`. **Ações por linha:** ver inspeção relacionada.
 

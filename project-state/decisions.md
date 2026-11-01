@@ -1218,3 +1218,30 @@ Status:
 ACTIVE
 
 ---
+
+### [2026-11-01] — FE-W22 consulta a inspeção relacionada em modal enquanto FE-W20 está pendente
+
+Context:
+O protótipo liga cada não conformidade à inspeção, mas a rota FE-W20 não existe
+no frontend. `docs/telas-frontend.md` requer que a lista permita consultar o
+item relacionado. A API já oferece consulta da NC, da inspeção e das evidências.
+
+Decision:
+Na lista FE-W22, a ação “Ver inspeção relacionada” abre um modal somente leitura
+que consulta os três recursos existentes, identifica o item do checklist e conta
+as evidências associadas à NC. A lista usa o título da inspeção quando disponível
+e mantém o UUID como fallback.
+
+Reason:
+Mantém a ação útil enquanto a rota FE-W20 não está implementada e evita navegar
+para uma rota inexistente. Nenhuma edição, mudança de situação ou exclusão de NC
+é exposta pela lista.
+
+Impact:
+FE-W22 cobre consulta dos detalhes relacionados; FE-W20 continua pendente para
+planejamento, reatribuição, cancelamento e histórico da inspeção.
+
+Status:
+ACTIVE
+
+---

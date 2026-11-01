@@ -317,11 +317,11 @@ Nenhum componente de revisão.
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
+| Status | **COMPLETA (2026-11-01)** |
 | Rota documentada | `/non-conformities` |
 | Serviço existente | `NonConformitiesService` em `resources.ts` |
 
-Serviço existe mas nenhum componente o consome. Rota ausente de `app.routes.ts`.
+`CatalogListComponent` apresenta título, descrição, inspeção relacionada resolvida, criticidade, situação e data do dispositivo, com filtro de severidade e paginação. A ação de consulta abre um modal de leitura com NC, item do checklist e evidências. A rota FE-W20 permanece ausente; edição e tratamento completo de NC não pertencem ao MVP desta tela.
 
 ---
 

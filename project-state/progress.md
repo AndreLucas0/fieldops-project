@@ -968,3 +968,21 @@ Data: 2026-11-01. Branch: `develop`. Tipo: estrutura inicial do painel web.
 **Validação:** build de produção da aplicação web executado após a mudança; resultado registrado no commit correspondente. Testes automatizados não executados neste incremento.
 
 ---
+
+### WEB-ADMIN-LISTS-2026-11-01 — primeiras listas administrativas
+
+Branch: `feat/web-admin-lists`. Implementadas as listas FE-W03 (usuários),
+FE-W05 (clientes), FE-W08 (locais), FE-W11 (equipamentos) e FE-W22 (não
+conformidades). Todas usam os serviços de recursos existentes, paginação e
+ordenação do servidor, filtros aceitos pelo contrato e estados comuns da
+`DataTableComponent`. Em locais/equipamentos, os IDs de cliente/local da API são
+resolvidos para nomes na tabela.
+
+Responsividade verificada no navegador em viewport estreita (615 px); a tabela
+mantém a rolagem horizontal restrita ao contêiner. Build de produção aprovado;
+6 testes direcionados e a suíte completa aprovados (214 testes em 20 arquivos).
+
+Escopo pendente: formulários FE-W04/06/09/12 e ações da FE-W03/05/08/11 ainda
+não foram implementados. Nenhuma dependência ou contrato da API foi alterado.
+
+---

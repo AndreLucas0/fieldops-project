@@ -1090,3 +1090,31 @@ Status:
 ACTIVE
 
 ---
+
+### [2026-11-01] — Listagens administrativas reutilizam a tabela e os serviços de recursos
+
+Context:
+As listas de usuários, clientes, locais, equipamentos e não conformidades
+precisam manter os padrões de paginação, ordenação, erros e estados vazios sem
+duplicar componentes de tabela ou chamadas HTTP.
+
+Decision:
+Usar `DataTableComponent` nas cinco telas, com componentes específicos para
+clientes e um componente de catálogo configurado pela rota para usuários, locais,
+equipamentos e não conformidades. As buscas usam somente filtros descritos nos
+contratos existentes. Clientes e locais relacionados são resolvidos por ID com
+os serviços existentes quando exibidos nas listas.
+
+Reason:
+Preserva a API de recursos e os mocks já compartilhados; mantém uma única
+implementação de paginação e estados de tabela sem nova dependência.
+
+Impact:
+As listas e seus filtros básicos estão conectados. Formulários e ações de
+criação/edição/inativação permanecem em escopo separado, seguindo as telas e
+confirmações descritas em `docs/telas-frontend.md`.
+
+Status:
+ACTIVE
+
+---

@@ -62,7 +62,7 @@ Duas observações que valem para todo o restante do documento:
 | FE-W01 | Login (web) | Web | Todos | `/login` | Autenticação administrativa |
 | FE-W02 | Dashboard | Web | ADMIN, SUPERVISOR | `/dashboard` | Indicadores gerais |
 | FE-W03 | Usuários — lista | Web | ADMIN | `/users` | Gerenciar usuários |
-| FE-W04 | Usuário — cadastro/edição | Web | ADMIN | **[A DEFINIR]** (modal sobre `/users` ou rota própria) | Criar/editar usuário |
+| FE-W04 | Usuário — cadastro/edição | Web | ADMIN | Modal sobre `/users` | Criar/editar usuário |
 | FE-W05 | Clientes — lista | Web | ADMIN (escrita), SUPERVISOR (leitura) | `/clients` | Gerenciar clientes |
 | FE-W06 | Cliente — cadastro/edição | Web | ADMIN | **[A DEFINIR]** | Criar/editar cliente |
 | FE-W07 | Locais de um cliente | Web | ADMIN, SUPERVISOR | `/clients/:clientId/sites` | Locais do cliente selecionado |
@@ -394,7 +394,7 @@ Detalhamento completo de upload (limites, formatos, retry): seção 15.
 | Ação | Perfil | Endpoint | Payload | Comportamento da UI |
 |---|---|---|---|---|
 | Listar/filtrar/paginar | ADMIN | `GET /users?page=&size=&sort=&name=&email=&role=&status=` | — | Ver seção 9 (paginação padrão) |
-| Abrir cadastro | ADMIN | — (navegação/modal) | — | Abre FE-W04 — **[A DEFINIR]** se modal ou rota |
+| Abrir cadastro | ADMIN | — (navegação/modal) | — | Abre FE-W04 em modal sobre `/users` |
 | Ativar/inativar/bloquear | ADMIN | `PATCH /users/{id}/status` | `UserStatusUpdateRequest{status}` | Confirmação antes de executar (ação crítica, `interface-admnistrativa-web.md` §14.15); sucesso invalida sessões ativas do usuário (RN-008) — UI não recebe confirmação disso além do `200`, apenas deve informar que ocorreu |
 | Redefinir senha | ADMIN | `POST /users/{id}/reset-password` | — | Exibe `ResetPasswordResponse.message`; **[PENDÊNCIA]** o mecanismo real (e-mail? senha temporária exibida uma vez?) não está definido — PEND-01 do documento 20 |
 
@@ -402,7 +402,7 @@ Detalhamento completo de upload (limites, formatos, retry): seção 15.
 
 ### FE-W04 — Usuário (cadastro/edição)
 
-**Objetivo:** criar ou editar um usuário. **Usuários autorizados:** ADMIN. **Rota:** **[A DEFINIR]** — ver PEND-F01. **Pré-condições:** ao editar, usuário existente carregado via `GET /users/{id}`.
+**Objetivo:** criar ou editar um usuário. **Usuários autorizados:** ADMIN. **Apresentação:** modal sobre `/users` (PEND-F01 resolvida). **Pré-condições:** ao editar, usuário existente carregado via `GET /users/{id}`.
 
 **Dados exibidos (edição):** `name`, `email`, `role`, `status` (somente leitura aqui — alterado por ação separada em FE-W03), `phone`.
 
@@ -519,7 +519,7 @@ Formulário detalhado: seção 9.2.
 
 ### FE-W12 — Equipamento (cadastro/edição)
 
-**Objetivo:** criar/editar equipamento. **Usuários autorizados:** ADMIN, SUPERVISOR. **Rota:** **[A DEFINIR]**.
+**Objetivo:** criar/editar equipamento. **Usuários autorizados:** ADMIN, SUPERVISOR. **Rota:** modal aberto sobre `/equipment` (decisão de implementação 2026-11-01).
 
 **Ações disponíveis:**
 
@@ -1963,7 +1963,7 @@ Itens específicos de **composição de tela** descobertos na elaboração deste
 
 | ID | Item | Documentação relacionada | Impacto na tela | Impacto na API | Decisão necessária |
 |---|---|---|---|---|---|
-| PEND-F01 | Rotas de criação/edição de Usuário e Equipamento não são definidas em `interface-admnistrativa-web.md` §14.3; Cliente e Local foram definidos como modais sobre as listas | `interface-admnistrativa-web.md` §14.3 vs. §14.6–14.7 | FE-W06 e FE-W09 usam modal em `/clients` e `/sites`; FE-W04/12 ainda precisam de escolha | Nenhum (mesmos endpoints `POST`/`PUT`) | **Parcialmente resolvida — FE-W04/12 pendentes** |
+| PEND-F01 | Rota de criação/edição de Usuário não é definida em `interface-admnistrativa-web.md` §14.3; Cliente, Local e Equipamento foram definidos como modais sobre as listas | `interface-admnistrativa-web.md` §14.3 vs. §14.6–14.7 | FE-W04/06/09/12 usam modal sobre `/users`, `/clients`, `/sites` e `/equipment` | Nenhum (mesmos endpoints `POST`/`PUT`) | **Resolvida — modal para os quatro formulários** |
 | PEND-F02 | Comportamento do logout mobile (FE-M05) quando existem operações pendentes na outbox | `aplicativo-mobile.md` §13.4 (silente sobre esse cruzamento) | Define se o logout bloqueia, avisa ou é silencioso nesse caso | Nenhum — é decisão 100% client-side | **[A DEFINIR]** |
 | PEND-F03 | Regra que decide, na divergência de equipamento no scanner (FE-M11) ou na tela de início (FE-M07), entre "exigir confirmação" e "bloquear" | `regras-de-negocio.md` RN-064 (menciona ambas as alternativas sem definir quando cada uma se aplica), `criterios-de-aceitacao.md` §17.11 | Define se a tela de scanner tem um modal de confirmação ou uma tela de bloqueio | Define se a regra é parametrizada por modelo/inspeção ou fixa no sistema | **[DECISÃO NECESSÁRIA]** |
 | PEND-F04 | Tela FE-W23 (Auditoria) sem endpoint correspondente | Repetição de INC-05/PEND-08 do documento 20, aplicada especificamente à composição desta tela | Tela não pode ser especificada em detalhe (dados exibidos, filtros) até a lacuna de backend ser resolvida | Precisa de `GET /audit-events` (ou equivalente) com filtros administrativos | **[PENDÊNCIA]** |

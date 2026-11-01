@@ -7,18 +7,38 @@
  * Angular Material, primeira parte do Angular, na mesma linha de versão (21.x).
  */
 html {
-  color-scheme: light;
+  color-scheme: dark;
 
   @include mat.theme(
     (
       color: (
-        primary: mat.$azure-palette,
-        tertiary: mat.$blue-palette,
+        theme-type: dark,
+        primary: mat.$orange-palette,
+        tertiary: mat.$yellow-palette,
       ),
       typography: Roboto,
       density: 0,
     )
   );
+
+  --mat-sys-background: #101419;
+  --mat-sys-on-background: #edf0f2;
+  --mat-sys-surface: #101419;
+  --mat-sys-surface-dim: #101419;
+  --mat-sys-surface-bright: #2a3037;
+  --mat-sys-surface-container-lowest: #0d1116;
+  --mat-sys-surface-container-low: #151a20;
+  --mat-sys-surface-container: #1a2027;
+  --mat-sys-surface-container-high: #222831;
+  --mat-sys-surface-container-highest: #2b323b;
+  --mat-sys-on-surface: #edf0f2;
+  --mat-sys-on-surface-variant: #a1a9b1;
+  --mat-sys-primary: #f3ad16;
+  --mat-sys-on-primary: #12161b;
+  --mat-sys-primary-container: #553800;
+  --mat-sys-on-primary-container: #ffdfa0;
+  --mat-sys-outline: #75808a;
+  --mat-sys-outline-variant: #303842;
 }
 
 /*
@@ -39,7 +59,7 @@ body {
 
 body {
   margin: 0;
-  background: var(--mat-sys-surface);
+  background: #101419;
   color: var(--mat-sys-on-surface);
   font-family: Roboto, 'Helvetica Neue', sans-serif;
 }

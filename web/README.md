@@ -24,6 +24,7 @@ src/app/
     ├── shell/               navegação autenticada e cabeçalho responsivo
     ├── catalog-list/        usuários, locais, equipamentos e não conformidades
     ├── clients/             lista de clientes
+    ├── users/               cadastro/edição de usuários
     ├── feature-placeholder/ demais rotas ainda em preparação
     ├── dashboard/           FE-W02
     ├── login/               FE-W01
@@ -34,9 +35,13 @@ A área autenticada usa um shell compartilhado. Em telas estreitas, a navegaçã
 lateral vira um menu recolhível e as tabelas mantêm a rolagem horizontal dentro
 da própria área. As listas de clientes, locais, equipamentos, usuários e não
 conformidades estão conectadas aos serviços e mocks existentes, com filtros,
-paginação e estados de carregamento, vazio e erro. Clientes e locais já têm
-cadastro/edição em modal; as demais ações e formulários seguem em implementação
-conforme os contratos documentados.
+paginação e estados de carregamento, vazio e erro. Clientes, locais,
+equipamentos e usuários têm cadastro/edição em modal; equipamentos também
+podem ser localizados pelo QR Code. A lista de usuários permite alteração
+confirmada de situação e solicitação de redefinição de senha usando a mensagem
+retornada pela API, sem assumir entrega ou geração de senha.
+As telas administrativas seguem o tema carvão e âmbar do protótipo, mantendo
+as tabelas roláveis dentro do próprio contêiner em telas estreitas.
 
 ## Regras para implementar telas
 

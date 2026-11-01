@@ -128,6 +128,23 @@ describe('serviços fictícios da web', () => {
 
       expect(inativado.status).toBe('INACTIVE');
     });
+
+    it('solicita redefinição de senha e devolve a mensagem do contrato', async () => {
+      const response = await firstValueFrom(
+        TestBed.inject(UsersService).resetPassword(USER_IDS.technician),
+      );
+
+      expect(response.message).toBeTruthy();
+    });
+
+    it('devolve 404 ao redefinir senha de usuário inexistente', async () => {
+      const erro = await firstValueFrom(
+        TestBed.inject(UsersService).resetPassword('nao-existe'),
+      ).catch((e: ApiError) => e);
+
+      expect(erro).toBeInstanceOf(ApiError);
+      expect((erro as ApiError).status).toBe(404);
+    });
   });
 
   describe('paginação', () => {

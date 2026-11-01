@@ -205,6 +205,29 @@ describe('CatalogListComponent', () => {
     expect(component.data().content[0]?.id).toBe('current-user');
   });
 
+  it('mantém o carregamento atual quando uma busca anterior falha', async () => {
+    const fixture = await setup('users');
+    const users = TestBed.inject(UsersService);
+    const previousRequest = new Subject<Page<User>>();
+    const currentRequest = new Subject<Page<User>>();
+    vi.spyOn(users, 'list')
+      .mockReturnValueOnce(previousRequest)
+      .mockReturnValueOnce(currentRequest);
+    const component = fixture.componentInstance as unknown as {
+      error(): unknown;
+      loading(): boolean;
+      load(): void;
+      setName(value: string): void;
+    };
+
+    component.load();
+    component.setName('atual');
+    previousRequest.error(new Error('resposta antiga falhou'));
+
+    expect(component.error()).toBeNull();
+    expect(component.loading()).toBe(true);
+  });
+
   it('filtra não conformidades por criticidade', async () => {
     const fixture = await setup('non-conformities');
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';

@@ -951,3 +951,20 @@ próximos passos). Continua valendo que `project-state/backend-audit.md` é a fo
 verdade do estado **detalhado** do backend; `ESTADO-DO-PROJETO.md` é a visão geral de
 uma página. As seções §8 (Expo Go) e §9 (armadilhas) foram preservadas na reescrita —
 são as referenciadas por `CLAUDE.md` §10.
+
+### WEB-ADMIN-SHELL-SCAFFOLD-2026-11-01 — base responsiva para implementação paralela
+
+Data: 2026-11-01. Branch: `develop`. Tipo: estrutura inicial do painel web.
+
+**Preparado:**
+- Shell autenticado compartilhado com navegação baseada em permissões, nome/perfil do usuário, logout e consumo de notificações globais.
+- Menu lateral fixo em desktop e recolhível em telas estreitas.
+- Rotas lazy para clientes, locais, equipamentos, usuários e não conformidades; cada rota mostra um placeholder responsivo até a tela funcional ser implementada.
+- Rotas existentes de login, dashboard, lista e construtor de modelos preservadas dentro da área autenticada.
+- README web atualizado com a estrutura atual e regras de implementação.
+
+**Não implementado neste incremento:** tabelas funcionais, formulários, filtros ou ações de domínio das cinco telas. Não houve alteração de dependências ou contratos da API.
+
+**Validação:** build de produção da aplicação web executado após a mudança; resultado registrado no commit correspondente. Testes automatizados não executados neste incremento.
+
+---

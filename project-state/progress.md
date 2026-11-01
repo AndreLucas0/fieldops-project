@@ -1079,4 +1079,30 @@ atualizada para registrar a coluna composta. Sem mudanças no serviço/API.
 Validação: 14 testes direcionados, suíte web completa (244 testes em 25
 arquivos), build de produção, Prettier e `git diff --check` aprovados.
 
+### WEB-ADMIN-PROTOTYPE-ALIGNMENT-2026-11-01 — revisão das cinco listas
+
+Revisão das telas FE-W03 (usuários), FE-W05 (clientes), FE-W08 (locais), FE-W11
+(equipamentos) e FE-W22 (não conformidades) contra as páginas abertas no protótipo
+Lovable e os requisitos de `docs/telas-frontend.md` e `docs/regras-de-negocio.md`.
+
+As listas agora seguem as colunas e agrupamentos visuais da referência. Contagens
+de locais/equipamentos usam endpoints aninhados paginados; FE-W22 filtra por
+inspeção e exibe a contagem das evidências ligadas à própria NC. FE-W11 gera o QR
+localmente e consulta histórico paginado em modo somente leitura. Campos sem
+dado no contrato, como último acesso do usuário, não recebem valor aproximado.
+Os formulários, permissões e mudanças de estado definidos pela documentação
+permanecem disponíveis, e a consulta de NC não cria ações de edição/exclusão.
+
+Validação: suíte completa `npm test -- --watch=false` — 257 testes em 27 arquivos;
+`npm run build` — sucesso; `git diff --check` — sem erros. Um teste adicional
+confirma que uma resposta antiga de busca não substitui a lista atual. O teste de catálogo
+também confirma que as ações QR e Histórico abrem os diálogos corretos para o
+equipamento selecionado. Nenhuma rota do backend foi modificada. `qr@0.7.2` foi
+adicionada para gerar SVG no navegador; nenhuma correção automática de dependências
+foi feita.
+
+Autoria: os 11 commits anteriores da sequência web estavam com autoria incorreta
+(Andre Lucas Ferreira). A reescrita dessa sequência para `Lucas Ianovski`
+<ianovskilucas@gmail.com> e a publicação em `develop` ainda precisam ser concluídas.
+
 ---

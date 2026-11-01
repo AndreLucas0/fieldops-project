@@ -434,7 +434,7 @@ Detalhamento do formulário: seção 9.1.
 
 ### FE-W06 — Cliente (cadastro/edição)
 
-**Objetivo:** criar/editar cliente. **Usuários autorizados:** ADMIN. **Rota:** **[A DEFINIR]**. **Pré-condições:** ao editar, `GET /clients/{id}`.
+**Objetivo:** criar/editar cliente. **Usuários autorizados:** ADMIN. **Rota:** modal aberto sobre `/clients` (decisão de implementação 2026-11-01). **Pré-condições:** ao editar, os dados atuais do cliente são passados ao modal.
 
 **Ações disponíveis:**
 
@@ -477,7 +477,7 @@ Formulário detalhado: seção 9.2.
 
 ### FE-W09 — Local (cadastro/edição)
 
-**Objetivo:** criar/editar local. **Usuários autorizados:** ADMIN. **Rota:** **[A DEFINIR]**.
+**Objetivo:** criar/editar local. **Usuários autorizados:** ADMIN. **Rota:** modal aberto sobre `/sites` (decisão de implementação 2026-11-01).
 
 **Ações disponíveis:**
 
@@ -1963,7 +1963,7 @@ Itens específicos de **composição de tela** descobertos na elaboração deste
 
 | ID | Item | Documentação relacionada | Impacto na tela | Impacto na API | Decisão necessária |
 |---|---|---|---|---|---|
-| PEND-F01 | Rotas de criação/edição de Usuário, Cliente, Local e Equipamento não são definidas em `interface-admnistrativa-web.md` §14.3 (só a lista tem rota própria) — diferente de Modelos e Inspeções, que têm `/new` e `/:id/edit` explícitos | `interface-admnistrativa-web.md` §14.3 vs. §14.6–14.7 | Define se FE-W04/06/09/12 são modais sobre a lista ou rotas próprias — muda a estrutura de componentes (roteamento vs. estado de modal) | Nenhum (mesmos endpoints `POST`/`PUT`) | **[DECISÃO NECESSÁRIA]** |
+| PEND-F01 | Rotas de criação/edição de Usuário e Equipamento não são definidas em `interface-admnistrativa-web.md` §14.3; Cliente e Local foram definidos como modais sobre as listas | `interface-admnistrativa-web.md` §14.3 vs. §14.6–14.7 | FE-W06 e FE-W09 usam modal em `/clients` e `/sites`; FE-W04/12 ainda precisam de escolha | Nenhum (mesmos endpoints `POST`/`PUT`) | **Parcialmente resolvida — FE-W04/12 pendentes** |
 | PEND-F02 | Comportamento do logout mobile (FE-M05) quando existem operações pendentes na outbox | `aplicativo-mobile.md` §13.4 (silente sobre esse cruzamento) | Define se o logout bloqueia, avisa ou é silencioso nesse caso | Nenhum — é decisão 100% client-side | **[A DEFINIR]** |
 | PEND-F03 | Regra que decide, na divergência de equipamento no scanner (FE-M11) ou na tela de início (FE-M07), entre "exigir confirmação" e "bloquear" | `regras-de-negocio.md` RN-064 (menciona ambas as alternativas sem definir quando cada uma se aplica), `criterios-de-aceitacao.md` §17.11 | Define se a tela de scanner tem um modal de confirmação ou uma tela de bloqueio | Define se a regra é parametrizada por modelo/inspeção ou fixa no sistema | **[DECISÃO NECESSÁRIA]** |
 | PEND-F04 | Tela FE-W23 (Auditoria) sem endpoint correspondente | Repetição de INC-05/PEND-08 do documento 20, aplicada especificamente à composição desta tela | Tela não pode ser especificada em detalhe (dados exibidos, filtros) até a lacuna de backend ser resolvida | Precisa de `GET /audit-events` (ou equivalente) com filtros administrativos | **[PENDÊNCIA]** |

@@ -1,7 +1,7 @@
 # Web — Inventário de Telas e Status de Integração
 
 **Data da auditoria original:** 2026-10-14 (inventário histórico; os estados das telas abaixo foram atualizados conforme os incrementos de 2026-11-01)
-**Branch atualizada:** `feat/web-admin-lists`
+**Branch atualizada:** `develop` (2026-11-01)
 **Validação atual:** consulte as entradas datadas em `progress.md`; não use o resumo executivo histórico abaixo como estado atual.
 **Fonte primária:** `docs/telas-frontend.md` §2, `docs/auditoria-frontend-backend.md`, `web/src/app/`
 
@@ -106,6 +106,8 @@ Ressalva: sem shell, navegação para outras telas é impossível sem digitar UR
 
 `ClientsListComponent` lista, filtra e pagina clientes, com edição/status restritos a ADMIN. ADMIN e SUPERVISOR podem abrir os locais do cliente; o contexto é passado para `/sites?clientId=...`.
 
+Alinhamento visual (2026-11-01): cabeçalhos Cliente/CNPJ/Contato/Locais/Situação/Ações; a contagem usa `GET /clients/{clientId}/sites` e o link abre `/clients/:clientId/sites`.
+
 ---
 
 ### FE-W06 — Cliente — cadastro/edição
@@ -123,13 +125,11 @@ Ressalva: sem shell, navegação para outras telas é impossível sem digitar UR
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
+| Status | **COMPLETA (2026-11-01)** |
 | Rota documentada | `/clients/:clientId/sites` |
 | Contrato | `GET /clients/{clientId}/sites` → `Page<SiteResponse>` |
 
-Nenhum componente. `ClientsService` não tem método para essa rota nested.
-
-Divergência a resolver ao implementar: `resources.ts` itera response como array — backend retorna `Page`.
+`CatalogListComponent` renderiza a lista no contexto do cliente usando `SitesService.listByClient()`, que preserva a paginação `Page` do contrato. O caminho é alcançado pelo link de contagem em FE-W05.
 
 ---
 
@@ -142,6 +142,8 @@ Divergência a resolver ao implementar: `resources.ts` itera response como array
 | Serviço existente | `SitesService` em `resources.ts` |
 
 `CatalogListComponent` lista, filtra, pagina, ordena e resolve o nome do cliente. A criação/edição e ativação/inativação ficam disponíveis conforme perfil; a ação contextual abre equipamentos filtrados pelo local.
+
+Alinhamento visual (2026-11-01): endereço, coordenadas, contato em duas linhas e contagem de equipamentos; a contagem usa `GET /sites/{siteId}/equipment` e abre FE-W10.
 
 ---
 
@@ -160,11 +162,11 @@ Divergência a resolver ao implementar: `resources.ts` itera response como array
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
+| Status | **COMPLETA (2026-11-01)** |
 | Rota documentada | `/sites/:siteId/equipment` |
 | Contrato | `GET /sites/{siteId}/equipment` → `Page<EquipmentResponse>` |
 
-Divergência a resolver: idem FE-W07 — iteração direta vs. `Page`.
+`CatalogListComponent` renderiza a lista no contexto do local usando `EquipmentService.listBySite()`, com paginação `Page`. O caminho é alcançado pelo link de contagem de equipamentos em FE-W08.
 
 ---
 
@@ -176,7 +178,7 @@ Divergência a resolver: idem FE-W07 — iteração direta vs. `Page`.
 | Rota documentada | `/equipment` |
 | Serviço existente | `EquipmentService` em `resources.ts` |
 
-`CatalogListComponent` lista, filtra, pagina, ordena, exibe o código QR em fonte monoespaçada e permite buscar por QR; edição e alteração de status exigem o perfil autorizado e confirmação.
+`CatalogListComponent` lista, filtra, pagina e ordena equipamentos; a coluna segue TAG, patrimônio, nº de série, fabricante/modelo, local e situação. A ação QR gera a imagem no navegador usando o `qrCode` persistido; a ação Histórico consulta `GET /inspections?equipmentId=...` em modo somente leitura. Busca por QR continua usando o endpoint existente; edição e mudança de estado seguem as permissões documentadas.
 
 ---
 
@@ -321,7 +323,7 @@ Nenhum componente de revisão.
 | Rota documentada | `/non-conformities` |
 | Serviço existente | `NonConformitiesService` em `resources.ts` |
 
-`CatalogListComponent` apresenta título, descrição, inspeção relacionada resolvida, criticidade, situação e data do dispositivo, com filtro de severidade e paginação. A ação de consulta abre um modal de leitura com NC, item do checklist e evidências. A rota FE-W20 permanece ausente; edição e tratamento completo de NC não pertencem ao MVP desta tela.
+`CatalogListComponent` apresenta criticidade, item, descrição, contagem de evidências associadas, inspeção relacionada resolvida e data ISO, com filtros por severidade e inspeção. A API já suporta `inspectionId`; evidências são contadas por vínculo `nonConformityId`. A ação de consulta abre um modal somente leitura; a rota FE-W20 permanece ausente e edição/tratamento de NC não pertencem ao MVP.
 
 ---
 
@@ -344,10 +346,12 @@ Sem endpoint de backend definido (PEND-08 — escopo futuro). Mantida no invent�
 | `DashboardService` | FE-W02 | CONSUMIDO |
 | `UsersService` | FE-W03/04 | CONSUMIDO |
 | `ClientsService` | FE-W05/06 | CONSUMIDO |
-| `SitesService` | FE-W08/09 | CONSUMIDO |
-| `EquipmentService` | FE-W11/12 | CONSUMIDO |
-| `InspectionsService` | FE-W22 (detalhes relacionados) | CONSUMIDO |
+| `SitesService` | FE-W07/W08/09 | CONSUMIDO |
+| `EquipmentService` | FE-W10/W11/12 | CONSUMIDO |
+| `InspectionsService` | FE-W11 (histórico), FE-W22 (filtro, contagem e detalhes relacionados) | CONSUMIDO |
 | `NonConformitiesService` | FE-W22 | CONSUMIDO |
+
+FE-W07 e FE-W10 usam as operações aninhadas paginadas de `SitesService` e `EquipmentService`; as linhas antigas de F14/F15 foram resolvidas.
 
 ---
 
@@ -358,8 +362,8 @@ Sem endpoint de backend definido (PEND-08 — escopo futuro). Mantida no invent�
 | ~~F1~~ | ~~`createSection()` não envia `displayOrder` → 400~~ | **RESOLVIDA 2026-10-14** (WEB-DISPLAYORDER) |
 | ~~F2~~ | ~~`createItem()` não envia `displayOrder` → 400~~ | **RESOLVIDA 2026-10-14** (WEB-DISPLAYORDER) |
 | F13 | `listVersions()` itera array; backend retorna `Page` | FE-W17 quebraria |
-| F14 | `GET /clients/{clientId}/sites` retorna `Page`, não array | FE-W07 quebraria |
-| F15 | `GET /sites/{siteId}/equipment` retorna `Page`, não array | FE-W10 quebraria |
+| ~~F14~~ | ~~`GET /clients/{clientId}/sites` retorna `Page`, não array~~ | **RESOLVIDA 2026-11-01** — `SitesService.listByClient()` preserva `Page` |
+| ~~F15~~ | ~~`GET /sites/{siteId}/equipment` retorna `Page`, não array~~ | **RESOLVIDA 2026-11-01** — `EquipmentService.listBySite()` preserva `Page` |
 | F16 | ~~Sem proxy/CORS em dev~~ | **RESOLVIDA** INT-011 (`npm run start:api`) |
 | F17 | ~~F5 deslogava (refresh sem `user`)~~ | **RESOLVIDA** INT-011 (`GET /auth/me`) |
 
@@ -369,9 +373,9 @@ Sem endpoint de backend definido (PEND-08 — escopo futuro). Mantida no invent�
 
 Em ordem de desbloqueio:
 
-1. **WEB-SHELL** — menu lateral, logout, toasts. Desbloqueia navegação para todas as telas.
+1. ~~**WEB-SHELL** — menu lateral, logout, toasts.~~ — concluído em 2026-11-01; ver `progress.md`.
 2. ~~**WEB-DISPLAYORDER** — incluir `displayOrder` nos payloads do construtor.~~ — **RESOLVIDO 2026-10-14**.
 3. ~~**WEB-MOCK-AUTH** — mock de `/auth` para `npm start`.~~ — **RESOLVIDO 2026-10-14**.
 4. ~~**FE-W03 + FE-W04** (Usuários)~~ — concluídas em 2026-11-01; ver `progress.md`.
-5. **FE-W05–W12** (Clientes, Locais, Equipamentos) — dependem do shell; podem ser feitas em paralelo.
+5. ~~**FE-W05–W12** (Clientes, Locais, Equipamentos)~~ — listas/contextos e modais concluídos em 2026-11-01; ver `progress.md`.
 6. **FE-W18–W21** (Inspeções e Revisão) — maior complexidade; dependem de cadastros e shell.

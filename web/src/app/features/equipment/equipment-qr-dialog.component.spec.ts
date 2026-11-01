@@ -30,6 +30,10 @@ describe('EquipmentQrDialogComponent', () => {
     expect(image?.getAttribute('src')).toBe('blob:fieldops-qr');
     expect(image?.getAttribute('alt')).toContain('PR-101');
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('QR-PR-101');
+
+    fixture.destroy();
+
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:fieldops-qr');
   });
 });
 

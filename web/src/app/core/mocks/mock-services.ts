@@ -779,9 +779,9 @@ export class MockInspectionsService extends MockBase implements InspectionsServi
 @Injectable()
 export class MockNonConformitiesService extends MockBase implements NonConformitiesService {
   list(query: PageQuery<NonConformityFilters> = {}): Observable<Page<NonConformity>> {
-    const { severity } = query;
+    const { inspectionId, severity } = query;
     const filtered = this.db.nonConformities.filter((nc) =>
-      matchesFilters(nc as unknown as Record<string, unknown>, { severity }),
+      matchesFilters(nc as unknown as Record<string, unknown>, { inspectionId, severity }),
     );
     return this.page(filtered, query);
   }

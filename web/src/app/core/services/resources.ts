@@ -54,7 +54,7 @@ export type ClientFilters = { name?: string; status?: 'ACTIVE' | 'INACTIVE' };
 export type SiteFilters = { name?: string; clientId?: Uuid };
 export type EquipmentFilters = { name?: string; siteId?: Uuid; status?: EquipmentStatus };
 export type TemplateFilters = { category?: string; status?: string };
-export type NonConformityFilters = { severity?: Severity };
+export type NonConformityFilters = { inspectionId?: Uuid; severity?: Severity };
 
 export type InspectionFilters = {
   status?: InspectionStatus;

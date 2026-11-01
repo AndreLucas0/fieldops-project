@@ -1386,12 +1386,13 @@ Todo componente também renderiza, quando `required=true`, um indicador visual d
 
 | Coluna | Campo da API | Formatação |
 |---|---|---|
-| Nome | `name` | Texto |
-| Razão social | `legalName` | Texto |
-| Documento | `document` | Texto |
+| Cliente | `name` | Texto |
+| CNPJ | `document` | Texto |
+| Contato | `email` (fallback `phone`) | Texto |
+| Locais | `GET /clients/{clientId}/sites` | Total da página; link para FE-W07 |
 | Situação | `status` | Badge |
 
-**Ações por linha:** editar, inativar/reativar, ver locais.
+**Ações por linha:** editar, inativar/reativar. A contagem de locais abre FE-W07; escrita segue restrita a ADMIN.
 
 ## 10.3 FE-W08 — Locais
 

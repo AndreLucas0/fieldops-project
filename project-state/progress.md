@@ -1097,12 +1097,14 @@ Validação: suíte completa `npm test -- --watch=false` — 257 testes em 27 ar
 `npm run build` — sucesso; `git diff --check` — sem erros. Um teste adicional
 confirma que uma resposta antiga de busca não substitui a lista atual. O teste de catálogo
 também confirma que as ações QR e Histórico abrem os diálogos corretos para o
-equipamento selecionado. Nenhuma rota do backend foi modificada. `qr@0.7.2` foi
-adicionada para gerar SVG no navegador; nenhuma correção automática de dependências
-foi feita.
+equipamento selecionado; o teste QR confirma também a revogação do object URL ao
+fechar. Nenhuma rota do backend foi modificada. `qr@0.7.2` foi adicionada para
+gerar SVG no navegador; nenhuma correção automática de dependências foi feita.
 
-Autoria: os 11 commits anteriores da sequência web estavam com autoria incorreta
-(Andre Lucas Ferreira). A reescrita dessa sequência para `Lucas Ianovski`
-<ianovskilucas@gmail.com> e a publicação em `develop` ainda precisam ser concluídas.
+Autoria: os 11 commits iniciais desta sequência tinham autor e committer incorretos
+(Andre Lucas Ferreira). A autoria e o committer foram corrigidos para Lucas Ianovski
+<ianovskilucas@gmail.com> sem alterar commits anteriores ao início da sequência.
+O branch `develop` local está pronto para atualizar o PR #292 após validação remota
+final e envio com proteção contra atualizações concorrentes.
 
 ---

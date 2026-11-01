@@ -1110,3 +1110,15 @@ ponta. A atualização do título e da descrição do PR não foi permitida pela
 GitHub conectada (HTTP 403).
 
 ---
+
+### WEB-ADMIN-REVIEW-2026-11-01 — retomada da auditoria das cinco telas
+
+Revisadas as telas FE-W03 (usuários), FE-W05 (clientes), FE-W08 (locais), FE-W11
+(equipamentos) e FE-W22 (não conformidades) contra os componentes atuais e as regras
+registradas em `docs/telas-frontend.md` e `docs/regras-de-negocio.md`. As listas,
+formulários, ações, permissões e estados responsivos previstos já constam na
+implementação de `develop`; nenhum desvio funcional adicional foi confirmado nesta
+revisão somente de código. Corrigida em `pending-web.md` a referência histórica da
+navegação de clientes para a rota efetiva `/clients/:clientId/sites`.
+
+A inspeção visual automatizada do navegador local foi impedida pelo controle de segurança do ambiente; breakpoints não foram conferidos visualmente. Validação: `npm test -- --watch=false` — 257 testes em 27 arquivos; `npm run build` — sucesso; `git diff --check` — sem erros.

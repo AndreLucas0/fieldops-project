@@ -104,7 +104,7 @@ Ressalva: sem shell, navegação para outras telas é impossível sem digitar UR
 | Rota documentada | `/clients` |
 | Serviço existente | `ClientsService` em `resources.ts` |
 
-`ClientsListComponent` lista, filtra e pagina clientes, com edição/status restritos a ADMIN. ADMIN e SUPERVISOR podem abrir os locais do cliente; o contexto é passado para `/sites?clientId=...`.
+`ClientsListComponent` lista, filtra e pagina clientes, com edição/status restritos a ADMIN. ADMIN e SUPERVISOR podem abrir os locais do cliente; o link abre `/clients/:clientId/sites`.
 
 Alinhamento visual (2026-11-01): cabeçalhos Cliente/CNPJ/Contato/Locais/Situação/Ações; a contagem usa `GET /clients/{clientId}/sites` e o link abre `/clients/:clientId/sites`.
 

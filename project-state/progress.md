@@ -1122,3 +1122,30 @@ revisão somente de código. Corrigida em `pending-web.md` a referência histór
 navegação de clientes para a rota efetiva `/clients/:clientId/sites`.
 
 A inspeção visual automatizada do navegador local foi impedida pelo controle de segurança do ambiente; breakpoints não foram conferidos visualmente. Validação: `npm test -- --watch=false` — 257 testes em 27 arquivos; `npm run build` — sucesso; `git diff --check` — sem erros.
+
+### WEB-ADMIN-VISUAL-QA-2026-11-01 — revisão visual e responsiva
+
+Supera a limitação de acesso ao navegador registrada na entrada anterior. As cinco
+referências Lovable foram abertas e comparadas às listas FE-W03, FE-W05, FE-W08,
+FE-W11 e FE-W22. As cinco listas foram conferidas em 1440, 768 e 320 px; a rodada
+inicial também usou 390 px. As medições no DOM não encontraram largura da página
+maior que o viewport; a tabela mantém sua própria rolagem horizontal.
+
+Correções: filtros e tabela agrupados em cartão escuro; badges com cores adequadas
+ao tema; cabeçalhos e nomes/e-mails legíveis; botões de ação sem compressão e
+sobreposição; menu recolhível até 1023 px para aproveitar a largura do tablet.
+O QR Code estava preto sobre transparência no fundo escuro: agora tem fundo branco
+e margem de quatro módulos. Os quatro cadastros foram abertos e cancelados em
+320 px; QR, histórico carregado e detalhe de NC carregado também foram conferidos.
+O menu de tablet foi aberto e usado para navegar. Nenhum erro de console foi
+registrado na consulta final dos diálogos.
+
+A revisão usou os mocks existentes, com ADMIN em uma cópia temporária isolada e
+SUPERVISOR na aplicação original; a inicialização padrão do projeto não foi
+alterada. Não substitui homologação com API real ou aparelhos físicos. Diferenças
+de dados/contrato continuam intencionais: FieldOps mantém sua marca; último acesso
+fica sem valor quando ausente na API; situações e ações seguem os enums e as
+permissões documentadas, inclusive quando diferentes das opções do protótipo.
+
+Validação após os ajustes: `npm test -- --watch=false` — 257 testes em 27 arquivos;
+`npm run build` — sucesso. Sem atualização de dependências ou contratos.

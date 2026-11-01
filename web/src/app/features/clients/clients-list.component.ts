@@ -1,27 +1,42 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { catchError, finalize, of } from 'rxjs';
+import { catchError, finalize, filter, of, switchMap } from 'rxjs';
 
-import { isApiError, type ApiError } from '../../core';
+import { AuthStore, canWrite, isApiError, type ApiError } from '../../core';
+import { NotificationService } from '../../core/notifications/notification.service';
 import type { Client } from '../../core/models/domain';
 import { emptyPage, type Page, type PageParams, type Sort } from '../../core/models/page.model';
 import { ClientsService, type ClientFilters } from '../../core/services/resources';
 import {
   DataTableComponent,
+  ConfirmDialogService,
   PageHeaderComponent,
   type ActiveFilter,
+  type RowActionEvent,
   type TableColumn,
 } from '../../shared/components';
+import { ClientFormDialogComponent } from './client-form-dialog.component';
 
 @Component({
   selector: 'app-clients-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    MatButtonModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -31,7 +46,14 @@ import {
   ],
   template: `
     <section class="page">
-      <app-page-header title="Clientes" subtitle="Empresas atendidas pela FieldOps." />
+      <app-page-header title="Clientes" subtitle="Empresas atendidas pela FieldOps.">
+        @if (canManage()) {
+          <button actions matButton="filled" type="button" (click)="openForm()">
+            <mat-icon>add</mat-icon>
+            Novo cliente
+          </button>
+        }
+      </app-page-header>
       <div class="filters" aria-label="Filtros de clientes">
         <mat-form-field appearance="outline" subscriptSizing="dynamic">
           <mat-label>Buscar cliente</mat-label>
@@ -53,7 +75,7 @@ import {
         </mat-form-field>
       </div>
       <app-data-table
-        [columns]="columns"
+        [columns]="columns()"
         [data]="data()"
         [loading]="loading()"
         [error]="error()"
@@ -66,6 +88,7 @@ import {
         (pageChange)="onPage($event)"
         (sortChange)="onSort($event)"
         (filterChange)="onFilter($event)"
+        (rowAction)="onRowAction($event)"
         (retry)="load()"
       />
     </section>
@@ -94,13 +117,43 @@ import {
 })
 export class ClientsListComponent {
   private readonly clients = inject(ClientsService);
-  protected readonly columns: readonly TableColumn<Client>[] = [
+  private readonly auth = inject(AuthStore);
+  private readonly dialog = inject(MatDialog);
+  private readonly confirmation = inject(ConfirmDialogService);
+  private readonly notifications = inject(NotificationService);
+  private readonly destroyRef = inject(DestroyRef);
+  protected readonly canManage = computed(() => canWrite('clients', this.auth.role()));
+  protected readonly columns = computed<readonly TableColumn<Client>[]>(() => [
     { field: 'name', label: 'Cliente', sortable: true },
     { field: 'legalName', label: 'Razão social', emptyText: '—' },
     { field: 'document', label: 'Documento', emptyText: '—' },
     { field: 'email', label: 'E-mail', emptyText: '—' },
     { field: 'status', label: 'Situação', type: 'badge', badgeContext: 'user', align: 'center' },
-  ];
+    ...(this.canManage()
+      ? [
+          {
+            field: 'actions',
+            label: 'Ações',
+            type: 'actions' as const,
+            actions: [
+              { id: 'edit', label: 'Editar', icon: 'edit' },
+              {
+                id: 'deactivate',
+                label: 'Inativar',
+                icon: 'block',
+                visible: (row: Client) => row.status === 'ACTIVE',
+              },
+              {
+                id: 'activate',
+                label: 'Ativar',
+                icon: 'check_circle',
+                visible: (row: Client) => row.status === 'INACTIVE',
+              },
+            ],
+          },
+        ]
+      : []),
+  ]);
   protected readonly data = signal<Page<Client>>(emptyPage());
   protected readonly loading = signal(false);
   protected readonly error = signal<ApiError | null>(null);
@@ -173,5 +226,63 @@ export class ClientsListComponent {
     if (!filters.some((filter) => filter.key === 'status')) this.status.set(null);
     this.params.update((p) => ({ ...p, page: 0 }));
     this.load();
+  }
+
+  protected openForm(client?: Client): void {
+    if (!this.canManage()) return;
+    this.dialog
+      .open(ClientFormDialogComponent, {
+        data: { client: client ?? null },
+        width: '42rem',
+        maxWidth: '95vw',
+        autoFocus: 'first-tabbable',
+        restoreFocus: true,
+      })
+      .afterClosed()
+      .subscribe((saved: boolean | undefined) => {
+        if (saved) this.load();
+      });
+  }
+
+  protected onRowAction(event: RowActionEvent<Client>): void {
+    if (!this.canManage()) return;
+    if (event.action === 'edit') {
+      this.openForm(event.row);
+      return;
+    }
+
+    const status = event.action === 'deactivate' ? 'INACTIVE' : 'ACTIVE';
+    const verb = status === 'INACTIVE' ? 'inativar' : 'reativar';
+    const title = status === 'INACTIVE' ? 'Inativar cliente?' : 'Reativar cliente?';
+    const message =
+      status === 'INACTIVE'
+        ? `${event.row.name} não poderá ser selecionado em novas inspeções. Os registros históricos serão preservados.`
+        : `${event.row.name} poderá voltar a ser selecionado em novas inspeções.`;
+
+    this.confirmation
+      .open({
+        title,
+        message,
+        confirmLabel: `Sim, ${verb}`,
+        variant: status === 'INACTIVE' ? 'warning' : 'primary',
+      })
+      .pipe(
+        filter((result) => result.confirmed),
+        switchMap(() => this.clients.setStatus(event.row.id, status)),
+        catchError((error: unknown) => {
+          this.notifications.error(
+            isApiError(error) ? error.userMessage : 'Não foi possível atualizar o cliente.',
+          );
+          return of(null);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((client) => {
+        if (!client) return;
+        this.notifications.success(
+          status === 'INACTIVE' ? 'Cliente inativado.' : 'Cliente reativado.',
+        );
+        this.load();
+      });
   }
 }

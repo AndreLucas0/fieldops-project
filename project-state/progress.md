@@ -1104,7 +1104,9 @@ gerar SVG no navegador; nenhuma correção automática de dependências foi feit
 Autoria: os 11 commits iniciais desta sequência tinham autor e committer incorretos
 (Andre Lucas Ferreira). A autoria e o committer foram corrigidos para Lucas Ianovski
 <ianovskilucas@gmail.com> sem alterar commits anteriores ao início da sequência.
-O branch `develop` local está pronto para atualizar o PR #292 após validação remota
-final e envio com proteção contra atualizações concorrentes.
+O branch `develop` foi atualizado no remoto com proteção contra atualizações
+concorrentes. O PR #292 permanece aberto de `develop` para `main` e acompanha a nova
+ponta. A atualização do título e da descrição do PR não foi permitida pela integração
+GitHub conectada (HTTP 403).
 
 ---

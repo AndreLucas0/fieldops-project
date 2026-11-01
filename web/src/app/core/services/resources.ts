@@ -15,6 +15,7 @@ import type { Observable } from 'rxjs';
 import { ApiService } from '../http/api.service';
 import type {
   Client,
+  ActiveStatus,
   DashboardSummary,
   Equipment,
   EquipmentStatus,
@@ -95,6 +96,7 @@ export abstract class SitesService {
   abstract get(id: Uuid): Observable<InspectionSite>;
   abstract create(input: Partial<InspectionSite>): Observable<InspectionSite>;
   abstract update(id: Uuid, input: Partial<InspectionSite>): Observable<InspectionSite>;
+  abstract setStatus(id: Uuid, status: ActiveStatus): Observable<InspectionSite>;
 }
 
 export abstract class EquipmentService {
@@ -230,6 +232,9 @@ export class HttpSitesService extends SitesService {
   }
   update(id: Uuid, input: Partial<InspectionSite>) {
     return this.api.put<InspectionSite>(`/sites/${id}`, input);
+  }
+  setStatus(id: Uuid, status: ActiveStatus) {
+    return this.api.patch<InspectionSite>(`/sites/${id}/status`, { status });
   }
 }
 

@@ -8,20 +8,19 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { catchError, finalize, filter, of, switchMap } from 'rxjs';
+import { catchError, finalize, filter, forkJoin, of, switchMap } from 'rxjs';
 
 import { AuthStore, canWrite, isApiError, type ApiError } from '../../core';
 import { NotificationService } from '../../core/notifications/notification.service';
 import type { Client } from '../../core/models/domain';
 import { emptyPage, type Page, type PageParams, type Sort } from '../../core/models/page.model';
-import { ClientsService, type ClientFilters } from '../../core/services/resources';
+import { ClientsService, SitesService, type ClientFilters } from '../../core/services/resources';
 import {
   DataTableComponent,
   ConfirmDialogService,
@@ -47,7 +46,7 @@ import { ClientFormDialogComponent } from './client-form-dialog.component';
   ],
   template: `
     <section class="page">
-      <app-page-header title="Clientes" subtitle="Empresas atendidas pela FieldOps.">
+      <app-page-header title="Clientes" subtitle="Empresas atendidas e seus locais.">
         @if (canManage()) {
           <button actions matButton="filled" type="button" (click)="openForm()">
             <mat-icon>add</mat-icon>
@@ -118,25 +117,43 @@ import { ClientFormDialogComponent } from './client-form-dialog.component';
 })
 export class ClientsListComponent {
   private readonly clients = inject(ClientsService);
-  private readonly router = inject(Router);
+  private readonly sites = inject(SitesService);
   private readonly auth = inject(AuthStore);
   private readonly dialog = inject(MatDialog);
   private readonly confirmation = inject(ConfirmDialogService);
   private readonly notifications = inject(NotificationService);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly canManage = computed(() => canWrite('clients', this.auth.role()));
+  private readonly siteCounts = signal<Record<string, number | null>>({});
+  private siteCountsRequestId = 0;
   protected readonly columns = computed<readonly TableColumn<Client>[]>(() => [
     { field: 'name', label: 'Cliente', sortable: true },
-    { field: 'legalName', label: 'Razão social', emptyText: '—' },
-    { field: 'document', label: 'Documento', emptyText: '—' },
-    { field: 'email', label: 'E-mail', emptyText: '—' },
+    { field: 'document', label: 'CNPJ', emptyText: '—' },
+    {
+      field: 'email',
+      label: 'Contato',
+      format: (value, row) => String(value || row.phone || '—'),
+    },
+    {
+      field: 'id',
+      label: 'Locais',
+      type: 'link',
+      align: 'center',
+      link: (row) => ['/clients', row.id, 'sites'],
+      format: (_value, row) => {
+        const count = this.siteCounts()[row.id];
+        if (count === undefined) return '…';
+        if (count === null) return '—';
+        return `${count} ${count === 1 ? 'local' : 'locais'}`;
+      },
+    },
     { field: 'status', label: 'Situação', type: 'badge', badgeContext: 'user', align: 'center' },
     {
       field: 'actions',
       label: 'Ações',
       type: 'actions' as const,
+      actionsInline: true,
       actions: [
-        { id: 'view-sites', label: 'Ver locais', icon: 'location_on' },
         ...(this.canManage()
           ? [
               { id: 'edit', label: 'Editar', icon: 'edit' },
@@ -204,7 +221,30 @@ export class ClientsListComponent {
         }),
         finalize(() => this.loading.set(false)),
       )
-      .subscribe((page) => this.data.set(page));
+      .subscribe((page) => {
+        this.data.set(page);
+        this.resolveSiteCounts(page.content);
+      });
+  }
+
+  private resolveSiteCounts(clients: Client[]): void {
+    const requestId = ++this.siteCountsRequestId;
+    const ids = [...new Set(clients.map((client) => client.id))];
+    if (!ids.length) return;
+    this.siteCounts.set({});
+    forkJoin(
+      ids.map((id) =>
+        this.sites.listByClient(id, { page: 0, size: 1 }).pipe(catchError(() => of(null))),
+      ),
+    )
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((pages) => {
+        if (requestId !== this.siteCountsRequestId) return;
+        this.siteCounts.set(
+          Object.fromEntries(ids.map((id, index) => [id, pages[index]?.totalElements ?? null])),
+        );
+        this.data.update((page) => ({ ...page }));
+      });
   }
   protected setName(value: string): void {
     this.name.set(value);
@@ -248,10 +288,6 @@ export class ClientsListComponent {
   }
 
   protected onRowAction(event: RowActionEvent<Client>): void {
-    if (event.action === 'view-sites') {
-      void this.router.navigate(['/sites'], { queryParams: { clientId: event.row.id } });
-      return;
-    }
     if (!this.canManage()) return;
     if (event.action === 'edit') {
       this.openForm(event.row);

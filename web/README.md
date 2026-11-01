@@ -34,8 +34,9 @@ A área autenticada usa um shell compartilhado. Em telas estreitas, a navegaçã
 lateral vira um menu recolhível e as tabelas mantêm a rolagem horizontal dentro
 da própria área. As listas de clientes, locais, equipamentos, usuários e não
 conformidades estão conectadas aos serviços e mocks existentes, com filtros,
-paginação e estados de carregamento, vazio e erro. Formulários e ações de
-cadastro/edição ainda serão implementados conforme os contratos documentados.
+paginação e estados de carregamento, vazio e erro. Clientes e locais já têm
+cadastro/edição em modal; as demais ações e formulários seguem em implementação
+conforme os contratos documentados.
 
 ## Regras para implementar telas
 

@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   computed,
   effect,
   inject,
@@ -9,13 +10,16 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { ActivatedRoute } from '@angular/router';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { catchError, finalize, forkJoin, of, type Observable } from 'rxjs';
+import { ActivatedRoute, Router } from '@angular/router';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { catchError, filter, finalize, forkJoin, of, switchMap, type Observable } from 'rxjs';
 
-import { isApiError, type ApiError } from '../../core';
+import { AuthStore, canWrite, isApiError, type ApiError } from '../../core';
 import type {
   Client,
   Equipment,
@@ -43,7 +47,11 @@ import {
   statusOptions,
   type ActiveFilter,
   type TableColumn,
+  type RowActionEvent,
+  ConfirmDialogService,
 } from '../../shared/components';
+import { NotificationService } from '../../core/notifications/notification.service';
+import { SiteFormDialogComponent } from '../sites/site-form-dialog.component';
 
 type CatalogKey = 'users' | 'sites' | 'equipment' | 'non-conformities';
 type CatalogRow = User | InspectionSite | Equipment | NonConformity;
@@ -83,7 +91,9 @@ const PAGE_CONFIG: Record<
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    MatButtonModule,
     MatFormFieldModule,
+    MatIconModule,
     MatInputModule,
     MatSelectModule,
     DataTableComponent,
@@ -91,7 +101,14 @@ const PAGE_CONFIG: Record<
   ],
   template: `
     <section class="page">
-      <app-page-header [title]="config().title" [subtitle]="config().subtitle" />
+      <app-page-header [title]="config().title" [subtitle]="config().subtitle">
+        @if (kind() === 'sites' && canWrite('sites')) {
+          <button actions matButton="filled" type="button" (click)="openSiteForm()">
+            <mat-icon>add</mat-icon>
+            Novo local
+          </button>
+        }
+      </app-page-header>
       <div class="filters" [attr.aria-label]="'Filtros de ' + config().title.toLowerCase()">
         @if (kind() !== 'non-conformities') {
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
@@ -163,6 +180,7 @@ const PAGE_CONFIG: Record<
         (pageChange)="onPage($event)"
         (sortChange)="onSort($event)"
         (filterChange)="onFilter($event)"
+        (rowAction)="onRowAction($event)"
         (retry)="load()"
       />
     </section>
@@ -194,6 +212,15 @@ export class CatalogListComponent {
   private readonly routeData = toSignal(this.route.data, {
     initialValue: this.route.snapshot.data,
   });
+  private readonly queryParams = toSignal(this.route.queryParamMap, {
+    initialValue: this.route.snapshot.queryParamMap,
+  });
+  private readonly router = inject(Router);
+  private readonly auth = inject(AuthStore);
+  private readonly dialog = inject(MatDialog);
+  private readonly confirmation = inject(ConfirmDialogService);
+  private readonly notifications = inject(NotificationService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly users = inject(UsersService);
   private readonly sites = inject(SitesService);
   private readonly equipment = inject(EquipmentService);
@@ -205,6 +232,14 @@ export class CatalogListComponent {
     return key && key in PAGE_CONFIG ? key : 'users';
   });
   protected readonly config = computed(() => PAGE_CONFIG[this.kind()]);
+  private readonly contextId = computed(() => {
+    const params = this.queryParams();
+    return this.kind() === 'sites'
+      ? params.get('clientId')
+      : this.kind() === 'equipment'
+        ? params.get('siteId')
+        : null;
+  });
   protected readonly statusChoices = computed(() =>
     statusOptions(this.kind() === 'users' ? 'user' : 'equipment'),
   );
@@ -263,6 +298,34 @@ export class CatalogListComponent {
             type: 'badge',
             badgeContext: 'user',
             align: 'center',
+          },
+          {
+            field: 'actions',
+            label: 'Ações',
+            type: 'actions',
+            actions: [
+              {
+                id: 'edit-site',
+                label: 'Editar',
+                icon: 'edit',
+                visible: () => this.canWrite('sites'),
+              },
+              {
+                id: 'deactivate-site',
+                label: 'Inativar',
+                icon: 'block',
+                visible: (row) =>
+                  this.canWrite('sites') && (row as InspectionSite).status === 'ACTIVE',
+              },
+              {
+                id: 'activate-site',
+                label: 'Ativar',
+                icon: 'check_circle',
+                visible: (row) =>
+                  this.canWrite('sites') && (row as InspectionSite).status === 'INACTIVE',
+              },
+              { id: 'view-equipment', label: 'Ver equipamentos', icon: 'precision_manufacturing' },
+            ],
           },
         ];
       case 'equipment':
@@ -323,6 +386,12 @@ export class CatalogListComponent {
         label: 'Criticidade',
         value: statusLabel('severity', this.severity()),
       });
+    if (this.contextId())
+      filters.push({
+        key: this.kind() === 'sites' ? 'clientId' : 'siteId',
+        label: this.kind() === 'sites' ? 'Cliente' : 'Local',
+        value: 'Selecionado',
+      });
     return filters;
   });
   protected readonly emptyMessage = computed(() =>
@@ -334,6 +403,7 @@ export class CatalogListComponent {
   constructor() {
     effect(() => {
       this.kind();
+      this.contextId();
       untracked(() => {
         this.name.set('');
         this.email.set('');
@@ -364,11 +434,13 @@ export class CatalogListComponent {
           ? this.sites.list({
               ...paging,
               name: this.name().trim() || undefined,
+              clientId: this.contextId() ?? undefined,
             } satisfies PageParams & SiteFilters)
           : key === 'equipment'
             ? this.equipment.list({
                 ...paging,
                 name: this.name().trim() || undefined,
+                siteId: this.contextId() ?? undefined,
                 status: this.status() as EquipmentFilters['status'] | undefined,
               } satisfies PageParams & EquipmentFilters)
             : this.nonConformities.list({
@@ -459,7 +531,78 @@ export class CatalogListComponent {
     if (!filters.some((filter) => filter.key === 'role')) this.role.set(null);
     if (!filters.some((filter) => filter.key === 'status')) this.status.set(null);
     if (!filters.some((filter) => filter.key === 'severity')) this.severity.set(null);
+    const contextKey = this.kind() === 'sites' ? 'clientId' : 'siteId';
+    if (this.contextId() && !filters.some((filter) => filter.key === contextKey)) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { clientId: null, siteId: null },
+        queryParamsHandling: 'merge',
+      });
+      return;
+    }
     this.refreshFirstPage();
+  }
+
+  protected canWrite(resource: 'sites' | 'equipment'): boolean {
+    return canWrite(resource, this.auth.role());
+  }
+
+  protected openSiteForm(site?: InspectionSite): void {
+    if (!this.canWrite('sites')) return;
+    this.dialog
+      .open(SiteFormDialogComponent, {
+        data: { site: site ?? null },
+        width: '48rem',
+        maxWidth: '95vw',
+        autoFocus: 'first-tabbable',
+        restoreFocus: true,
+      })
+      .afterClosed()
+      .subscribe((saved: boolean | undefined) => {
+        if (saved) this.load();
+      });
+  }
+
+  protected onRowAction(event: RowActionEvent<CatalogRow>): void {
+    if (this.kind() !== 'sites') return;
+    const site = event.row as InspectionSite;
+    if (event.action === 'view-equipment') {
+      void this.router.navigate(['/equipment'], { queryParams: { siteId: site.id } });
+      return;
+    }
+    if (!this.canWrite('sites')) return;
+    if (event.action === 'edit-site') {
+      this.openSiteForm(site);
+      return;
+    }
+
+    const status = event.action === 'deactivate-site' ? 'INACTIVE' : 'ACTIVE';
+    const inactive = status === 'INACTIVE';
+    this.confirmation
+      .open({
+        title: inactive ? 'Inativar local?' : 'Reativar local?',
+        message: inactive
+          ? `${site.name} não poderá ser selecionado em novas inspeções. O histórico será preservado.`
+          : `${site.name} poderá voltar a ser selecionado em novas inspeções.`,
+        confirmLabel: inactive ? 'Sim, inativar' : 'Sim, reativar',
+        variant: inactive ? 'warning' : 'primary',
+      })
+      .pipe(
+        filter((result) => result.confirmed),
+        switchMap(() => this.sites.setStatus(site.id, status)),
+        catchError((thrown: unknown) => {
+          this.notifications.error(
+            isApiError(thrown) ? thrown.userMessage : 'Não foi possível atualizar o local.',
+          );
+          return of(null);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((updated) => {
+        if (!updated) return;
+        this.notifications.success(inactive ? 'Local inativado.' : 'Local reativado.');
+        this.load();
+      });
   }
   private refreshFirstPage(): void {
     this.params.update((p) => ({ ...p, page: 0 }));

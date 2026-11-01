@@ -986,3 +986,23 @@ Escopo pendente: formulários FE-W04/06/09/12 e ações da FE-W03/05/08/11 ainda
 não foram implementados. Nenhuma dependência ou contrato da API foi alterado.
 
 ---
+
+### WEB-MASTER-DATA-2026-11-01 — clientes e locais
+
+Em `feat/web-admin-lists`, FE-W05/06 agora inclui cadastro e edição de clientes
+em modal, validação client-side, erros de campo da API, autorização de escrita
+somente para ADMIN e confirmação para ativar/inativar. A inativação mantém o
+registro e explica que ele deixa de ser selecionável em novas inspeções (RN-013).
+
+FE-W08/09 inclui modal de criação/edição de locais. A criação exige cliente
+ativo e nome; a edição mantém `clientId` imutável. Latitude/longitude têm limites
+geográficos, e o contrato de status do local agora está disponível no serviço e
+mock para inativar/reativar com confirmação. O atalho “Ver equipamentos” passa o
+`siteId` como filtro de contexto da lista de equipamentos.
+
+PEND-F01 foi parcialmente resolvida: FE-W06 e FE-W09 usam modal; as opções de
+Usuário/Equipamento ficam pendentes. Build de produção aprovado. Testes
+direcionados aprovados: 37 do mock/services, 6 de clientes e 10 de locais/listas.
+Suíte completa aprovada após este incremento: 225 testes em 22 arquivos.
+
+---

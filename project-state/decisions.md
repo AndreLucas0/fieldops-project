@@ -1118,3 +1118,27 @@ Status:
 ACTIVE
 
 ---
+
+### [2026-11-01] — Formulários de clientes e locais abrem como modais nas listas
+
+Context:
+`docs/telas-frontend.md` PEND-F01 deixa indefinido se FE-W04/06/09/12 devem ser
+rotas próprias ou modais sobre as listas.
+
+Decision:
+FE-W06 (cliente) abre como modal em `/clients`; FE-W09 (local) abre como modal
+em `/sites`. Os formulários de Usuário e Equipamento ainda não foram definidos.
+
+Reason:
+O cadastro e a edição são operações curtas e têm o mesmo conjunto de campos;
+o modal mantém o contexto da lista e permite atualizar a paginação após salvar.
+
+Impact:
+As regras de FE-W06/09 seguem os DTOs atuais. O `clientId` do local é obrigatório
+na criação e imutável na edição. PEND-F01 permanece parcialmente pendente para
+FE-W04/12.
+
+Status:
+ACTIVE
+
+---

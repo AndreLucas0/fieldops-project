@@ -29,6 +29,7 @@ import {
 import { ApiError } from '../models/api-error.model';
 import type {
   Client,
+  ActiveStatus,
   DashboardSummary,
   Equipment,
   EquipmentStatus,
@@ -267,6 +268,10 @@ export class MockSitesService extends MockBase implements SitesService {
     const { clientId: _ignored, ...rest } = input;
     return this.respond(() => this.require(updateEntity(this.db.sites, id, rest), '/sites', id));
   }
+
+  setStatus(id: Uuid, status: ActiveStatus): Observable<InspectionSite> {
+    return this.update(id, { status });
+  }
 }
 
 @Injectable()
@@ -279,10 +284,7 @@ export class MockEquipmentService extends MockBase implements EquipmentService {
     return this.page(filtered, query);
   }
 
-  listBySite(
-    siteId: Uuid,
-    query: PageQuery<EquipmentFilters> = {},
-  ): Observable<Page<Equipment>> {
+  listBySite(siteId: Uuid, query: PageQuery<EquipmentFilters> = {}): Observable<Page<Equipment>> {
     return this.page(
       this.db.equipment.filter((equipment) => equipment.siteId === siteId),
       query,

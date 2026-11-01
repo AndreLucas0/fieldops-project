@@ -1,7 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 
-import { EQUIPMENT_IDS, INSPECTION_IDS, USER_IDS, resetMockStore } from '@fieldops/shared';
+import {
+  EQUIPMENT_IDS,
+  INSPECTION_IDS,
+  SITE_IDS,
+  USER_IDS,
+  resetMockStore,
+} from '@fieldops/shared';
 
 import { ApiError } from '../models/api-error.model';
 import { provideResources } from '../core.providers';
@@ -107,7 +113,9 @@ describe('serviços fictícios da web', () => {
       const service = TestBed.inject(UsersService);
       const antes = await firstValueFrom(service.get(USER_IDS.technician));
 
-      const depois = await firstValueFrom(service.update(USER_IDS.technician, { name: 'Carlos S.' }));
+      const depois = await firstValueFrom(
+        service.update(USER_IDS.technician, { name: 'Carlos S.' }),
+      );
 
       expect(depois.name).toBe('Carlos S.');
       expect(depois.version).toBe(antes.version + 1);
@@ -150,7 +158,10 @@ describe('serviços fictícios da web', () => {
       );
 
       expect(locais.content).toHaveLength(2);
-      expect(locais.content.map((site) => site.name)).toEqual(['Planta São Paulo', 'Filial Campinas']);
+      expect(locais.content.map((site) => site.name)).toEqual([
+        'Planta São Paulo',
+        'Filial Campinas',
+      ]);
     });
 
     it('recusa local sem cliente válido (RN-009)', async () => {
@@ -161,11 +172,22 @@ describe('serviços fictícios da web', () => {
       expect((erro as ApiError).status).toBe(422);
       expect((erro as ApiError).fieldError('clientId')).toBeTruthy();
     });
+
+    it('inativa local sem removê-lo do histórico (RN-013)', async () => {
+      const service = TestBed.inject(SitesService);
+      const local = await firstValueFrom(service.setStatus(SITE_IDS.plantaSaoPaulo, 'INACTIVE'));
+      const page = await firstValueFrom(service.list());
+
+      expect(local.status).toBe('INACTIVE');
+      expect(page.content.some((site) => site.id === local.id)).toBe(true);
+    });
   });
 
   describe('EquipmentService', () => {
     it('encontra por código QR', async () => {
-      const equipamento = await firstValueFrom(TestBed.inject(EquipmentService).getByQrCode('CP002'));
+      const equipamento = await firstValueFrom(
+        TestBed.inject(EquipmentService).getByQrCode('CP002'),
+      );
 
       expect(equipamento.name).toBe('Compressor CP-002');
     });
@@ -195,9 +217,7 @@ describe('serviços fictícios da web', () => {
 
       expect(versoes.content).toHaveLength(1);
       expect(versoes.content[0].sections).toHaveLength(3);
-      expect(
-        versoes.content[0].sections?.flatMap((secao) => secao.items ?? []),
-      ).toHaveLength(6);
+      expect(versoes.content[0].sections?.flatMap((secao) => secao.items ?? [])).toHaveLength(6);
     });
 
     it('o rascunho não tem versão publicada, mas tem seções para editar', async () => {
@@ -342,7 +362,9 @@ describe('serviços fictícios da web', () => {
   describe('DashboardService', () => {
     it('o resumo bate com as inspeções listadas', async () => {
       const resumo = await firstValueFrom(TestBed.inject(DashboardService).summary());
-      const inspecoes = await firstValueFrom(TestBed.inject(InspectionsService).list({ size: 100 }));
+      const inspecoes = await firstValueFrom(
+        TestBed.inject(InspectionsService).list({ size: 100 }),
+      );
 
       expect(resumo.totalInspections).toBe(inspecoes.totalElements);
       expect(resumo.inspectionsApproved).toBe(1);
@@ -354,7 +376,9 @@ describe('serviços fictícios da web', () => {
         TestBed.inject(InspectionsService).cancel(INSPECTION_IDS.assigned, 'adiado'),
       );
 
-      const porEstado = await firstValueFrom(TestBed.inject(DashboardService).inspectionsByStatus());
+      const porEstado = await firstValueFrom(
+        TestBed.inject(DashboardService).inspectionsByStatus(),
+      );
       expect(porEstado.find((entry) => entry.status === 'CANCELED')?.count).toBe(1);
       expect(porEstado.find((entry) => entry.status === 'ASSIGNED')).toBeUndefined();
     });

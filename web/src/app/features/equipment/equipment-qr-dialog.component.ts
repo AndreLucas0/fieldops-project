@@ -47,6 +47,7 @@ export interface EquipmentQrDialogData {
       width: min(16rem, 70vw);
       aspect-ratio: 1;
       image-rendering: pixelated;
+      background: #fff;
     }
     code {
       padding: 0.5rem 0.75rem;
@@ -65,7 +66,7 @@ export class EquipmentQrDialogComponent {
 
   constructor() {
     try {
-      const svg = encodeQR(this.data.equipment.qrCode, 'svg', { ecc: 'high' });
+      const svg = encodeQR(this.data.equipment.qrCode, 'svg', { ecc: 'high', border: 4 });
       const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
       this.imageUrl.set(url);
       this.destroyRef.onDestroy(() => URL.revokeObjectURL(url));

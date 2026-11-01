@@ -416,6 +416,14 @@ export class CatalogListComponent {
         return [
           { field: 'name', label: 'Equipamento', sortable: true },
           { field: 'qrCode', label: 'Código QR', monospace: true, width: '9rem' },
+          {
+            field: 'manufacturer',
+            label: 'Fabricante / modelo',
+            format: (_value, row) => {
+              const equipment = row as Equipment;
+              return [equipment.manufacturer, equipment.model].filter(Boolean).join(' · ') || '—';
+            },
+          },
           { field: 'assetNumber', label: 'Patrimônio', emptyText: '—' },
           { field: 'serialNumber', label: 'Nº de série', emptyText: '—' },
           {

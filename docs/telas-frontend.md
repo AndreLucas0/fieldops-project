@@ -1411,6 +1411,7 @@ Todo componente também renderiza, quando `required=true`, um indicador visual d
 | Nome | `name` | Texto |
 | Local | `siteId` (resolvido) | Texto |
 | Código QR | `qrCode` | Texto monoespaçado |
+| Fabricante / modelo | `manufacturer`/`model` | Texto |
 | Patrimônio/Nº de série | `assetNumber`/`serialNumber` | Texto |
 | Situação | `status` | Badge (`DECOMMISSIONED` também deve se distinguir visualmente de `INACTIVE`) |
 

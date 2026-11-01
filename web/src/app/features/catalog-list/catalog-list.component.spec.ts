@@ -80,6 +80,7 @@ describe('CatalogListComponent', () => {
     expect(text).toContain('Equipamentos');
     expect(text).toContain('Código QR');
     expect(text).toContain('GD001');
+    expect(text).toContain('Stemac · ST-450');
     expect(text).toContain('Patrimônio');
     expect(text).toContain('Nº de série');
   });

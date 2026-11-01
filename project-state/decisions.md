@@ -1059,3 +1059,34 @@ futuro, o campo está disponível sem nova migration.
 
 Status:
 ACTIVE
+
+### [2026-11-01] — Shell autenticado como contêiner das telas administrativas
+
+Context:
+O painel tinha rotas lazy independentes, mas não possuía navegação comum, cabeçalho
+com sessão, apresentação de notificações globais ou ponto consistente para
+adaptar a navegação a telas estreitas.
+
+Decision:
+Agrupar as rotas administrativas sob um shell lazy autenticado. O shell filtra
+os links pelo mapa de permissões existente, mostra sessão/perfil, executa o
+logout já definido em AuthService e consome NotificationService. Rotas ainda sem
+tela funcional ficam em placeholders compartilhados.
+
+Reason:
+Permite que implementações paralelas conectem suas telas à navegação sem
+duplicar sessão, permissões ou layout. A navegação colapsa em telas estreitas, mantendo o conteúdo da rota no mesmo outlet.
+
+Alternatives considered:
+Adicionar navegação e cabeçalho em cada tela — rejeitado por duplicar comportamento
+e dificultar consistência responsiva.
+
+Impact:
+Rotas /clients, /sites, /equipment, /users e /non-conformities estão registradas.
+Os placeholders devem ser substituídos pelas telas funcionais conforme os
+contratos de cada área; não simulam dados nem ações de negócio.
+
+Status:
+ACTIVE
+
+---

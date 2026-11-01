@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -117,6 +118,7 @@ import { ClientFormDialogComponent } from './client-form-dialog.component';
 })
 export class ClientsListComponent {
   private readonly clients = inject(ClientsService);
+  private readonly router = inject(Router);
   private readonly auth = inject(AuthStore);
   private readonly dialog = inject(MatDialog);
   private readonly confirmation = inject(ConfirmDialogService);
@@ -129,13 +131,14 @@ export class ClientsListComponent {
     { field: 'document', label: 'Documento', emptyText: '—' },
     { field: 'email', label: 'E-mail', emptyText: '—' },
     { field: 'status', label: 'Situação', type: 'badge', badgeContext: 'user', align: 'center' },
-    ...(this.canManage()
-      ? [
-          {
-            field: 'actions',
-            label: 'Ações',
-            type: 'actions' as const,
-            actions: [
+    {
+      field: 'actions',
+      label: 'Ações',
+      type: 'actions' as const,
+      actions: [
+        { id: 'view-sites', label: 'Ver locais', icon: 'location_on' },
+        ...(this.canManage()
+          ? [
               { id: 'edit', label: 'Editar', icon: 'edit' },
               {
                 id: 'deactivate',
@@ -149,10 +152,10 @@ export class ClientsListComponent {
                 icon: 'check_circle',
                 visible: (row: Client) => row.status === 'INACTIVE',
               },
-            ],
-          },
-        ]
-      : []),
+            ]
+          : []),
+      ],
+    },
   ]);
   protected readonly data = signal<Page<Client>>(emptyPage());
   protected readonly loading = signal(false);
@@ -245,6 +248,10 @@ export class ClientsListComponent {
   }
 
   protected onRowAction(event: RowActionEvent<Client>): void {
+    if (event.action === 'view-sites') {
+      void this.router.navigate(['/sites'], { queryParams: { clientId: event.row.id } });
+      return;
+    }
     if (!this.canManage()) return;
     if (event.action === 'edit') {
       this.openForm(event.row);

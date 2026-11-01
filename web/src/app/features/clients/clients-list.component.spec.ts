@@ -1,6 +1,6 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 
 import { resetMockStore } from '@fieldops/shared';
@@ -66,6 +66,47 @@ describe('ClientsListComponent', () => {
     const fixture = TestBed.createComponent(ClientsListComponent);
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Novo cliente');
+  });
+
+  it('permite que SUPERVISOR abra os locais do cliente sem ações de escrita', async () => {
+    const auth = TestBed.inject(AuthStore);
+    auth.setSession({
+      accessToken: 'token',
+      refreshToken: 'refresh',
+      expiresAt: Date.now() + 60_000,
+      user: {
+        id: 'supervisor-1',
+        name: 'Supervisor',
+        email: 'supervisor@example.test',
+        role: 'SUPERVISOR',
+      },
+    });
+    const fixture = TestBed.createComponent(ClientsListComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const component = fixture.componentInstance as unknown as {
+      columns: () => readonly { field: string; actions?: readonly { id: string }[] }[];
+      onRowAction: (event: { action: string; row: Client }) => void;
+    };
+    const actions = component.columns().find((column) => column.field === 'actions')?.actions ?? [];
+    expect(actions.map((action) => action.id)).toEqual(['view-sites']);
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).not.toContain('Novo cliente');
+
+    const client: Client = {
+      id: 'client-2001',
+      name: 'Indústria Alfa',
+      status: 'ACTIVE',
+      createdAt: '2026-11-01T12:00:00Z',
+      updatedAt: '2026-11-01T12:00:00Z',
+      version: 1,
+    };
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    component.onRowAction({ action: 'view-sites', row: client });
+
+    expect(navigate).toHaveBeenCalledWith(['/sites'], { queryParams: { clientId: client.id } });
   });
 
   it('confirma a inativação e envia INACTIVE sem excluir o cliente', async () => {

@@ -176,7 +176,7 @@ Divergência a resolver: idem FE-W07 — iteração direta vs. `Page`.
 | Rota documentada | `/equipment` |
 | Serviço existente | `EquipmentService` em `resources.ts` |
 
-`CatalogListComponent` lista, filtra, pagina, ordena e busca por QR; permite editar e alterar status com confirmação conforme perfil.
+`CatalogListComponent` lista, filtra, pagina, ordena, exibe o código QR em fonte monoespaçada e permite buscar por QR; edição e alteração de status exigem o perfil autorizado e confirmação.
 
 ---
 

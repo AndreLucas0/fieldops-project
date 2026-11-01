@@ -60,6 +60,8 @@ export interface TableColumn<T> {
   align?: ColumnAlign;
   /** Largura CSS fixa (ex.: `'8rem'`). Sem valor, a coluna se ajusta. */
   width?: string;
+  /** Apresenta códigos e identificadores em fonte monoespaçada. */
+  monospace?: boolean;
   /** Texto para valor nulo ou vazio. Padrão: travessão. */
   emptyText?: string;
 }

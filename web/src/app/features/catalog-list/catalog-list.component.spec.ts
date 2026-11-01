@@ -78,6 +78,8 @@ describe('CatalogListComponent', () => {
   it('apresenta equipamentos com identificadores e situação', async () => {
     const text = await render('equipment');
     expect(text).toContain('Equipamentos');
+    expect(text).toContain('Código QR');
+    expect(text).toContain('GD001');
     expect(text).toContain('Patrimônio');
     expect(text).toContain('Nº de série');
   });

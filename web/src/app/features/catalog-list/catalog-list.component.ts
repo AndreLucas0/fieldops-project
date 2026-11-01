@@ -23,6 +23,7 @@ import { AuthStore, canWrite, isApiError, type ApiError } from '../../core';
 import type {
   Client,
   Equipment,
+  Inspection,
   InspectionSite,
   NonConformity,
   User,
@@ -54,6 +55,8 @@ import {
 import { NotificationService } from '../../core/notifications/notification.service';
 import { SiteFormDialogComponent } from '../sites/site-form-dialog.component';
 import { EquipmentFormDialogComponent } from '../equipment/equipment-form-dialog.component';
+import { EquipmentHistoryDialogComponent } from '../equipment/equipment-history-dialog.component';
+import { EquipmentQrDialogComponent } from '../equipment/equipment-qr-dialog.component';
 import { UserFormDialogComponent } from '../users/user-form-dialog.component';
 import { NonConformityDetailDialogComponent } from '../non-conformities/non-conformity-detail-dialog.component';
 
@@ -180,6 +183,17 @@ const PAGE_CONFIG: Record<
               }
             </mat-select>
           </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Inspeção</mat-label>
+            <mat-select [ngModel]="inspectionId()" (ngModelChange)="setInspectionId($event)">
+              <mat-option [value]="null">Todas as inspeções</mat-option>
+              @for (inspection of inspectionChoices(); track inspection.id) {
+                <mat-option [value]="inspection.id">
+                  {{ inspection.title || 'Inspeção ' + inspection.id.slice(0, 8) }}
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
         }
         @if (kind() === 'equipment') {
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="qr-search">
@@ -255,6 +269,9 @@ export class CatalogListComponent {
   private readonly queryParams = toSignal(this.route.queryParamMap, {
     initialValue: this.route.snapshot.queryParamMap,
   });
+  private readonly routeParams = toSignal(this.route.paramMap, {
+    initialValue: this.route.snapshot.paramMap,
+  });
   private readonly router = inject(Router);
   private readonly auth = inject(AuthStore);
   private readonly dialog = inject(MatDialog);
@@ -275,10 +292,11 @@ export class CatalogListComponent {
   protected readonly config = computed(() => PAGE_CONFIG[this.kind()]);
   private readonly contextId = computed(() => {
     const params = this.queryParams();
+    const routeParams = this.routeParams();
     return this.kind() === 'sites'
-      ? params.get('clientId')
+      ? (routeParams.get('clientId') ?? params.get('clientId'))
       : this.kind() === 'equipment'
-        ? params.get('siteId')
+        ? (routeParams.get('siteId') ?? params.get('siteId'))
         : null;
   });
   protected readonly statusChoices = computed(() =>
@@ -288,7 +306,16 @@ export class CatalogListComponent {
   protected readonly data = signal<Page<CatalogRow>>(emptyPage());
   private readonly clientNames = signal<Record<string, string>>({});
   private readonly siteNames = signal<Record<string, string>>({});
+  private readonly equipmentCounts = signal<Record<string, number | null>>({});
   private readonly inspectionNames = signal<Record<string, string>>({});
+  private readonly evidenceCounts = signal<Record<string, number | null>>({});
+  protected readonly inspectionChoices = signal<Inspection[]>([]);
+  private clientNamesRequestId = 0;
+  private siteNamesRequestId = 0;
+  private equipmentCountsRequestId = 0;
+  private inspectionDetailsRequestId = 0;
+  private inspectionChoicesRequestId = 0;
+  private dataRequestId = 0;
   protected readonly loading = signal(false);
   protected readonly error = signal<ApiError | null>(null);
   protected readonly name = signal('');
@@ -298,6 +325,7 @@ export class CatalogListComponent {
     null,
   );
   protected readonly severity = signal<NonConformityFilters['severity'] | null>(null);
+  protected readonly inspectionId = signal<NonConformityFilters['inspectionId'] | null>(null);
   protected readonly qrCode = signal('');
   private readonly qrSearchActive = signal(false);
   private readonly params = signal<PageParams>({ page: 0, size: 20 });
@@ -309,8 +337,7 @@ export class CatalogListComponent {
     switch (this.kind()) {
       case 'users':
         return [
-          { field: 'name', label: 'Nome', sortable: true },
-          { field: 'email', label: 'E-mail', sortable: true },
+          { field: 'name', label: 'Nome', secondaryField: 'email', sortable: true },
           {
             field: 'role',
             label: 'Perfil',
@@ -325,12 +352,12 @@ export class CatalogListComponent {
             badgeContext: 'user',
             align: 'center',
           },
-          { field: 'phone', label: 'Telefone', emptyText: '—' },
-          { field: 'createdAt', label: 'Criado em', type: 'date', sortable: true },
+          { field: 'lastAccess', label: 'Último acesso', emptyText: '—' },
           {
             field: 'actions',
             label: 'Ações',
             type: 'actions',
+            actionsInline: true,
             actions: [
               {
                 id: 'edit-user',
@@ -374,8 +401,43 @@ export class CatalogListComponent {
             label: 'Cliente',
             format: (value) => this.clientNames()[String(value)] ?? String(value ?? ''),
           },
-          { field: 'city', label: 'Cidade', emptyText: '—' },
-          { field: 'state', label: 'UF', emptyText: '—', width: '5rem' },
+          {
+            field: 'addressLine',
+            label: 'Endereço',
+            format: (_value, row) => {
+              const site = row as InspectionSite;
+              const cityState = [site.city, site.state].filter(Boolean).join('/');
+              return [site.addressLine, cityState].filter(Boolean).join(' — ') || '—';
+            },
+          },
+          {
+            field: 'latitude',
+            label: 'Coordenadas',
+            format: (_value, row) => {
+              const site = row as InspectionSite;
+              if (site.latitude == null || site.longitude == null) return '—';
+              return `${site.latitude.toFixed(2)} , ${site.longitude.toFixed(2)}`;
+            },
+          },
+          {
+            field: 'contactName',
+            label: 'Contato',
+            secondaryField: 'contactPhone',
+            emptyText: '—',
+          },
+          {
+            field: 'id',
+            label: 'Equipamentos',
+            type: 'link',
+            align: 'center',
+            link: (row) => ['/sites', row.id, 'equipment'],
+            format: (_value, row) => {
+              const count = this.equipmentCounts()[row.id];
+              if (count === undefined) return '…';
+              if (count === null) return '—';
+              return `${count} ${count === 1 ? 'item' : 'itens'}`;
+            },
+          },
           {
             field: 'status',
             label: 'Situação',
@@ -387,6 +449,7 @@ export class CatalogListComponent {
             field: 'actions',
             label: 'Ações',
             type: 'actions',
+            actionsInline: true,
             actions: [
               {
                 id: 'edit-site',
@@ -408,14 +471,14 @@ export class CatalogListComponent {
                 visible: (row) =>
                   this.canWrite('sites') && (row as InspectionSite).status === 'INACTIVE',
               },
-              { id: 'view-equipment', label: 'Ver equipamentos', icon: 'precision_manufacturing' },
             ],
           },
         ];
       case 'equipment':
         return [
-          { field: 'name', label: 'Equipamento', sortable: true },
-          { field: 'qrCode', label: 'Código QR', monospace: true, width: '9rem' },
+          { field: 'name', label: 'TAG', sortable: true },
+          { field: 'assetNumber', label: 'Patrimônio', emptyText: '—' },
+          { field: 'serialNumber', label: 'Nº de série', emptyText: '—' },
           {
             field: 'manufacturer',
             label: 'Fabricante / modelo',
@@ -424,8 +487,6 @@ export class CatalogListComponent {
               return [equipment.manufacturer, equipment.model].filter(Boolean).join(' · ') || '—';
             },
           },
-          { field: 'assetNumber', label: 'Patrimônio', emptyText: '—' },
-          { field: 'serialNumber', label: 'Nº de série', emptyText: '—' },
           {
             field: 'siteId',
             label: 'Local',
@@ -442,7 +503,10 @@ export class CatalogListComponent {
             field: 'actions',
             label: 'Ações',
             type: 'actions',
+            actionsInline: true,
             actions: [
+              { id: 'view-qr', label: 'QR Code', icon: 'qr_code_2' },
+              { id: 'view-history', label: 'Histórico', icon: 'history' },
               {
                 id: 'edit-equipment',
                 label: 'Editar',
@@ -476,13 +540,6 @@ export class CatalogListComponent {
         ];
       case 'non-conformities':
         return [
-          { field: 'title', label: 'Item relacionado', sortable: true },
-          { field: 'description', label: 'Descrição', emptyText: '—' },
-          {
-            field: 'inspectionId',
-            label: 'Inspeção relacionada',
-            format: (value) => this.inspectionNames()[String(value)] ?? String(value ?? ''),
-          },
           {
             field: 'severity',
             label: 'Criticidade',
@@ -490,18 +547,33 @@ export class CatalogListComponent {
             badgeContext: 'severity',
             align: 'center',
           },
+          { field: 'title', label: 'Item relacionado', sortable: true },
+          { field: 'description', label: 'Descrição', emptyText: '—' },
           {
-            field: 'status',
-            label: 'Situação',
-            type: 'badge',
-            badgeContext: 'nonConformity',
+            field: 'id',
+            label: 'Evidências',
             align: 'center',
+            format: (_value, row) => {
+              const count = this.evidenceCounts()[row.id];
+              return count === undefined ? '…' : count === null ? '—' : String(count);
+            },
           },
-          { field: 'createdAtDevice', label: 'Registrada em', type: 'date', sortable: true },
+          {
+            field: 'inspectionId',
+            label: 'Inspeção',
+            format: (value) => this.inspectionNames()[String(value)] ?? String(value ?? ''),
+          },
+          {
+            field: 'createdAtDevice',
+            label: 'Data',
+            format: (value) => String(value ?? '').slice(0, 10) || '—',
+            sortable: true,
+          },
           {
             field: 'actions',
             label: 'Ações',
             type: 'actions',
+            actionsInline: true,
             actions: [
               { id: 'view-non-conformity', label: 'Ver inspeção relacionada', icon: 'visibility' },
             ],
@@ -527,6 +599,14 @@ export class CatalogListComponent {
         label: 'Criticidade',
         value: statusLabel('severity', this.severity()),
       });
+    if (this.inspectionId()) {
+      const selected = this.inspectionChoices().find((item) => item.id === this.inspectionId());
+      filters.push({
+        key: 'inspectionId',
+        label: 'Inspeção',
+        value: selected?.title || `Inspeção ${this.inspectionId()!.slice(0, 8)}`,
+      });
+    }
     if (this.contextId())
       filters.push({
         key: this.kind() === 'sites' ? 'clientId' : 'siteId',
@@ -553,9 +633,11 @@ export class CatalogListComponent {
         this.role.set(null);
         this.status.set(null);
         this.severity.set(null);
+        this.inspectionId.set(null);
         this.qrCode.set('');
         this.qrSearchActive.set(false);
         this.params.set({ page: 0, size: 20 });
+        if (this.kind() === 'non-conformities') this.loadInspectionChoices();
         this.load();
       });
     });
@@ -564,6 +646,7 @@ export class CatalogListComponent {
   protected load(): void {
     this.qrSearchActive.set(false);
     const key = this.kind();
+    const requestId = ++this.dataRequestId;
     this.loading.set(true);
     this.error.set(null);
     const paging = this.params();
@@ -577,44 +660,62 @@ export class CatalogListComponent {
             status: this.status() as UserFilters['status'] | undefined,
           } satisfies PageParams & UserFilters)
         : key === 'sites'
-          ? this.sites.list({
-              ...paging,
-              name: this.name().trim() || undefined,
-              clientId: this.contextId() ?? undefined,
-            } satisfies PageParams & SiteFilters)
-          : key === 'equipment'
-            ? this.equipment.list({
+          ? this.contextId()
+            ? this.sites.listByClient(this.contextId()!, {
                 ...paging,
                 name: this.name().trim() || undefined,
-                siteId: this.contextId() ?? undefined,
-                status: this.status() as EquipmentFilters['status'] | undefined,
-              } satisfies PageParams & EquipmentFilters)
+              })
+            : this.sites.list({
+                ...paging,
+                name: this.name().trim() || undefined,
+              } satisfies PageParams & SiteFilters)
+          : key === 'equipment'
+            ? this.contextId()
+              ? this.equipment.listBySite(this.contextId()!, {
+                  ...paging,
+                  name: this.name().trim() || undefined,
+                  status: this.status() as EquipmentFilters['status'] | undefined,
+                })
+              : this.equipment.list({
+                  ...paging,
+                  name: this.name().trim() || undefined,
+                  status: this.status() as EquipmentFilters['status'] | undefined,
+                } satisfies PageParams & EquipmentFilters)
             : this.nonConformities.list({
                 ...paging,
                 severity: this.severity() ?? undefined,
+                inspectionId: this.inspectionId() ?? undefined,
               } satisfies PageParams & NonConformityFilters)
     ) as Observable<Page<CatalogRow>>;
     request
       .pipe(
         catchError((thrown: unknown) => {
-          this.error.set(isApiError(thrown) ? thrown : null);
+          if (requestId === this.dataRequestId) this.error.set(isApiError(thrown) ? thrown : null);
           return of(emptyPage<CatalogRow>(this.params().size));
         }),
-        finalize(() => this.loading.set(false)),
+        finalize(() => {
+          if (requestId === this.dataRequestId) this.loading.set(false);
+        }),
       )
       .subscribe((page) => {
+        if (requestId !== this.dataRequestId) return;
         this.data.set(page as Page<CatalogRow>);
-        if (key === 'sites') this.resolveClients(page.content as InspectionSite[]);
+        if (key === 'sites') {
+          this.resolveClients(page.content as InspectionSite[]);
+          this.resolveEquipmentCounts(page.content as InspectionSite[]);
+        }
         if (key === 'equipment') this.resolveSites(page.content as Equipment[]);
         if (key === 'non-conformities') this.resolveInspections(page.content as NonConformity[]);
       });
   }
 
   private resolveClients(rows: InspectionSite[]): void {
+    const requestId = ++this.clientNamesRequestId;
     const ids = [...new Set(rows.map((row) => row.clientId))];
     if (!ids.length) return;
     forkJoin(ids.map((id) => this.clients.get(id).pipe(catchError(() => of(null))))).subscribe(
       (clients) => {
+        if (requestId !== this.clientNamesRequestId) return;
         this.clientNames.set(
           Object.fromEntries(
             clients
@@ -627,11 +728,33 @@ export class CatalogListComponent {
     );
   }
 
+  private resolveEquipmentCounts(rows: InspectionSite[]): void {
+    const requestId = ++this.equipmentCountsRequestId;
+    const ids = [...new Set(rows.map((site) => site.id))];
+    this.equipmentCounts.set({});
+    if (!ids.length) return;
+    forkJoin(
+      ids.map((id) =>
+        this.equipment.listBySite(id, { page: 0, size: 1 }).pipe(catchError(() => of(null))),
+      ),
+    )
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((pages) => {
+        if (requestId !== this.equipmentCountsRequestId) return;
+        this.equipmentCounts.set(
+          Object.fromEntries(ids.map((id, index) => [id, pages[index]?.totalElements ?? null])),
+        );
+        this.data.update((page) => ({ ...page }));
+      });
+  }
+
   private resolveSites(rows: Equipment[]): void {
+    const requestId = ++this.siteNamesRequestId;
     const ids = [...new Set(rows.map((row) => row.siteId))];
     if (!ids.length) return;
     forkJoin(ids.map((id) => this.sites.get(id).pipe(catchError(() => of(null))))).subscribe(
       (sites) => {
+        if (requestId !== this.siteNamesRequestId) return;
         this.siteNames.set(
           Object.fromEntries(
             sites
@@ -645,19 +768,60 @@ export class CatalogListComponent {
   }
 
   private resolveInspections(rows: NonConformity[]): void {
+    const requestId = ++this.inspectionDetailsRequestId;
     const ids = [...new Set(rows.map((row) => row.inspectionId))];
+    this.inspectionNames.set({});
+    this.evidenceCounts.set({});
     if (!ids.length) return;
-    forkJoin(ids.map((id) => this.inspections.get(id).pipe(catchError(() => of(null)))))
+    forkJoin(
+      ids.map((id) =>
+        forkJoin({
+          inspection: this.inspections.get(id).pipe(catchError(() => of(null))),
+          evidence: this.inspections.listEvidence(id).pipe(catchError(() => of(null))),
+        }),
+      ),
+    )
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((inspections) => {
+      .subscribe((related) => {
+        if (requestId !== this.inspectionDetailsRequestId) return;
         this.inspectionNames.set(
           Object.fromEntries(
-            inspections
-              .filter((inspection) => inspection !== null)
+            related
+              .map(({ inspection }) => inspection)
+              .filter(
+                (inspection): inspection is NonNullable<typeof inspection> => inspection !== null,
+              )
               .map((inspection) => [inspection.id, inspection.title || inspection.id]),
           ),
         );
+        const byInspection = new Map(ids.map((id, index) => [id, related[index].evidence]));
+        this.evidenceCounts.set(
+          Object.fromEntries(
+            rows.map((row) => {
+              const evidence = byInspection.get(row.inspectionId);
+              return [
+                row.id,
+                evidence === null
+                  ? null
+                  : (evidence?.filter((item) => item.nonConformityId === row.id).length ?? 0),
+              ];
+            }),
+          ),
+        );
         this.data.update((page) => ({ ...page }));
+      });
+  }
+
+  private loadInspectionChoices(): void {
+    const requestId = ++this.inspectionChoicesRequestId;
+    this.inspections
+      .list({ page: 0, size: 100 })
+      .pipe(
+        catchError(() => of(emptyPage<Inspection>(100))),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((page) => {
+        if (requestId === this.inspectionChoicesRequestId) this.inspectionChoices.set(page.content);
       });
   }
 
@@ -681,6 +845,10 @@ export class CatalogListComponent {
     this.severity.set(value);
     this.refreshFirstPage();
   }
+  protected setInspectionId(value: NonConformityFilters['inspectionId'] | null): void {
+    this.inspectionId.set(value);
+    this.refreshFirstPage();
+  }
   protected onPage(page: PageParams): void {
     this.params.update((p) => ({ ...p, ...page }));
     this.load();
@@ -695,17 +863,14 @@ export class CatalogListComponent {
     if (!filters.some((filter) => filter.key === 'role')) this.role.set(null);
     if (!filters.some((filter) => filter.key === 'status')) this.status.set(null);
     if (!filters.some((filter) => filter.key === 'severity')) this.severity.set(null);
+    if (!filters.some((filter) => filter.key === 'inspectionId')) this.inspectionId.set(null);
     if (!filters.some((filter) => filter.key === 'qrCode')) {
       this.qrSearchActive.set(false);
       this.qrCode.set('');
     }
     const contextKey = this.kind() === 'sites' ? 'clientId' : 'siteId';
     if (this.contextId() && !filters.some((filter) => filter.key === contextKey)) {
-      void this.router.navigate([], {
-        relativeTo: this.route,
-        queryParams: { clientId: null, siteId: null },
-        queryParamsHandling: 'merge',
-      });
+      void this.router.navigate([this.kind() === 'sites' ? '/sites' : '/equipment']);
       return;
     }
     this.refreshFirstPage();
@@ -811,7 +976,7 @@ export class CatalogListComponent {
     if (this.kind() === 'sites') {
       const site = event.row as InspectionSite;
       if (event.action === 'view-equipment') {
-        void this.router.navigate(['/equipment'], { queryParams: { siteId: site.id } });
+        void this.router.navigate(['/sites', site.id, 'equipment']);
         return;
       }
       if (!this.canWrite('sites')) return;
@@ -824,6 +989,26 @@ export class CatalogListComponent {
     }
     if (this.kind() !== 'equipment') return;
     const equipment = event.row as Equipment;
+    if (event.action === 'view-qr') {
+      this.dialog.open(EquipmentQrDialogComponent, {
+        data: { equipment },
+        width: '26rem',
+        maxWidth: '95vw',
+        autoFocus: 'first-tabbable',
+        restoreFocus: true,
+      });
+      return;
+    }
+    if (event.action === 'view-history') {
+      this.dialog.open(EquipmentHistoryDialogComponent, {
+        data: { equipment },
+        width: '56rem',
+        maxWidth: '95vw',
+        autoFocus: 'first-tabbable',
+        restoreFocus: true,
+      });
+      return;
+    }
     if (!this.canWrite('equipment')) return;
     if (event.action === 'edit-equipment') {
       this.openEquipmentForm(equipment);

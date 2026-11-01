@@ -683,7 +683,7 @@ A interface **não permite** editar silenciosamente a resposta original do técn
 
 | Ação | Perfil | Endpoint | Comportamento da UI |
 |---|---|---|---|
-| Listar/filtrar por criticidade | ADMIN, SUPERVISOR | `GET /non-conformities?severity=&page=&size=&sort=` | — |
+| Listar/filtrar por criticidade e inspeção | ADMIN, SUPERVISOR | `GET /non-conformities?severity=&inspectionId=&page=&size=&sort=` | Ambos os filtros são suportados pela API |
 | Consultar item relacionado | ADMIN, SUPERVISOR | `GET /non-conformities/{id}`, `GET /inspections/{inspectionId}`, `GET /inspections/{inspectionId}/evidence` | Abre detalhe somente leitura com item do checklist e evidências associadas. FE-W20 ainda não está implementada como rota e segue no backlog. |
 
 O acompanhamento completo de plano de ação é P2 (`interface-admnistrativa-web.md` §14.12) — fora do escopo desta tela no MVP.
@@ -1452,15 +1452,15 @@ Todo componente também renderiza, quando `required=true`, um indicador visual d
 
 | Coluna | Campo da API | Formatação |
 |---|---|---|
-| Título | `title` | Texto |
-| Descrição | `description` | Texto |
-| Inspeção relacionada | `inspectionId` (resolvido para título; fallback UUID) | Texto |
 | Criticidade | `severity` | Badge |
-| Situação | `status` | Badge (único valor `OPEN` no MVP) |
-| Criada em | `createdAtDevice` | `dd/MM/yyyy HH:mm` |
+| Item relacionado | `title` | Texto |
+| Descrição | `description` | Texto |
+| Evidências | `GET /inspections/{inspectionId}/evidence` | Conta somente evidências com `nonConformityId` igual ao da linha |
+| Inspeção | `inspectionId` (resolvido para título; fallback UUID) | Texto; consulta relacionada abre detalhe somente leitura |
+| Data | `createdAtDevice` | `yyyy-MM-dd` |
 | Ações | — | Consultar inspeção relacionada em detalhe somente leitura |
 
-**Filtros:** `severity`. **Ações por linha:** ver inspeção relacionada.
+**Filtros:** `severity`, `inspectionId`. **Ações por linha:** ver inspeção relacionada. A rota FE-W20 ainda não existe, por isso a consulta abre em modal e não navega para uma rota quebrada.
 
 ## 10.8 FE-M03 — Lista de inspeções (mobile, dados locais)
 

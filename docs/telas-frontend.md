@@ -1373,12 +1373,10 @@ Todo componente também renderiza, quando `required=true`, um indicador visual d
 
 | Coluna | Campo da API | Formatação |
 |---|---|---|
-| Nome | `name` | Texto |
-| E-mail | `email` | Texto |
+| Nome | `name` + `email` | Nome em destaque e e-mail abaixo |
 | Perfil | `role` | Badge |
 | Situação | `status` | Badge (`ACTIVE`=verde, `INACTIVE`=cinza, `BLOCKED`=vermelho — cores não normativas, sugestão) |
-| Telefone | `phone` | Texto |
-| Criado em | `createdAt` | `dd/MM/yyyy HH:mm` |
+| Último acesso | — | `—` até que a API exponha um campo de acesso; `createdAt` não representa último acesso |
 
 **Filtros:** `name`, `email`, `role`, `status`. **Busca:** não há parâmetro dedicado (ver PEND-15 do documento 20; aqui aplicado também a usuários por analogia — **[A DEFINIR]**). **Ordenação:** `sort=createdAt,desc` (padrão sugerido). **Paginação:** padrão da seção 9 do documento 20. **Ações por linha:** editar, ativar/inativar/bloquear, redefinir senha. **Ações em lote:** não previstas em nenhum documento. **Sem resultados:** estado vazio com CTA "cadastrar usuário".
 

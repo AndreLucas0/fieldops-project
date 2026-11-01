@@ -1,16 +1,16 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { provideRouter } from '@angular/router';
+import { of, Subject } from 'rxjs';
 
 import { resetMockStore } from '@fieldops/shared';
 
 import { provideResources } from '../../core/core.providers';
 import { AuthStore } from '../../core/auth/auth.store';
 import { MOCK_LATENCY_MS } from '../../core/mocks/mock-services';
-import { ClientsService } from '../../core/services/resources';
+import { ClientsService, SitesService } from '../../core/services/resources';
 import { ConfirmDialogService } from '../../shared/components';
-import type { Client } from '../../core/models/domain';
+import type { Client, InspectionSite } from '../../core/models/domain';
 import { ClientsListComponent } from './clients-list.component';
 
 describe('ClientsListComponent', () => {
@@ -38,6 +38,55 @@ describe('ClientsListComponent', () => {
     expect(text).toContain('Cliente');
     expect(text).toContain('Situação');
     expect(text).toContain('Ativo');
+  });
+
+  it('mostra CNPJ, contato e quantidade de locais do cliente', async () => {
+    const fixture = TestBed.createComponent(ClientsListComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('CNPJ');
+    expect(text).toContain('Contato');
+    expect(text).toContain('Locais');
+    expect(text).toContain('2 locais');
+    expect(text).toContain('1 local');
+  });
+
+  it('ignora a resposta atrasada de contagem de locais de uma página anterior', () => {
+    const fixture = TestBed.createComponent(ClientsListComponent);
+    const sites = TestBed.inject(SitesService);
+    const previousPage = new Subject<{
+      content: InspectionSite[];
+      totalElements: number;
+      totalPages: number;
+      page: number;
+      size: number;
+    }>();
+    const currentPage = new Subject<{
+      content: InspectionSite[];
+      totalElements: number;
+      totalPages: number;
+      page: number;
+      size: number;
+    }>();
+    vi.spyOn(sites, 'listByClient')
+      .mockReturnValueOnce(previousPage)
+      .mockReturnValueOnce(currentPage);
+    const component = fixture.componentInstance as unknown as {
+      resolveSiteCounts(clients: Client[]): void;
+      siteCounts(): Record<string, number | null>;
+    };
+
+    component.resolveSiteCounts([{ id: 'old-client' } as Client]);
+    component.resolveSiteCounts([{ id: 'current-client' } as Client]);
+    currentPage.next({ content: [], totalElements: 3, totalPages: 3, page: 0, size: 1 });
+    currentPage.complete();
+    previousPage.next({ content: [], totalElements: 1, totalPages: 1, page: 0, size: 1 });
+    previousPage.complete();
+
+    expect(component.siteCounts()).toEqual({ 'current-client': 3 });
   });
 
   it('envia busca ao serviço e reinicia a página quando o filtro muda', async () => {
@@ -86,27 +135,27 @@ describe('ClientsListComponent', () => {
     await fixture.whenStable();
 
     const component = fixture.componentInstance as unknown as {
-      columns: () => readonly { field: string; actions?: readonly { id: string }[] }[];
-      onRowAction: (event: { action: string; row: Client }) => void;
+      columns: () => readonly {
+        field: string;
+        actions?: readonly { id: string }[];
+        link?: (row: Client) => string | unknown[];
+      }[];
     };
     const actions = component.columns().find((column) => column.field === 'actions')?.actions ?? [];
-    expect(actions.map((action) => action.id)).toEqual(['view-sites']);
+    const siteColumn = component.columns().find((column) => column.field === 'id');
+    expect(actions).toEqual([]);
+    expect(siteColumn?.link?.({ id: 'client-2001' } as Client)).toEqual([
+      '/clients',
+      'client-2001',
+      'sites',
+    ]);
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).not.toContain('Novo cliente');
 
-    const client: Client = {
-      id: 'client-2001',
-      name: 'Indústria Alfa',
-      status: 'ACTIVE',
-      createdAt: '2026-11-01T12:00:00Z',
-      updatedAt: '2026-11-01T12:00:00Z',
-      version: 1,
-    };
-    const router = TestBed.inject(Router);
-    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
-    component.onRowAction({ action: 'view-sites', row: client });
-
-    expect(navigate).toHaveBeenCalledWith(['/sites'], { queryParams: { clientId: client.id } });
+    const siteLink = [...(fixture.nativeElement as HTMLElement).querySelectorAll('a')].find(
+      (link) => /\/clients\/[^/]+\/sites/.test(link.getAttribute('href') ?? ''),
+    );
+    expect(siteLink).toBeTruthy();
   });
 
   it('confirma a inativação e envia INACTIVE sem excluir o cliente', async () => {

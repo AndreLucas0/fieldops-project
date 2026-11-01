@@ -11,17 +11,19 @@ const ADMIN_FEATURE_ROUTES: Routes = [
         (module) => module.ClientsListComponent,
       ),
   },
+  catalogRoute('clients/:clientId/sites', 'Locais do cliente', 'sites'),
   catalogRoute('sites', 'Locais'),
+  catalogRoute('sites/:siteId/equipment', 'Equipamentos do local', 'equipment'),
   catalogRoute('equipment', 'Equipamentos'),
   catalogRoute('users', 'Usuários'),
   catalogRoute('non-conformities', 'Não conformidades'),
 ];
 
-function catalogRoute(path: string, title: string): Route {
+function catalogRoute(path: string, title: string, catalog = path): Route {
   return {
     path,
     title: `${title} — FieldOps`,
-    data: { catalog: path },
+    data: { catalog },
     loadComponent: () =>
       import('./features/catalog-list/catalog-list.component').then(
         (module) => module.CatalogListComponent,

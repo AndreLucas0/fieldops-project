@@ -1,8 +1,8 @@
 # Web — Inventário de Telas e Status de Integração
 
-**Data:** 2026-10-14 (atualizado — auditoria documental)
-**Branch analisada:** `main` (HEAD após WEB-MOCK-AUTH + WEB-DISPLAYORDER, não commitados)
-**Tipo:** inventário atualizado em 2026-10-14 com base em evidências de código e testes (205/205 web GREEN)
+**Data da auditoria original:** 2026-10-14 (inventário histórico; os estados das telas abaixo foram atualizados conforme os incrementos de 2026-11-01)
+**Branch atualizada:** `feat/web-admin-lists`
+**Validação atual:** consulte as entradas datadas em `progress.md`; não use o resumo executivo histórico abaixo como estado atual.
 **Fonte primária:** `docs/telas-frontend.md` §2, `docs/auditoria-frontend-backend.md`, `web/src/app/`
 
 ---
@@ -100,11 +100,11 @@ Ressalva: sem shell, navegação para outras telas é impossível sem digitar UR
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
+| Status | **COMPLETA (2026-11-01)** |
 | Rota documentada | `/clients` |
 | Serviço existente | `ClientsService` em `resources.ts` |
 
-Nenhum componente. Rota ausente de `app.routes.ts`.
+`ClientsListComponent` lista, filtra e pagina clientes, com edição/status restritos a ADMIN. ADMIN e SUPERVISOR podem abrir os locais do cliente; o contexto é passado para `/sites?clientId=...`.
 
 ---
 
@@ -112,10 +112,10 @@ Nenhum componente. Rota ausente de `app.routes.ts`.
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
-| Rota documentada | **[A DEFINIR]** |
+| Status | **COMPLETA (2026-11-01)** |
+| Rota documentada | Modal sobre `/clients` (decisão em `docs/telas-frontend.md`) |
 
-Depende de FE-W05.
+`ClientFormDialogComponent` cria e edita clientes com validação e erros de campo da API.
 
 ---
 
@@ -137,11 +137,11 @@ Divergência a resolver ao implementar: `resources.ts` itera response como array
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
+| Status | **COMPLETA (2026-11-01)** |
 | Rota documentada | `/sites` |
 | Serviço existente | `SitesService` em `resources.ts` |
 
-Nenhum componente. Rota ausente de `app.routes.ts`.
+`CatalogListComponent` lista, filtra, pagina, ordena e resolve o nome do cliente. A criação/edição e ativação/inativação ficam disponíveis conforme perfil; a ação contextual abre equipamentos filtrados pelo local.
 
 ---
 
@@ -149,10 +149,10 @@ Nenhum componente. Rota ausente de `app.routes.ts`.
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
-| Rota documentada | **[A DEFINIR]** |
+| Status | **COMPLETA (2026-11-01)** |
+| Rota documentada | Modal sobre `/sites` (decisão em `docs/telas-frontend.md`) |
 
-Depende de FE-W08.
+`SiteFormDialogComponent` valida os campos e mantém o cliente imutável na edição.
 
 ---
 
@@ -172,11 +172,11 @@ Divergência a resolver: idem FE-W07 — iteração direta vs. `Page`.
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
+| Status | **COMPLETA (2026-11-01)** |
 | Rota documentada | `/equipment` |
 | Serviço existente | `EquipmentService` em `resources.ts` |
 
-Nenhum componente. Rota ausente.
+`CatalogListComponent` lista, filtra, pagina, ordena e busca por QR; permite editar e alterar status com confirmação conforme perfil.
 
 ---
 
@@ -184,10 +184,10 @@ Nenhum componente. Rota ausente.
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
-| Rota documentada | **[A DEFINIR]** |
+| Status | **COMPLETA (2026-11-01)** |
+| Rota documentada | Modal sobre `/equipment` (decisão em `docs/telas-frontend.md`) |
 
-Depende de FE-W11.
+`EquipmentFormDialogComponent` exige local ativo e QR na criação; local e QR permanecem imutáveis na edição.
 
 ---
 
@@ -342,12 +342,12 @@ Sem endpoint de backend definido (PEND-08 — escopo futuro). Mantida no invent�
 |---|---|---|
 | `TemplatesService` | FE-W13 (list), FE-W15 (builder) | PARCIALMENTE CONSUMIDO |
 | `DashboardService` | FE-W02 | CONSUMIDO |
-| `UsersService` | nenhuma | ÓRFÃO |
-| `ClientsService` | nenhuma | ÓRFÃO |
-| `SitesService` | nenhuma | ÓRFÃO |
-| `EquipmentService` | nenhuma | ÓRFÃO |
-| `InspectionsService` | nenhuma | ÓRFÃO |
-| `NonConformitiesService` | nenhuma | ÓRFÃO |
+| `UsersService` | FE-W03/04 | CONSUMIDO |
+| `ClientsService` | FE-W05/06 | CONSUMIDO |
+| `SitesService` | FE-W08/09 | CONSUMIDO |
+| `EquipmentService` | FE-W11/12 | CONSUMIDO |
+| `InspectionsService` | FE-W22 (detalhes relacionados) | CONSUMIDO |
+| `NonConformitiesService` | FE-W22 | CONSUMIDO |
 
 ---
 

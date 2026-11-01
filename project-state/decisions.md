@@ -65,6 +65,29 @@ ACTIVE
 
 ---
 
+### [2026-11-01] — a lista de clientes abre os locais no contexto do cliente
+
+Context:
+FE-W05 exige que ADMIN e SUPERVISOR possam acessar os locais de um cliente.
+FE-W08 já interpreta `clientId` na query string para filtrar sua lista.
+
+Decision:
+Expor a ação somente leitura “Ver locais” para ambos os perfis e navegar para
+`/sites?clientId=<id>`. As ações de criar, editar e alterar status continuam
+visíveis somente a ADMIN.
+
+Reason:
+Reutiliza a lista e os filtros existentes, mantendo a autorização documentada
+sem criar rota ou endpoint adicional.
+
+Impact:
+O SUPERVISOR pode consultar locais pelo cliente; não ganha permissão de escrita.
+
+Status:
+ACTIVE
+
+---
+
 ### [2026-10-05] — INT-011: web em dev fala com a API real via proxy do `ng serve`, não via CORS
 
 Context:

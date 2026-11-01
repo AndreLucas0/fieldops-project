@@ -1054,4 +1054,13 @@ Validação: 15 testes direcionados em 2 arquivos; suíte completa 243 testes em
 25 arquivos; build de produção aprovado. O modal foi conferido em viewport
 móvel de 615 px.
 
+### WEB-CLIENT-SITE-NAV-2026-11-01 — acesso aos locais pelo cliente
+
+FE-W05 agora oferece “Ver locais” para ADMIN e SUPERVISOR. A ação abre a lista
+FE-W08 filtrada pelo `clientId`; ações de escrita continuam restritas a ADMIN.
+Um teste cobre a permissão de leitura do SUPERVISOR e a navegação contextual.
+Validação direcionada: 5 testes do componente aprovados; suíte web completa:
+244 testes em 25 arquivos; `npm run build`, Prettier e `git diff --check`
+aprovados.
+
 ---

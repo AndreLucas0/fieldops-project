@@ -1149,3 +1149,33 @@ permissões documentadas, inclusive quando diferentes das opções do protótipo
 
 Validação após os ajustes: `npm test -- --watch=false` — 257 testes em 27 arquivos;
 `npm run build` — sucesso. Sem atualização de dependências ou contratos.
+
+### GIT-ISSUE-OWNERSHIP-AUDIT-2026-11-01 — LucasIanovski
+
+Snapshot auditado: `develop` em `3d24b92`, `main` em `3a38371`, após `git fetch
+origin`. Conferidas 28 branches remotas e 8 locais, 504 commits alcançáveis e
+263 issues. No conjunto remoto há 197 commits únicos; 49 têm autoria Lucas
+Ianovski/LucasIanovski (`ianovskilucas@gmail.com`), sendo 48 sem merge e um merge.
+Os 175 commits adicionais dessa identidade presentes somente nas referências
+locais têm árvores idênticas às de commits remotos; backups e reescritas locais
+não foram contados como novas entregas.
+
+Conferidas com LucasIanovski e Status Done: #2, #3, #23, #65, #66, #67, #72, #74,
+#77, #238, #280 e #288. #3 recebeu a atribuição pela criação/atualização do README
+em `c048ae4` e `ddc28ce`; já estava em Done. Nas issues #2 e #3 a responsabilidade
+atual ficou somente com Lucas conforme solicitação do usuário, sem alterar a
+autoria histórica compartilhada da estrutura/configuração. As nove tasks web já
+tratadas e #238 (testes de autorização, evidência `a8b0e07`) foram preservadas.
+
+Não concluídas por associação parcial: #78 (a seleção encadeada exigida na
+reabertura não é comprovada pelas listas contextuais), #250 (troca de imagem
+MinIO não entrega Dockerfile/Compose completo), #252 (README inicial não é a
+documentação final de demonstração). #230 tem componentes originais de outro
+autor; não foi atribuída ao autor que apenas os reutilizou. O merge `9ca2b56`
+feito por Lucas não prova autoria dos commits de backend de Andre Lucas Ferreira.
+Organograma (`651e322`) e contribuições a aquisições/partes interessadas
+(`fcb2748`) não têm issues específicas no inventário examinado.
+
+Validação desta rodada: leitura de históricos/diffs e conferência das 12 issues
+no navegador autenticado. Sem alteração funcional; testes não repetidos. O
+relatório detalhado e os inventários JSON foram entregues fora do repositório.

@@ -2,17 +2,25 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 
-import { EQUIPMENT_IDS, resetMockStore, SITE_IDS } from '@fieldops/shared';
+import { CLIENT_IDS, EQUIPMENT_IDS, resetMockStore, SITE_IDS } from '@fieldops/shared';
 
 import { AuthStore } from '../../core/auth/auth.store';
 import { provideResources } from '../../core/core.providers';
 import { MOCK_LATENCY_MS } from '../../core/mocks/mock-services';
-import type { Equipment, InspectionSite, NonConformity } from '../../core/models/domain';
-import { EquipmentService, SitesService, UsersService } from '../../core/services/resources';
+import type { Equipment, InspectionSite, NonConformity, User } from '../../core/models/domain';
+import type { Page } from '../../core/models/page.model';
+import {
+  EquipmentService,
+  NonConformitiesService,
+  SitesService,
+  UsersService,
+} from '../../core/services/resources';
 import { ConfirmDialogService } from '../../shared/components';
 import { CatalogListComponent } from './catalog-list.component';
+import { EquipmentHistoryDialogComponent } from '../equipment/equipment-history-dialog.component';
+import { EquipmentQrDialogComponent } from '../equipment/equipment-qr-dialog.component';
 
 describe('CatalogListComponent', () => {
   async function setup(
@@ -20,6 +28,7 @@ describe('CatalogListComponent', () => {
     role: 'ADMIN' | 'SUPERVISOR' = 'SUPERVISOR',
     queryParams: Record<string, string> = {},
     extraProviders: unknown[] = [],
+    routeParams: Record<string, string> = {},
   ) {
     resetMockStore();
     TestBed.configureTestingModule({
@@ -35,9 +44,11 @@ describe('CatalogListComponent', () => {
           useValue: {
             data: of({ catalog }),
             queryParamMap: of(convertToParamMap(queryParams)),
+            paramMap: of(convertToParamMap(routeParams)),
             snapshot: {
               data: { catalog },
               queryParamMap: convertToParamMap(queryParams),
+              paramMap: convertToParamMap(routeParams),
             },
           },
         },
@@ -62,27 +73,136 @@ describe('CatalogListComponent', () => {
   }
 
   it('apresenta a lista de usuários com perfil e situação', async () => {
-    const text = await render('users');
+    const fixture = await setup('users');
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Usuários');
     expect(text).toContain('Perfil');
     expect(text).toContain('Situação');
+    expect(text).toContain('Último acesso');
+    expect(text).toContain('admin@fieldops.local');
+    expect(text).not.toContain('Criado em');
   });
 
-  it('apresenta locais com cliente, cidade e estado', async () => {
+  it('apresenta locais com endereço, coordenadas, contato e total de equipamentos', async () => {
     const text = await render('sites');
     expect(text).toContain('Locais');
     expect(text).toContain('Cliente');
-    expect(text).toContain('Cidade');
+    expect(text).toContain('Endereço');
+    expect(text).toContain('Coordenadas');
+    expect(text).toContain('Contato');
+    expect(text).toContain('Equipamentos');
+    expect(text).toContain('Av. das Indústrias, 1500 — São Paulo/SP');
+    expect(text).toContain('-23.55 , -46.63');
+    expect(text).toContain('Eduardo Prado');
+    expect(text).toContain('+55 11 99777-3030');
+    expect(text).toContain('2 itens');
   });
 
   it('apresenta equipamentos com identificadores e situação', async () => {
-    const text = await render('equipment');
+    const fixture = await setup('equipment');
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Equipamentos');
-    expect(text).toContain('Código QR');
-    expect(text).toContain('GD001');
     expect(text).toContain('Stemac · ST-450');
+    expect(text).toContain('TAG');
     expect(text).toContain('Patrimônio');
     expect(text).toContain('Nº de série');
+    expect(text).toContain('Fabricante / modelo');
+    const component = fixture.componentInstance as unknown as {
+      columns(): readonly { field: string; label: string; actions?: readonly { id: string }[] }[];
+    };
+    const columns = component.columns();
+    expect(columns.map((column) => column.label)).toEqual([
+      'TAG',
+      'Patrimônio',
+      'Nº de série',
+      'Fabricante / modelo',
+      'Local',
+      'Situação',
+      'Ações',
+    ]);
+    expect(
+      columns.find((column) => column.field === 'actions')?.actions?.map(({ id }) => id),
+    ).toEqual(expect.arrayContaining(['view-qr', 'view-history']));
+  });
+
+  it('abre os diálogos de QR e histórico para o equipamento selecionado', async () => {
+    const fixture = await setup('equipment');
+    const dialog = TestBed.inject(MatDialog);
+    const open = vi.spyOn(dialog, 'open').mockReturnValue({} as never);
+    const component = fixture.componentInstance as unknown as {
+      data(): { content: Equipment[] };
+      onRowAction(event: { action: string; row: Equipment }): void;
+    };
+    const equipment = component.data().content[0];
+
+    component.onRowAction({ action: 'view-qr', row: equipment });
+    component.onRowAction({ action: 'view-history', row: equipment });
+
+    expect(open).toHaveBeenNthCalledWith(
+      1,
+      EquipmentQrDialogComponent,
+      expect.objectContaining({ data: { equipment } }),
+    );
+    expect(open).toHaveBeenNthCalledWith(
+      2,
+      EquipmentHistoryDialogComponent,
+      expect.objectContaining({ data: { equipment } }),
+    );
+  });
+
+  it('carrega a lista contextual pelo endpoint de locais do cliente', async () => {
+    const fixture = await setup('sites', 'SUPERVISOR', {}, [], { clientId: CLIENT_IDS.alfa });
+    const service = TestBed.inject(SitesService);
+    const listByClient = vi.spyOn(service, 'listByClient');
+    const component = fixture.componentInstance as unknown as { load(): void };
+
+    component.load();
+    await fixture.whenStable();
+
+    expect(listByClient).toHaveBeenCalledWith(CLIENT_IDS.alfa, expect.any(Object));
+  });
+
+  it('carrega a lista contextual pelo endpoint de equipamentos do local', async () => {
+    const fixture = await setup('equipment', 'SUPERVISOR', {}, [], {
+      siteId: SITE_IDS.plantaSaoPaulo,
+    });
+    const service = TestBed.inject(EquipmentService);
+    const listBySite = vi.spyOn(service, 'listBySite');
+    const component = fixture.componentInstance as unknown as { load(): void };
+
+    component.load();
+    await fixture.whenStable();
+
+    expect(listBySite).toHaveBeenCalledWith(SITE_IDS.plantaSaoPaulo, expect.any(Object));
+  });
+
+  it('ignora uma resposta antiga da lista após uma nova busca', async () => {
+    const fixture = await setup('users');
+    const users = TestBed.inject(UsersService);
+    const previousRequest = new Subject<Page<User>>();
+    const currentRequest = new Subject<Page<User>>();
+    vi.spyOn(users, 'list')
+      .mockReturnValueOnce(previousRequest)
+      .mockReturnValueOnce(currentRequest);
+    const component = fixture.componentInstance as unknown as {
+      data(): Page<User>;
+      load(): void;
+      setName(value: string): void;
+    };
+    const createPage = (id: string): Page<User> => ({
+      content: [{ id } as User],
+      page: 0,
+      size: 20,
+      totalElements: 1,
+      totalPages: 1,
+    });
+
+    component.load();
+    component.setName('atual');
+    currentRequest.next(createPage('current-user'));
+    previousRequest.next(createPage('old-user'));
+
+    expect(component.data().content[0]?.id).toBe('current-user');
   });
 
   it('filtra não conformidades por criticidade', async () => {
@@ -90,6 +210,28 @@ describe('CatalogListComponent', () => {
     expect(text).toContain('Não conformidades');
     expect(text).toContain('Criticidade');
     expect(text).toContain('Inspeção Compressor');
+    expect(text).toContain('Evidências');
+    expect(text).toContain('Data');
+    const component = fixture.componentInstance as unknown as { inspectionChoices(): unknown[] };
+    expect(component.inspectionChoices().length).toBeGreaterThan(0);
+  });
+
+  it('carrega as inspeções para o filtro e envia a inspeção escolhida à API', async () => {
+    const fixture = await setup('non-conformities');
+    const nonConformities = TestBed.inject(NonConformitiesService);
+    const listNonConformities = vi.spyOn(nonConformities, 'list');
+    const component = fixture.componentInstance as unknown as {
+      setInspectionId(value: string): void;
+      inspectionChoices(): unknown[];
+    };
+
+    expect(component.inspectionChoices().length).toBeGreaterThan(0);
+    component.setInspectionId('inspection-1');
+    await fixture.whenStable();
+
+    expect(listNonConformities).toHaveBeenCalledWith(
+      expect.objectContaining({ inspectionId: 'inspection-1' }),
+    );
   });
 
   it('abre a inspeção relacionada à não conformidade em detalhe somente leitura', async () => {
@@ -223,14 +365,17 @@ describe('CatalogListComponent', () => {
   });
 
   it('aplica o contexto de cliente vindo da lista de clientes aos locais', async () => {
-    const list = vi.fn(() =>
+    const listByClient = vi.fn(() =>
       of({ content: [], totalElements: 0, totalPages: 0, page: 0, size: 20 }),
     );
     const fixture = await setup('sites', 'SUPERVISOR', { clientId: 'client-context' }, [
-      { provide: SitesService, useValue: { list, get: vi.fn(), setStatus: vi.fn() } },
+      {
+        provide: SitesService,
+        useValue: { listByClient, list: vi.fn(), get: vi.fn(), setStatus: vi.fn() },
+      },
     ]);
 
-    expect(list).toHaveBeenCalledWith(expect.objectContaining({ clientId: 'client-context' }));
+    expect(listByClient).toHaveBeenCalledWith('client-context', expect.any(Object));
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Selecionado');
   });
 

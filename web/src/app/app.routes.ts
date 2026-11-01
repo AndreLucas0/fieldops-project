@@ -11,6 +11,14 @@ const ADMIN_FEATURE_ROUTES: Routes = [
         (module) => module.ClientsListComponent,
       ),
   },
+  {
+    path: 'inspections',
+    title: 'Inspeções — FieldOps',
+    loadComponent: () =>
+      import('./features/inspections/inspections-list.component').then(
+        (module) => module.InspectionsListComponent,
+      ),
+  },
   catalogRoute('clients/:clientId/sites', 'Locais do cliente', 'sites'),
   catalogRoute('sites', 'Locais'),
   catalogRoute('sites/:siteId/equipment', 'Equipamentos do local', 'equipment'),

@@ -1,6 +1,7 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 import { of } from 'rxjs';
 
 import { EQUIPMENT_IDS, resetMockStore, SITE_IDS } from '@fieldops/shared';
@@ -8,7 +9,7 @@ import { EQUIPMENT_IDS, resetMockStore, SITE_IDS } from '@fieldops/shared';
 import { AuthStore } from '../../core/auth/auth.store';
 import { provideResources } from '../../core/core.providers';
 import { MOCK_LATENCY_MS } from '../../core/mocks/mock-services';
-import type { Equipment, InspectionSite } from '../../core/models/domain';
+import type { Equipment, InspectionSite, NonConformity } from '../../core/models/domain';
 import { EquipmentService, SitesService, UsersService } from '../../core/services/resources';
 import { ConfirmDialogService } from '../../shared/components';
 import { CatalogListComponent } from './catalog-list.component';
@@ -85,6 +86,37 @@ describe('CatalogListComponent', () => {
     const text = await render('non-conformities');
     expect(text).toContain('Não conformidades');
     expect(text).toContain('Criticidade');
+    expect(text).toContain('Inspeção Compressor');
+  });
+
+  it('abre a inspeção relacionada à não conformidade em detalhe somente leitura', async () => {
+    const fixture = await setup('non-conformities', 'SUPERVISOR');
+    const dialog = TestBed.inject(MatDialog);
+    const open = vi
+      .spyOn(dialog, 'open')
+      .mockReturnValue({ afterClosed: () => of(undefined) } as never);
+    const nonConformity: NonConformity = {
+      id: 'nc-1',
+      inspectionId: 'inspection-1',
+      title: 'Cabo de aço',
+      description: 'Fios rompidos.',
+      severity: 'HIGH',
+      status: 'OPEN',
+      createdAtDevice: '2026-11-01T10:00:00Z',
+      createdAt: '2026-11-01T10:00:01Z',
+      updatedAt: '2026-11-01T10:00:01Z',
+      version: 1,
+    };
+    const component = fixture.componentInstance as unknown as {
+      onRowAction(event: { action: string; row: NonConformity }): void;
+    };
+
+    component.onRowAction({ action: 'view-non-conformity', row: nonConformity });
+
+    expect(open).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({ data: { nonConformity } }),
+    );
   });
 
   it('só mostra cadastro de local e ações de escrita para ADMIN', async () => {

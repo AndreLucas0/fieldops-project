@@ -1040,3 +1040,18 @@ arquivos; build de produção aprovado. A lista de clientes foi conferida em
 viewport móvel de 615 px, com rolagem horizontal confinada à tabela.
 
 ---
+
+### WEB-NONCONFORMITY-ADMIN-2026-11-01 — consulta de NC e inspeção relacionada
+
+FE-W22 mantém filtro de severidade do contrato, exibe item, descrição, título da
+inspeção (quando disponível), criticidade, estado e data do dispositivo. A ação
+de consulta carrega NC, inspeção e evidências pelos endpoints existentes; o
+modal identifica o item do checklist e conta evidências vinculadas à NC.
+
+A rota FE-W20 ainda não existe no frontend; o modal mantém a consulta funcional
+sem link quebrado. A tela não altera status nem exclui NC, seguindo RN-056/057.
+Validação: 15 testes direcionados em 2 arquivos; suíte completa 243 testes em
+25 arquivos; build de produção aprovado. O modal foi conferido em viewport
+móvel de 615 px.
+
+---

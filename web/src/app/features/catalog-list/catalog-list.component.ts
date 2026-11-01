@@ -31,6 +31,7 @@ import { emptyPage, type Page, type PageParams, type Sort } from '../../core/mod
 import {
   ClientsService,
   EquipmentService,
+  InspectionsService,
   NonConformitiesService,
   SitesService,
   UsersService,
@@ -54,6 +55,7 @@ import { NotificationService } from '../../core/notifications/notification.servi
 import { SiteFormDialogComponent } from '../sites/site-form-dialog.component';
 import { EquipmentFormDialogComponent } from '../equipment/equipment-form-dialog.component';
 import { UserFormDialogComponent } from '../users/user-form-dialog.component';
+import { NonConformityDetailDialogComponent } from '../non-conformities/non-conformity-detail-dialog.component';
 
 type CatalogKey = 'users' | 'sites' | 'equipment' | 'non-conformities';
 type CatalogRow = User | InspectionSite | Equipment | NonConformity;
@@ -262,6 +264,7 @@ export class CatalogListComponent {
   private readonly users = inject(UsersService);
   private readonly sites = inject(SitesService);
   private readonly equipment = inject(EquipmentService);
+  private readonly inspections = inject(InspectionsService);
   private readonly nonConformities = inject(NonConformitiesService);
   private readonly clients = inject(ClientsService);
 
@@ -285,6 +288,7 @@ export class CatalogListComponent {
   protected readonly data = signal<Page<CatalogRow>>(emptyPage());
   private readonly clientNames = signal<Record<string, string>>({});
   private readonly siteNames = signal<Record<string, string>>({});
+  private readonly inspectionNames = signal<Record<string, string>>({});
   protected readonly loading = signal(false);
   protected readonly error = signal<ApiError | null>(null);
   protected readonly name = signal('');
@@ -463,8 +467,13 @@ export class CatalogListComponent {
         ];
       case 'non-conformities':
         return [
-          { field: 'title', label: 'Não conformidade', sortable: true },
-          { field: 'inspectionId', label: 'Inspeção' },
+          { field: 'title', label: 'Item relacionado', sortable: true },
+          { field: 'description', label: 'Descrição', emptyText: '—' },
+          {
+            field: 'inspectionId',
+            label: 'Inspeção relacionada',
+            format: (value) => this.inspectionNames()[String(value)] ?? String(value ?? ''),
+          },
           {
             field: 'severity',
             label: 'Criticidade',
@@ -479,7 +488,15 @@ export class CatalogListComponent {
             badgeContext: 'nonConformity',
             align: 'center',
           },
-          { field: 'createdAt', label: 'Registrada em', type: 'date', sortable: true },
+          { field: 'createdAtDevice', label: 'Registrada em', type: 'date', sortable: true },
+          {
+            field: 'actions',
+            label: 'Ações',
+            type: 'actions',
+            actions: [
+              { id: 'view-non-conformity', label: 'Ver inspeção relacionada', icon: 'visibility' },
+            ],
+          },
         ];
     }
   });
@@ -580,6 +597,7 @@ export class CatalogListComponent {
         this.data.set(page as Page<CatalogRow>);
         if (key === 'sites') this.resolveClients(page.content as InspectionSite[]);
         if (key === 'equipment') this.resolveSites(page.content as Equipment[]);
+        if (key === 'non-conformities') this.resolveInspections(page.content as NonConformity[]);
       });
   }
 
@@ -615,6 +633,23 @@ export class CatalogListComponent {
         this.data.update((page) => ({ ...page }));
       },
     );
+  }
+
+  private resolveInspections(rows: NonConformity[]): void {
+    const ids = [...new Set(rows.map((row) => row.inspectionId))];
+    if (!ids.length) return;
+    forkJoin(ids.map((id) => this.inspections.get(id).pipe(catchError(() => of(null)))))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((inspections) => {
+        this.inspectionNames.set(
+          Object.fromEntries(
+            inspections
+              .filter((inspection) => inspection !== null)
+              .map((inspection) => [inspection.id, inspection.title || inspection.id]),
+          ),
+        );
+        this.data.update((page) => ({ ...page }));
+      });
   }
 
   protected setName(value: string): void {
@@ -760,6 +795,10 @@ export class CatalogListComponent {
       else this.confirmUserStatus(user, event.action);
       return;
     }
+    if (this.kind() === 'non-conformities') {
+      this.openNonConformityDetail(event.row as NonConformity);
+      return;
+    }
     if (this.kind() === 'sites') {
       const site = event.row as InspectionSite;
       if (event.action === 'view-equipment') {
@@ -783,6 +822,16 @@ export class CatalogListComponent {
     }
 
     this.confirmEquipmentStatus(equipment, event.action);
+  }
+
+  private openNonConformityDetail(nonConformity: NonConformity): void {
+    this.dialog.open(NonConformityDetailDialogComponent, {
+      data: { nonConformity },
+      width: '44rem',
+      maxWidth: '95vw',
+      autoFocus: 'first-tabbable',
+      restoreFocus: true,
+    });
   }
 
   private confirmUserStatus(user: User, action: string): void {

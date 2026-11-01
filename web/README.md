@@ -40,6 +40,8 @@ equipamentos e usuários têm cadastro/edição em modal; equipamentos também
 podem ser localizados pelo QR Code. A lista de usuários permite alteração
 confirmada de situação e solicitação de redefinição de senha usando a mensagem
 retornada pela API, sem assumir entrega ou geração de senha.
+Na lista de não conformidades, a consulta abre um modal de leitura que recupera
+a inspeção, o item relacionado e as evidências pela API.
 As telas administrativas seguem o tema carvão e âmbar do protótipo, mantendo
 as tabelas roláveis dentro do próprio contêiner em telas estreitas.
 

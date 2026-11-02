@@ -29,320 +29,329 @@ import {
     TemplatesService,
     UsersService,
 } from '../../core/services/resources';
+import { PageHeaderComponent } from '../../shared/components';
 
 @Component({
     selector: 'app-inspection-create',
     standalone: true,
-    imports: [FormsModule],
+    imports: [FormsModule, PageHeaderComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
     <section class="page">
-      <h1>Planejar inspeção</h1>
+  <app-page-header
+    title="Planejar inspeção"
+    subtitle="Defina o modelo, o local e os responsáveis pela execução."
+  />
 
-      <form #form="ngForm" (ngSubmit)="submit()">
-        <div class="form-card">
+  <div class="catalog-card">
+    <form #form="ngForm" (ngSubmit)="submit()">
+      <div class="form-card">
 
-          <div class="field full">
-            <label for="template">Modelo (versão publicada) *</label>
-            <select
-              id="template"
-              name="template"
-              required
-              [ngModel]="templateId()"
-              (ngModelChange)="onTemplateChange($event)"
-            >
-              <option value="">Selecione...</option>
-              @for (template of templates(); track template.id) {
-                <option [value]="template.id">{{ template.title }}</option>
-              }
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="client">Cliente *</label>
-            <select
-              id="client"
-              name="client"
-              required
-              [ngModel]="clientId()"
-              (ngModelChange)="onClientChange($event)"
-            >
-              <option value="">Selecione...</option>
-              @for (client of clients(); track client.id) {
-                <option [value]="client.id">{{ client.name }}</option>
-              }
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="site">Local *</label>
-            <select
-              id="site"
-              name="site"
-              required
-              [disabled]="!clientId() || loadingSites()"
-              [ngModel]="siteId()"
-              (ngModelChange)="onSiteChange($event)"
-            >
-              <option value="">
-                {{ clientId() ? 'Selecione...' : 'Escolha o cliente primeiro' }}
-              </option>
-              @for (site of sites(); track site.id) {
-                <option [value]="site.id">{{ site.name }}</option>
-              }
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="equipment">Equipamento</label>
-            <select
-              id="equipment"
-              name="equipment"
-              [disabled]="!siteId() || loadingEquipment()"
-              [ngModel]="equipmentId()"
-              (ngModelChange)="equipmentId.set($event)"
-            >
-              <option value="">
-                {{ siteId() ? 'Selecione...' : 'Escolha o local primeiro' }}
-              </option>
-              @for (equipment of equipmentOptions(); track equipment.id) {
-                <option [value]="equipment.id">{{ equipment.name }}</option>
-              }
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="technician">Técnico *</label>
-            <select
-              id="technician"
-              name="technician"
-              required
-              [(ngModel)]="technicianId"
-            >
-              <option value="">Selecione...</option>
-              @for (technician of technicians(); track technician.id) {
-                <option [value]="technician.id">{{ technician.name }}</option>
-              }
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="supervisor">Supervisor</label>
-            <select
-              id="supervisor"
-              name="supervisor"
-              [(ngModel)]="supervisorId"
-            >
-              <option value="">Selecione...</option>
-              @for (supervisor of supervisors(); track supervisor.id) {
-                <option [value]="supervisor.id">{{ supervisor.name }}</option>
-              }
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="scheduledFor">Data prevista *</label>
-            <input
-              id="scheduledFor"
-              name="scheduledFor"
-              type="date"
-              required
-              [min]="today"
-              [(ngModel)]="scheduledFor"
-            />
-          </div>
-
-          <div class="field">
-            <label for="priority">Prioridade *</label>
-            <select
-              id="priority"
-              name="priority"
-              required
-              [(ngModel)]="priority"
-            >
-              <option value="LOW">Baixa</option>
-              <option value="MEDIUM">Média</option>
-              <option value="HIGH">Alta</option>
-              <option value="CRITICAL">Crítica</option>
-            </select>
-          </div>
-
-          <div class="field full">
-            <label for="instructions">Instruções ao técnico</label>
-            <textarea
-              id="instructions"
-              name="instructions"
-              rows="4"
-              maxlength="2000"
-              placeholder="Descreva orientações para a execução da inspeção..."
-              [(ngModel)]="instructions"
-            ></textarea>
-          </div>
-
-          @if (error()) {
-            <div class="message error">{{ error() }}</div>
-          }
-
-          @if (loadingInitial()) {
-            <div class="message">Carregando dados do formulário...</div>
-          }
-
-        </div>
-
-        <div class="form-actions">
-          <button type="button" class="btn-cancel" (click)="cancel()">
-            Cancelar
-          </button>
-
-          <button
-            type="submit"
-            class="btn-submit"
-            [disabled]="form.invalid || saving() || loadingInitial() || !templateVersionId()"
+        <!-- Modelo -->
+        <div class="field full">
+          <label for="template">Modelo (versão publicada) *</label>
+          <select
+            id="template"
+            name="template"
+            required
+            [ngModel]="templateId()"
+            (ngModelChange)="onTemplateChange($event)"
           >
-            {{ saving() ? 'Criando...' : 'Criar e atribuir' }}
-          </button>
+            <option value="">Selecione...</option>
+            @for (template of templates(); track template.id) {
+              <option [value]="template.id">{{ template.title }}</option>
+            }
+          </select>
         </div>
-      </form>
-    </section>
+
+        <!-- Cliente -->
+        <div class="field">
+          <label for="client">Cliente *</label>
+          <select
+            id="client"
+            name="client"
+            required
+            [ngModel]="clientId()"
+            (ngModelChange)="onClientChange($event)"
+          >
+            <option value="">Selecione...</option>
+            @for (client of clients(); track client.id) {
+              <option [value]="client.id">{{ client.name }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Local -->
+        <div class="field">
+          <label for="site">Local *</label>
+          <select
+            id="site"
+            name="site"
+            required
+            [disabled]="!clientId() || loadingSites()"
+            [ngModel]="siteId()"
+            (ngModelChange)="onSiteChange($event)"
+          >
+            <option value="">
+              {{ clientId() ? 'Selecione...' : 'Escolha o cliente primeiro' }}
+            </option>
+            @for (site of sites(); track site.id) {
+              <option [value]="site.id">{{ site.name }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Equipamento -->
+        <div class="field">
+          <label for="equipment">Equipamento</label>
+          <select
+            id="equipment"
+            name="equipment"
+            [disabled]="!siteId() || loadingEquipment()"
+            [ngModel]="equipmentId()"
+            (ngModelChange)="equipmentId.set($event)"
+          >
+            <option value="">
+              {{ siteId() ? 'Selecione...' : 'Escolha o local primeiro' }}
+            </option>
+            @for (equipment of equipmentOptions(); track equipment.id) {
+              <option [value]="equipment.id">{{ equipment.name }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Técnico -->
+        <div class="field">
+          <label for="technician">Técnico *</label>
+          <select
+            id="technician"
+            name="technician"
+            required
+            [(ngModel)]="technicianId"
+          >
+            <option value="">Selecione...</option>
+            @for (technician of technicians(); track technician.id) {
+              <option [value]="technician.id">{{ technician.name }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Supervisor -->
+        <div class="field">
+          <label for="supervisor">Supervisor</label>
+          <select
+            id="supervisor"
+            name="supervisor"
+            [(ngModel)]="supervisorId"
+          >
+            <option value="">Selecione...</option>
+            @for (supervisor of supervisors(); track supervisor.id) {
+              <option [value]="supervisor.id">{{ supervisor.name }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Data prevista -->
+        <div class="field">
+          <label for="scheduledFor">Data prevista *</label>
+          <input
+            id="scheduledFor"
+            name="scheduledFor"
+            type="date"
+            required
+            [min]="today"
+            [(ngModel)]="scheduledFor"
+          />
+        </div>
+
+        <!-- Prioridade -->
+        <div class="field">
+          <label for="priority">Prioridade *</label>
+          <select
+            id="priority"
+            name="priority"
+            required
+            [(ngModel)]="priority"
+          >
+            <option value="LOW">Baixa</option>
+            <option value="MEDIUM">Média</option>
+            <option value="HIGH">Alta</option>
+            <option value="CRITICAL">Crítica</option>
+          </select>
+        </div>
+
+        <!-- Instruções -->
+        <div class="field full">
+          <label for="instructions">Instruções ao técnico</label>
+          <textarea
+            id="instructions"
+            name="instructions"
+            rows="4"
+            maxlength="2000"
+            placeholder="Descreva orientações para a execução da inspeção..."
+            [(ngModel)]="instructions"
+          ></textarea>
+        </div>
+
+        @if (error()) {
+          <div class="message error">{{ error() }}</div>
+        }
+
+        @if (loadingInitial()) {
+          <div class="message">Carregando dados do formulário...</div>
+        }
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn-cancel" (click)="cancel()">
+          Cancelar
+        </button>
+
+        <button
+          type="submit"
+          class="btn-submit"
+          [disabled]="form.invalid || saving() || loadingInitial() || !templateVersionId()"
+        >
+          {{ saving() ? 'Criando...' : 'Criar e atribuir' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
   `,
     styles: `
-    :host {
-      display: block;
-      min-width: 0;
-    }
+   :host {
+  display: block;
+  min-width: 0;
+}
 
-    .page {
-      max-width: 76rem;
-      margin: 0 auto;
-      padding: 1.5rem;
-      color: #f5f6f7;
-    }
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
 
-    h1 {
-      margin: 0 0 2rem;
-      font-size: 1.8rem;
-      font-weight: 700;
-    }
+.form-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
 
-    .form-card {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 2rem 1.5rem;
-      padding: 2rem;
-      background: linear-gradient(145deg, #1c242b, #141a1f);
-      border: 1px solid #303941;
-      border-radius: 1.25rem;
-    }
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+}
 
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 0.45rem;
-      min-width: 0;
-    }
+.field.full {
+  grid-column: 1 / -1;
+}
 
-    .field.full {
-      grid-column: 1 / -1;
-    }
+label {
+  color: #91a7c0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
 
-    label {
-      color: #91a7c0;
-      font-size: 0.82rem;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
+input,
+select,
+textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 0.8rem 1rem;
+  color: #f5f6f7;
+  background: #101519;
+  border: 1px solid #303941;
+  border-radius: 0.75rem;
+  font: inherit;
+  outline: none;
+}
 
-    input, select, textarea {
-      box-sizing: border-box;
-      width: 100%;
-      min-width: 0;
-      padding: 0.8rem 1rem;
-      color: #f5f6f7;
-      background: #101519;
-      border: 1px solid #303941;
-      border-radius: 0.75rem;
-      font: inherit;
-      outline: none;
-    }
+input,
+select {
+  min-height: 2.8rem;
+}
 
-    input, select {
-      min-height: 2.8rem;
-    }
+select:disabled {
+  color: #7d858c;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
 
-    select:disabled {
-      color: #7d858c;
-      cursor: not-allowed;
-      opacity: 0.7;
-    }
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #f5a316;
+}
 
-    input:focus, select:focus, textarea:focus {
-      border-color: #f5a316;
-    }
+textarea {
+  resize: vertical;
+}
 
-    textarea {
-      resize: vertical;
-    }
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
 
-    .form-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.65rem;
-      margin-top: 0;
-      padding: 1.25rem 1.5rem;
-      border-top: 1px solid #303941;
-    }
+button {
+  min-height: 2.8rem;
+  padding: 0.7rem 1.3rem;
+  border-radius: 0.75rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
 
-    button {
-      min-height: 2.8rem;
-      padding: 0.7rem 1.3rem;
-      border-radius: 0.75rem;
-      font: inherit;
-      font-weight: 600;
-      cursor: pointer;
-    }
+.btn-cancel {
+  color: #f5f6f7;
+  background: transparent;
+  border: 1px solid #39434b;
+}
 
-    .btn-cancel {
-      color: #f5f6f7;
-      background: transparent;
-      border: 1px solid #39434b;
-    }
+.btn-submit {
+  color: #171717;
+  background: #f5a316;
+  border: 1px solid #f5a316;
+}
 
-    .btn-submit {
-      color: #171717;
-      background: #f5a316;
-      border: 1px solid #f5a316;
-    }
+.btn-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
 
-    .btn-submit:disabled {
-      cursor: not-allowed;
-      opacity: 0.55;
-    }
+.message {
+  grid-column: 1 / -1;
+  color: #91a7c0;
+  font-size: 0.9rem;
+}
 
-    .message {
-      grid-column: 1 / -1;
-      color: #91a7c0;
-      font-size: 0.9rem;
-    }
+.message.error {
+  color: #ff7777;
+}
 
-    .message.error {
-      color: #ff7777;
-    }
+@media (max-width: 700px) {
+  .form-card {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+    gap: 1.25rem;
+  }
 
-    @media (max-width: 700px) {
-      .form-card {
-        grid-template-columns: 1fr;
-        padding: 1.25rem;
-        gap: 1.25rem;
-      }
+  .field.full {
+    grid-column: auto;
+  }
 
-      .field.full {
-        grid-column: auto;
-      }
-
-      .page {
-        padding: 1rem;
-      }
-    }
+  .form-actions {
+    flex-wrap: wrap;
+    padding: 1rem;
+  }
+}
   `,
 })
 export class InspectionCreateComponent {

@@ -151,14 +151,12 @@ interface DashboardData {
       display: block;
     }
 
-    .page {
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-      max-width: 76rem;
-      margin: 0 auto;
-      padding: 1.5rem;
-    }
+  .page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
 
     .actions {
       display: flex;

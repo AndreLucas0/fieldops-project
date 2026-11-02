@@ -83,60 +83,96 @@ function formatDay(day: string): string {
 @Component({
   selector: 'app-inspections-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-imports: [
-  FormsModule,
-  MatFormFieldModule,
-  MatInputModule,
-  MatSelectModule,
-  MatButtonModule,
-  MatIconModule,
-  DataTableComponent,
-  PageHeaderComponent,
-],
+  imports: [
+    FormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatButtonModule,
+    MatIconModule,
+    DataTableComponent,
+    PageHeaderComponent,
+  ],
   template: `
-    <section class="page">
-     <app-page-header
-  title="Inspeções"
-  subtitle="Acompanhe o planejamento e cancele quando necessário."
->
-  <div actions>
-    @if (canManage()) {
-      <button matButton="filled" (click)="createNew()">
-        <mat-icon>add</mat-icon>
-        Nova inspeção
-      </button>
-    }
-  </div>
-</app-page-header>
-      <div class="catalog-card">
+  <section class="page inspection-list-page">
+
+    <app-page-header
+      title="Inspeções"
+      subtitle="Acompanhe o planejamento e cancele quando necessário."
+    >
+      <div actions>
+        @if (canManage()) {
+          <button matButton="filled" (click)="createNew()">
+            <mat-icon>add</mat-icon>
+            Nova inspeção
+          </button>
+        }
+      </div>
+    </app-page-header>
+
+    <section class="content-panel">
+
+      <div class="filter-section">
+
+        <div class="filter-heading">
+          <div>
+            <h2>Filtros</h2>
+            <p>Encontre inspeções usando os critérios abaixo.</p>
+          </div>
+
+          <button matButton type="button" (click)="onFilter([])">
+            <mat-icon>filter_alt_off</mat-icon>
+            Limpar filtros
+          </button>
+        </div>
+
         <div class="filters" aria-label="Filtros de inspeções">
+
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Estado</mat-label>
-            <mat-select [ngModel]="status()" (ngModelChange)="setStatus($event)">
+            <mat-select
+              [ngModel]="status()"
+              (ngModelChange)="setStatus($event)"
+            >
               <mat-option [value]="null">Todos</mat-option>
               @for (option of statusOptions; track option.value) {
-                <mat-option [value]="option.value">{{ option.label }}</mat-option>
+                <mat-option [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
               }
             </mat-select>
           </mat-form-field>
+
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Técnico</mat-label>
-            <mat-select [ngModel]="technicianId()" (ngModelChange)="setTechnician($event)">
+            <mat-select
+              [ngModel]="technicianId()"
+              (ngModelChange)="setTechnician($event)"
+            >
               <mat-option [value]="null">Todos</mat-option>
               @for (technician of technicians(); track technician.id) {
-                <mat-option [value]="technician.id">{{ technician.name }}</mat-option>
+                <mat-option [value]="technician.id">
+                  {{ technician.name }}
+                </mat-option>
               }
             </mat-select>
           </mat-form-field>
+
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Cliente</mat-label>
-            <mat-select [ngModel]="clientId()" (ngModelChange)="setClient($event)">
+            <mat-select
+              [ngModel]="clientId()"
+              (ngModelChange)="setClient($event)"
+            >
               <mat-option [value]="null">Todos</mat-option>
               @for (client of clientOptions(); track client.id) {
-                <mat-option [value]="client.id">{{ client.name }}</mat-option>
+                <mat-option [value]="client.id">
+                  {{ client.name }}
+                </mat-option>
               }
             </mat-select>
           </mat-form-field>
+
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Agendada a partir de</mat-label>
             <input
@@ -147,6 +183,7 @@ imports: [
               (ngModelChange)="setFrom($event)"
             />
           </mat-form-field>
+
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Agendada até</mat-label>
             <input
@@ -157,7 +194,12 @@ imports: [
               (ngModelChange)="setTo($event)"
             />
           </mat-form-field>
+
         </div>
+      </div>
+
+      <div class="table-section">
+
         <app-data-table
           [columns]="columns()"
           [data]="data()"
@@ -175,30 +217,124 @@ imports: [
           (rowAction)="onRowAction($event)"
           (retry)="load()"
         />
+
       </div>
+
     </section>
+
+  </section>
   `,
-  styles: `
-    :host {
-      display: block;
-      min-width: 0;
-    }
-    .page {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      min-width: 0;
-    }
+ 
+styles: `
+  :host {
+    display: block;
+    min-width: 0;
+  }
+
+  /* Estrutura da página */
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+
+  /* Container único */
+  .content-panel {
+    min-width: 0;
+    padding: 1.5rem;
+    border: 1px solid var(--mat-sys-outline-variant);
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #1b232b, #161c22);
+  }
+
+  /* Área dos filtros */
+  .filter-section {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+  /* Cabeçalho dos filtros */
+  .filter-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .filter-heading h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--mat-sys-on-surface);
+  }
+
+  .filter-heading p {
+    margin: 0.3rem 0 0;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.85rem;
+  }
+
+  .filter-heading button {
+    flex-shrink: 0;
+  }
+
+  /* Cinco filtros em uma única linha */
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .filters mat-form-field {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+  }
+
+  /* Tabela diretamente abaixo dos filtros */
+ .table-section {
+  min-width: 0;
+  padding-top: 0.75rem;
+}
+
+  .table-section app-data-table {
+    display: block;
+    min-width: 0;
+  }
+
+  /* Telas intermediárias */
+  @media (max-width: 1100px) {
     .filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
-    .filters mat-form-field {
-      flex: 1 1 12rem;
-      max-width: 16rem;
+  }
+
+  /* Tablets */
+  @media (max-width: 700px) {
+    .content-panel {
+      padding: 1rem;
     }
-  `,
+
+    .filters {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /* Celulares */
+  @media (max-width: 480px) {
+    .filters {
+      grid-template-columns: 1fr;
+    }
+
+    .filter-heading {
+      align-items: flex-start;
+    }
+  }
+`,
 })
 export class InspectionsListComponent {
   private readonly inspections = inject(InspectionsService);
@@ -233,47 +369,94 @@ export class InspectionsListComponent {
     return sort && typeof sort === 'object' && !Array.isArray(sort) ? (sort as Sort) : null;
   });
 
-  protected readonly columns = computed<readonly TableColumn<Inspection>[]>(() => {
-    const technicianNames = new Map(this.technicians().map((user) => [user.id, user.name]));
-    const clientNames = new Map(this.clientOptions().map((client) => [client.id, client.name]));
-    return [
-      { field: 'title', label: 'Inspeção', sortable: true, emptyText: 'Sem título' },
-      {
-        field: 'clientId',
-        label: 'Cliente',
-        format: (value) => clientNames.get(String(value)) ?? '—',
-      },
-      {
-        field: 'technicianId',
-        label: 'Técnico',
-        format: (value) => technicianNames.get(String(value)) ?? '—',
-      },
-      { field: 'scheduledFor', label: 'Agendada para', type: 'date', sortable: true },
-      {
-        field: 'overdue',
-        label: 'Prazo',
-        format: (_value, row) => overdueLabel(row, this.now()),
-      },
-      { field: 'status', label: 'Estado', type: 'badge', badgeContext: 'inspection', align: 'center' },
-      {
-        field: 'actions',
-        label: 'Ações',
-        type: 'actions' as const,
-        actionsInline: true,
-        actions: this.canManage()
-          ? [
+  
+
+protected readonly columns = computed<readonly TableColumn<Inspection>[]>(() => {
+  const technicianNames = new Map(
+    this.technicians().map((user) => [user.id, user.name])
+  );
+
+  const clientNames = new Map(
+    this.clientOptions().map((client) => [client.id, client.name])
+  );
+
+  return [
+    {
+      field: 'title',
+      label: 'Inspeção',
+      type: 'link',
+      sortable: true,
+      width: '18rem',
+      emptyText: 'Sem título',
+      link: (row) => ['/inspections', row.id],
+    },
+    {
+      field: 'clientId',
+      label: 'Cliente / local',
+      width: '13rem',
+      format: (value) =>
+        clientNames.get(String(value)) ?? '—',
+    },
+    {
+      field: 'technicianId',
+      label: 'Técnico',
+      width: '12rem',
+      format: (value) =>
+        technicianNames.get(String(value)) ?? '—',
+    },
+    {
+      field: 'priority',
+      label: 'Prioridade',
+      type: 'badge',
+      badgeContext: 'priority',
+      align: 'center',
+      width: '9rem',
+    },
+    {
+      field: 'scheduledFor',
+      label: 'Prevista',
+      type: 'date',
+      sortable: true,
+      width: '12rem',
+    },
+    {
+      field: 'status',
+      label: 'Estado',
+      type: 'badge',
+      badgeContext: 'inspection',
+      align: 'center',
+      width: '12rem',
+    },
+    {
+      field: 'updatedAt',
+      label: 'Atualização',
+      type: 'date',
+      sortable: true,
+      width: '12rem',
+    },
+    {
+      field: 'actions',
+      label: 'Ações',
+      type: 'actions',
+      actionsInline: true,
+      width: '9rem',
+      actions: this.canManage()
+        ? [
             {
               id: 'cancel',
               label: 'Cancelar',
               icon: 'cancel',
               danger: true,
-              visible: (row: Inspection) => !NOT_CANCELABLE.has(row.status),
+              visible: (row: Inspection) =>
+                !NOT_CANCELABLE.has(row.status),
             },
           ]
-          : [],
-      },
-    ];
-  });
+        : [],
+    },
+  ];
+});
+
+
 
   protected readonly activeFilters = computed<ActiveFilter[]>(() => {
     const filters: ActiveFilter[] = [];
@@ -356,9 +539,9 @@ export class InspectionsListComponent {
   }
 
   protected createNew(): void {
-  if (!this.canManage()) return;
-  void this.router.navigate(['/inspections/new']);
-}
+    if (!this.canManage()) return;
+    void this.router.navigate(['/inspections/new']);
+  }
 
   protected setStatus(value: InspectionStatus | null): void {
     this.status.set(value);

@@ -44,21 +44,17 @@ export type StatTone = 'neutral' | 'good' | 'warning' | 'serious' | 'critical';
       display: block;
     }
 
-    .tile {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      /* Sem altura declarada: o próprio grid estica os itens da fileira até a
-         mesma altura. Encadear height:100% aqui fazia a trilha ficar menor que
-         o conteúdo e a fileira seguinte era desenhada por cima. */
-      padding: 1rem 1.125rem;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 12px;
-      background: var(--mat-sys-surface);
-      /* O tom colore ícone e rótulo; o fundo fica neutro para os sete cartões
-         lerem como um conjunto e não como sete avisos. */
-      --fo-tone: var(--mat-sys-on-surface-variant);
-    }
+   .tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 1.25rem;
+  border: 1px solid #303842;
+  border-radius: 1rem;
+  background: #1a2027;
+  --fo-tone: var(--mat-sys-on-surface-variant);
+}
 
     .tone-good {
       --fo-tone: #0ca30c;

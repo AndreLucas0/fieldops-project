@@ -77,25 +77,23 @@ export interface CategoryDatum {
       display: block;
     }
 
-    .chart {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      /* Cada cartão tem a altura do próprio conteúdo (o container alinha os
-         dois pelo topo): esticar o de 3 linhas até a altura do de 6 deixava um
-         vão morto no lugar de informação. */
-      padding: 1.25rem;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 12px;
-      background: var(--mat-sys-surface);
+   .chart {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+  padding: 1.5rem;
+  border: 1px solid #303842;
+  border-radius: 1rem;
+  background: #1a2027;
 
-      /* Papéis de cor da visualização, definidos uma vez.
-         O preenchimento é o azul de série 1 da paleta validada: 4,42:1 sobre o
-         branco, acima do mínimo de 3:1 para marcas. */
-      --fo-viz-fill: #2a78d6;
-      --fo-viz-track: color-mix(in srgb, var(--mat-sys-on-surface) 6%, transparent);
-    }
-
+  --fo-viz-fill: #2a78d6;
+  --fo-viz-track: color-mix(
+    in srgb,
+    var(--mat-sys-on-surface) 6%,
+    transparent
+  );
+}
     .chart__head {
       display: flex;
       flex-direction: column;

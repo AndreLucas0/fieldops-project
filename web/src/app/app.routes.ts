@@ -21,6 +21,14 @@ const ADMIN_FEATURE_ROUTES: Routes = [
     ),
   },
   {
+  path: 'inspections/:inspectionId',
+  title: 'Detalhes da inspeção — FieldOps',
+  loadComponent: () =>
+    import('./features/inspections/inspection-detail.component').then(
+      (module) => module.InspectionDetailComponent,
+    ),
+},
+  {
     path: 'inspections',
     title: 'Inspeções — FieldOps',
     loadComponent: () =>

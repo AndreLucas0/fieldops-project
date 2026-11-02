@@ -151,38 +151,43 @@ interface DashboardData {
       display: block;
     }
 
-  .page {
+ .page {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.5rem;
   min-width: 0;
 }
 
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
+.stats {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
 
-    .stats {
-      display: grid;
-      /* Item de flex recebe min-width: auto e pode ficar maior que o container
-         quando há uma coluna só, estourando a página na horizontal. */
-      min-width: 0;
-      /* Sete cartões. A largura mínima maior fecha em 4 colunas no monitor
-         largo (4 + 3), que lê melhor que 5 + 2, e desce para 3, 2 e 1 conforme
-         a janela encolhe. */
-      grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
-      gap: 0.875rem;
-    }
+.charts {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
 
-    .charts {
-      display: grid;
-      min-width: 0;
-      grid-template-columns: repeat(auto-fit, minmax(min(21rem, 100%), 1fr));
-      gap: 1rem;
-      align-items: start;
-    }
+@media (max-width: 1100px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .stats {
+    grid-template-columns: 1fr;
+  }
+}
   `,
 })
 export class DashboardComponent {

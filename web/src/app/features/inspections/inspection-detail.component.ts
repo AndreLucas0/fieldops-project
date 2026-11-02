@@ -8,287 +8,240 @@ import {
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { catchError, finalize, of } from 'rxjs';
+import { catchError, of } from 'rxjs';
 
-import type { Evidence, InspectionDetail } from '../../core/models/domain';
-import { InspectionsService } from '../../core/services/resources';
+import type {
+  AuditEvent,
+  Client,
+  Equipment,
+  Evidence,
+  Inspection,
+  InspectionSite,
+  InspectionTemplateVersionDetail,
+  User,
+} from '../../core/models/domain';
+
+import {
+  ClientsService,
+  EquipmentService,
+  InspectionsService,
+  SitesService,
+  TemplatesService,
+  UsersService,
+} from '../../core/services/resources';
 
 @Component({
   selector: 'app-inspection-detail',
   standalone: true,
   imports: [CommonModule, RouterLink],
+  templateUrl: './inspection-detail.component.html',
+  styleUrl: './inspection-detail.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <main class="page">
-      <a routerLink="/inspections" class="back-link">
-        ← Voltar para inspeções
-      </a>
-
-      @if (loading()) {
-        <p>Carregando inspeção...</p>
-      } @else if (error()) {
-        <p class="error">{{ error() }}</p>
-      } @else if (inspection(); as item) {
-        <header class="page-header">
-          <div>
-            <h1>{{ item.title || 'Inspeção sem título' }}</h1>
-            <p>Detalhes da inspeção</p>
-          </div>
-
-          <span class="status">{{ item.status }}</span>
-        </header>
-
-        <section class="card">
-          <h2>Informações gerais</h2>
-
-          <div class="details-grid">
-            <div>
-              <strong>Cliente</strong>
-              <p>{{ item.clientId }}</p>
-            </div>
-
-            <div>
-              <strong>Local</strong>
-              <p>{{ item.siteId }}</p>
-            </div>
-
-            <div>
-              <strong>Técnico</strong>
-              <p>{{ item.technicianId }}</p>
-            </div>
-
-            <div>
-              <strong>Agendada para</strong>
-              <p>{{ item.scheduledFor | date:'dd/MM/yyyy HH:mm' }}</p>
-            </div>
-
-            <div>
-              <strong>Prioridade</strong>
-              <p>{{ item.priority }}</p>
-            </div>
-
-            <div>
-              <strong>Equipamento</strong>
-              <p>{{ item.equipmentId || 'Não informado' }}</p>
-            </div>
-          </div>
-
-          @if (item.instructions) {
-            <div class="instructions">
-              <strong>Instruções</strong>
-              <p>{{ item.instructions }}</p>
-            </div>
-          }
-        </section>
-
-        <section class="card">
-          <h2>Checklist</h2>
-
-          @if (item.items?.length) {
-            @for (check of item.items; track check.id) {
-              <article class="list-item">
-                <strong>{{ check.itemTitle }}</strong>
-                @if (check.itemDescription) {
-                  <p>{{ check.itemDescription }}</p>
-                }
-              </article>
-            }
-          } @else {
-            <p>Nenhum item de checklist encontrado.</p>
-          }
-        </section>
-
-        <section class="card">
-          <h2>Respostas</h2>
-
-          @if (item.responses?.length) {
-            @for (response of item.responses; track response.id) {
-              <article class="list-item">
-                <strong>Item: {{ response.inspectionItemId }}</strong>
-                <p>
-                  {{ response.valueText
-                    || response.valueNumber
-                    || (response.valueBoolean === true ? 'Sim' :
-                        response.valueBoolean === false ? 'Não' : 'Sem resposta') }}
-                </p>
-                @if (response.observation) {
-                  <p>Observação: {{ response.observation }}</p>
-                }
-              </article>
-            }
-          } @else {
-            <p>Nenhuma resposta registrada.</p>
-          }
-        </section>
-
-        <section class="card">
-          <h2>Não conformidades</h2>
-
-          @if (item.nonConformities?.length) {
-            @for (nc of item.nonConformities; track nc.id) {
-              <article class="list-item">
-                <strong>{{ nc.title }}</strong>
-                <p>{{ nc.description }}</p>
-                <p>Gravidade: {{ nc.severity }} | Estado: {{ nc.status }}</p>
-              </article>
-            }
-          } @else {
-            <p>Nenhuma não conformidade registrada.</p>
-          }
-        </section>
-
-        <section class="card">
-          <h2>Histórico de revisões</h2>
-
-          @if (item.reviews?.length) {
-            @for (review of item.reviews; track review.id) {
-              <article class="list-item">
-                <strong>{{ review.decision }}</strong>
-                <p>{{ review.reviewedAt | date:'dd/MM/yyyy HH:mm' }}</p>
-                @if (review.reason) {
-                  <p>Motivo: {{ review.reason }}</p>
-                }
-                @if (review.comments) {
-                  <p>Comentários: {{ review.comments }}</p>
-                }
-              </article>
-            }
-          } @else {
-            <p>Nenhuma revisão registrada.</p>
-          }
-        </section>
-
-        <section class="card">
-          <h2>Evidências</h2>
-
-          @if (evidence().length) {
-            @for (file of evidence(); track file.id) {
-              <article class="list-item">
-                <strong>{{ file.description || file.type }}</strong>
-                <p>{{ file.mimeType }} — {{ file.sizeBytes }} bytes</p>
-                @if (file.accessUrl) {
-                  <a [href]="file.accessUrl" target="_blank" rel="noopener">
-                    Visualizar evidência
-                  </a>
-                }
-              </article>
-            }
-          } @else {
-            <p>Nenhuma evidência encontrada.</p>
-          }
-        </section>
-      }
-    </main>
-  `,
-  styles: `
-    :host {
-      display: block;
-      min-width: 0;
-    }
-
-    .page {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .back-link {
-      color: var(--mat-sys-primary);
-      text-decoration: none;
-      font-weight: 600;
-    }
-
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    h1, h2, p {
-      margin-top: 0;
-    }
-
-    .card {
-      padding: 1.25rem;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 12px;
-      background: var(--mat-sys-surface);
-    }
-
-    .details-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 1rem;
-    }
-
-    .details-grid p,
-    .list-item p {
-      margin: 0.35rem 0 0;
-      overflow-wrap: anywhere;
-    }
-
-    .instructions {
-      margin-top: 1rem;
-    }
-
-    .list-item {
-      padding: 0.85rem 0;
-      border-bottom: 1px solid var(--mat-sys-outline-variant);
-    }
-
-    .list-item:last-child {
-      border-bottom: 0;
-    }
-
-    .status {
-      padding: 0.4rem 0.7rem;
-      border-radius: 8px;
-      background: var(--mat-sys-surface-container-high);
-    }
-
-    .error {
-      color: var(--mat-sys-error);
-    }
-  `,
 })
 export class InspectionDetailComponent {
   private readonly route = inject(ActivatedRoute);
-  private readonly inspections = inject(InspectionsService);
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly inspection = signal<InspectionDetail | null>(null);
+  private readonly inspectionsService = inject(InspectionsService);
+  private readonly clientsService = inject(ClientsService);
+  private readonly sitesService = inject(SitesService);
+  private readonly equipmentService = inject(EquipmentService);
+  private readonly usersService = inject(UsersService);
+  private readonly templatesService = inject(TemplatesService);
+
+  protected readonly inspection = signal<Inspection | null>(null);
+
+  protected readonly client = signal<Client | null>(null);
+  protected readonly site = signal<InspectionSite | null>(null);
+  protected readonly equipment = signal<Equipment | null>(null);
+  protected readonly technician = signal<User | null>(null);
+  protected readonly supervisor = signal<User | null>(null);
+  protected readonly templateVersion =
+    signal<InspectionTemplateVersionDetail | null>(null);
+
+  protected readonly history = signal<AuditEvent[]>([]);
   protected readonly evidence = signal<Evidence[]>([]);
+
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
   constructor() {
-    const id = this.route.snapshot.paramMap.get('inspectionId');
+    const inspectionId = this.route.snapshot.paramMap.get('inspectionId');
 
-    if (!id) {
+    if (!inspectionId) {
       this.error.set('Identificador da inspeção não encontrado.');
       this.loading.set(false);
       return;
     }
 
-    this.inspections
+    this.loadInspection(inspectionId);
+    this.loadHistory(inspectionId);
+    this.loadEvidence(inspectionId);
+  }
+
+  private loadInspection(id: string): void {
+    this.inspectionsService
       .get(id)
       .pipe(
         catchError(() => {
-          this.error.set('Não foi possível carregar os detalhes da inspeção.');
+          this.error.set('Não foi possível carregar os dados da inspeção.');
           return of(null);
         }),
-        finalize(() => this.loading.set(false)),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((result) => this.inspection.set(result));
+      .subscribe((result) => {
+        this.loading.set(false);
 
-    this.inspections
+        if (!result) return;
+
+        this.inspection.set(result);
+
+        this.loadClient(result.clientId);
+        this.loadSite(result.siteId);
+        this.loadTechnician(result.technicianId);
+
+        if (result.equipmentId) {
+          this.loadEquipment(result.equipmentId);
+        }
+
+        if (result.supervisorId) {
+          this.loadSupervisor(result.supervisorId);
+        }
+
+        this.loadTemplateVersion(result.templateVersionId);
+      });
+  }
+
+  private loadClient(id: string): void {
+    this.clientsService
+      .get(id)
+      .pipe(
+        catchError(() => of(null)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => this.client.set(result));
+  }
+
+  private loadSite(id: string): void {
+    this.sitesService
+      .get(id)
+      .pipe(
+        catchError(() => of(null)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => this.site.set(result));
+  }
+
+  private loadEquipment(id: string): void {
+    this.equipmentService
+      .get(id)
+      .pipe(
+        catchError(() => of(null)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => this.equipment.set(result));
+  }
+
+  private loadTechnician(id: string): void {
+    this.usersService
+      .get(id)
+      .pipe(
+        catchError(() => of(null)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => this.technician.set(result));
+  }
+
+  private loadSupervisor(id: string): void {
+    this.usersService
+      .get(id)
+      .pipe(
+        catchError(() => of(null)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => this.supervisor.set(result));
+  }
+
+  private loadTemplateVersion(id: string): void {
+    this.templatesService
+      .getVersion(id)
+      .pipe(
+        catchError(() => of(null)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => this.templateVersion.set(result));
+  }
+
+  private loadHistory(id: string): void {
+    this.inspectionsService
+      .history(id, {
+        page: 0,
+        size: 50,
+        sort: 'occurredAt,desc',
+      })
+      .pipe(
+        catchError(() => of(null)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => this.history.set(result?.content ?? []));
+  }
+
+  private loadEvidence(id: string): void {
+    this.inspectionsService
       .listEvidence(id)
       .pipe(
         catchError(() => of([])),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((result) => this.evidence.set(result));
+  }
+
+  protected statusLabel(status: string): string {
+    const labels: Record<string, string> = {
+      DRAFT: 'Rascunho',
+      ASSIGNED: 'Atribuída',
+      IN_PROGRESS: 'Em andamento',
+      SUBMITTED: 'Aguardando revisão',
+      UNDER_REVIEW: 'Em revisão',
+      APPROVED: 'Aprovada',
+      REJECTED: 'Rejeitada',
+      CANCELED: 'Cancelada',
+    };
+
+    return labels[status] ?? status;
+  }
+
+  protected priorityLabel(priority: string): string {
+    const labels: Record<string, string> = {
+      LOW: 'Baixa',
+      MEDIUM: 'Média',
+      HIGH: 'Alta',
+      CRITICAL: 'Crítica',
+    };
+
+    return labels[priority] ?? priority;
+  }
+
+  protected eventLabel(action: string): string {
+    const labels: Record<string, string> = {
+      CREATED: 'Inspeção criada',
+      UPDATED: 'Dados atualizados',
+      ASSIGNED: 'Inspeção atribuída',
+      CANCELED: 'Inspeção cancelada',
+      STARTED: 'Inspeção iniciada',
+      SUBMITTED: 'Inspeção enviada para revisão',
+      APPROVED: 'Inspeção aprovada',
+      REJECTED: 'Inspeção rejeitada',
+    };
+
+    return labels[action] ?? action.replaceAll('_', ' ');
+  }
+
+  protected getStatusClass(status: string): string {
+    return status.toLowerCase().replaceAll('_', '-');
+  }
+
+  protected get hasHistory(): boolean {
+    return this.history().length > 0;
   }
 }

@@ -32,6 +32,9 @@ import {
 } from '../../shared/components';
 import { InspectionCancelDialogComponent } from './inspection-cancel-dialog.component';
 import { overdueLabel } from './inspection-overdue';
+import { Router } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 
 /** Um item por valor de `INSPECTION_STATUSES` (shared/src/domain/enums.ts). */
 const STATUS_OPTIONS: readonly { value: InspectionStatus; label: string }[] = [
@@ -56,6 +59,8 @@ const NOT_CANCELABLE: ReadonlySet<InspectionStatus> = new Set<InspectionStatus>(
   'CANCELED',
 ]);
 
+
+
 /** `yyyy-MM-dd` do input de data → ISO 8601 no início/fim do dia local. */
 function toIso(day: string, endOfDay: boolean): string | undefined {
   if (!day) return undefined;
@@ -78,20 +83,31 @@ function formatDay(day: string): string {
 @Component({
   selector: 'app-inspections-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    FormsModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
-    DataTableComponent,
-    PageHeaderComponent,
-  ],
+imports: [
+  FormsModule,
+  MatFormFieldModule,
+  MatInputModule,
+  MatSelectModule,
+  MatButtonModule,
+  MatIconModule,
+  DataTableComponent,
+  PageHeaderComponent,
+],
   template: `
     <section class="page">
-      <app-page-header
-        title="Inspeções"
-        subtitle="Acompanhe o planejamento e cancele quando necessário."
-      />
+     <app-page-header
+  title="Inspeções"
+  subtitle="Acompanhe o planejamento e cancele quando necessário."
+>
+  <div actions>
+    @if (canManage()) {
+      <button matButton="filled" (click)="createNew()">
+        <mat-icon>add</mat-icon>
+        Nova inspeção
+      </button>
+    }
+  </div>
+</app-page-header>
       <div class="catalog-card">
         <div class="filters" aria-label="Filtros de inspeções">
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
@@ -191,6 +207,7 @@ export class InspectionsListComponent {
   private readonly auth = inject(AuthStore);
   private readonly dialog = inject(MatDialog);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
 
   protected readonly statusOptions = STATUS_OPTIONS;
   /** Escrita em inspeções: ADMIN e SUPERVISOR (`RESOURCE_WRITE_ROLES`). */
@@ -245,14 +262,14 @@ export class InspectionsListComponent {
         actionsInline: true,
         actions: this.canManage()
           ? [
-              {
-                id: 'cancel',
-                label: 'Cancelar',
-                icon: 'cancel',
-                danger: true,
-                visible: (row: Inspection) => !NOT_CANCELABLE.has(row.status),
-              },
-            ]
+            {
+              id: 'cancel',
+              label: 'Cancelar',
+              icon: 'cancel',
+              danger: true,
+              visible: (row: Inspection) => !NOT_CANCELABLE.has(row.status),
+            },
+          ]
           : [],
       },
     ];
@@ -337,6 +354,11 @@ export class InspectionsListComponent {
     this.params.update((p) => ({ ...p, page: 0 }));
     this.load();
   }
+
+  protected createNew(): void {
+  if (!this.canManage()) return;
+  void this.router.navigate(['/inspections/new']);
+}
 
   protected setStatus(value: InspectionStatus | null): void {
     this.status.set(value);

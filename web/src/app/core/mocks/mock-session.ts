@@ -21,7 +21,7 @@ export function provideMockSession(): EnvironmentProviders {
 
     // O supervisor é o perfil com acesso a tudo que a área administrativa
     // oferece hoje, incluindo a revisão de inspeções (RN-079).
-    const supervisor = getMockStore().users.find((user) => user.role === 'SUPERVISOR');
+    const supervisor = getMockStore().users.find((user) => user.role === 'ADMIN');
     if (!supervisor) return;
 
     store.setSession({

@@ -24,6 +24,7 @@ interface NavigationItem {
 
 const NAVIGATION: readonly NavigationItem[] = [
   { label: 'Painel', route: '/dashboard', icon: 'space_dashboard' },
+  { label: 'Inspeções', route: '/inspections', icon: 'assignment' },
   { label: 'Modelos', route: '/inspection-templates', icon: 'fact_check' },
   { label: 'Clientes', route: '/clients', icon: 'business' },
   { label: 'Locais', route: '/sites', icon: 'location_on' },

@@ -8,6 +8,7 @@ import { resolveFieldValue, type ActiveFilter, type TableColumn } from './data-t
 interface Row {
   id: string;
   name: string;
+  email?: string;
   status: string;
   scheduledFor: string;
   site: { name: string };
@@ -170,6 +171,44 @@ describe('DataTableComponent', () => {
     expect(cells[1]?.textContent?.trim()).toBe('Unidade Norte');
     expect(cells[2]?.querySelector('app-status-badge')?.textContent?.trim()).toBe('Em andamento');
     expect(cells[3]?.textContent?.trim()).toBe('14/08/2026 13:45');
+  });
+
+  it('mostra um campo secundário abaixo do valor principal na mesma célula', async () => {
+    const element = await render({
+      columns: [{ field: 'name', label: 'Nome', secondaryField: 'email' }],
+      data: buildPage([{ ...ROWS[0], email: 'tecnico@fieldops.example' }]),
+    });
+
+    const cell = element.querySelector('tbody td');
+    expect(cell?.querySelector('.fo-table__primary')?.textContent?.trim()).toBe(
+      'Preventiva CP-100',
+    );
+    expect(cell?.querySelector('.fo-table__secondary')?.textContent?.trim()).toBe(
+      'tecnico@fieldops.example',
+    );
+  });
+
+  it('renderiza ações nomeadas diretamente na linha quando a coluna pede ações inline', async () => {
+    const element = await render({
+      columns: [
+        {
+          field: 'actions',
+          label: 'Ações',
+          type: 'actions',
+          actionsInline: true,
+          actions: [{ id: 'view', label: 'Histórico', icon: 'history' }],
+        },
+      ],
+      data: buildPage(ROWS.slice(0, 1)),
+    });
+    const emitted: unknown[] = [];
+    fixture.componentInstance.rowAction.subscribe((event) => emitted.push(event));
+
+    const button = element.querySelector<HTMLButtonElement>('.fo-table__inline-actions button');
+    expect(button?.textContent).toContain('Histórico');
+    button?.click();
+    await fixture.whenStable();
+    expect(emitted).toHaveLength(1);
   });
 
   it('oculta a ação marcada como invisível para a linha', async () => {

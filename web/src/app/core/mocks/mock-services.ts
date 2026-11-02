@@ -29,6 +29,7 @@ import {
 import { ApiError } from '../models/api-error.model';
 import type {
   Client,
+  ActiveStatus,
   DashboardSummary,
   Equipment,
   EquipmentStatus,
@@ -163,6 +164,13 @@ export class MockUsersService extends MockBase implements UsersService {
   setStatus(id: Uuid, status: UserStatus): Observable<User> {
     return this.update(id, { status });
   }
+
+  resetPassword(id: Uuid): Observable<{ message: string }> {
+    return this.respond(() => {
+      this.require(findById(this.db.users, id), '/users', id);
+      return { message: 'Solicitação de redefinição de senha registrada.' };
+    });
+  }
 }
 
 @Injectable()
@@ -267,6 +275,10 @@ export class MockSitesService extends MockBase implements SitesService {
     const { clientId: _ignored, ...rest } = input;
     return this.respond(() => this.require(updateEntity(this.db.sites, id, rest), '/sites', id));
   }
+
+  setStatus(id: Uuid, status: ActiveStatus): Observable<InspectionSite> {
+    return this.update(id, { status });
+  }
 }
 
 @Injectable()
@@ -279,10 +291,7 @@ export class MockEquipmentService extends MockBase implements EquipmentService {
     return this.page(filtered, query);
   }
 
-  listBySite(
-    siteId: Uuid,
-    query: PageQuery<EquipmentFilters> = {},
-  ): Observable<Page<Equipment>> {
+  listBySite(siteId: Uuid, query: PageQuery<EquipmentFilters> = {}): Observable<Page<Equipment>> {
     return this.page(
       this.db.equipment.filter((equipment) => equipment.siteId === siteId),
       query,
@@ -770,9 +779,9 @@ export class MockInspectionsService extends MockBase implements InspectionsServi
 @Injectable()
 export class MockNonConformitiesService extends MockBase implements NonConformitiesService {
   list(query: PageQuery<NonConformityFilters> = {}): Observable<Page<NonConformity>> {
-    const { severity } = query;
+    const { inspectionId, severity } = query;
     const filtered = this.db.nonConformities.filter((nc) =>
-      matchesFilters(nc as unknown as Record<string, unknown>, { severity }),
+      matchesFilters(nc as unknown as Record<string, unknown>, { inspectionId, severity }),
     );
     return this.page(filtered, query);
   }

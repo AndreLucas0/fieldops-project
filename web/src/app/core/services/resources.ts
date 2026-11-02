@@ -15,6 +15,7 @@ import type { Observable } from 'rxjs';
 import { ApiService } from '../http/api.service';
 import type {
   Client,
+  ActiveStatus,
   DashboardSummary,
   Equipment,
   EquipmentStatus,
@@ -53,7 +54,7 @@ export type ClientFilters = { name?: string; status?: 'ACTIVE' | 'INACTIVE' };
 export type SiteFilters = { name?: string; clientId?: Uuid };
 export type EquipmentFilters = { name?: string; siteId?: Uuid; status?: EquipmentStatus };
 export type TemplateFilters = { category?: string; status?: string };
-export type NonConformityFilters = { severity?: Severity };
+export type NonConformityFilters = { inspectionId?: Uuid; severity?: Severity };
 
 export type InspectionFilters = {
   status?: InspectionStatus;
@@ -76,6 +77,7 @@ export abstract class UsersService {
   abstract create(input: Partial<User> & { password?: string }): Observable<User>;
   abstract update(id: Uuid, input: Partial<User>): Observable<User>;
   abstract setStatus(id: Uuid, status: UserStatus): Observable<User>;
+  abstract resetPassword(id: Uuid): Observable<{ message: string }>;
 }
 
 export abstract class ClientsService {
@@ -95,6 +97,7 @@ export abstract class SitesService {
   abstract get(id: Uuid): Observable<InspectionSite>;
   abstract create(input: Partial<InspectionSite>): Observable<InspectionSite>;
   abstract update(id: Uuid, input: Partial<InspectionSite>): Observable<InspectionSite>;
+  abstract setStatus(id: Uuid, status: ActiveStatus): Observable<InspectionSite>;
 }
 
 export abstract class EquipmentService {
@@ -189,6 +192,9 @@ export class HttpUsersService extends UsersService {
   setStatus(id: Uuid, status: UserStatus) {
     return this.api.patch<User>(`/users/${id}/status`, { status });
   }
+  resetPassword(id: Uuid) {
+    return this.api.post<{ message: string }>(`/users/${id}/reset-password`);
+  }
 }
 
 @Injectable()
@@ -230,6 +236,9 @@ export class HttpSitesService extends SitesService {
   }
   update(id: Uuid, input: Partial<InspectionSite>) {
     return this.api.put<InspectionSite>(`/sites/${id}`, input);
+  }
+  setStatus(id: Uuid, status: ActiveStatus) {
+    return this.api.patch<InspectionSite>(`/sites/${id}/status`, { status });
   }
 }
 

@@ -1,14 +1,21 @@
 :host {
   display: block;
+  min-width: 0;
 }
 
 .fo-table {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: 0.5rem;
-  background: var(--mat-sys-surface);
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #1b232b, #161c22);
   overflow: hidden;
+}
+
+:host-context(.catalog-card) .fo-table {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .fo-table__filters {
@@ -24,6 +31,10 @@
   font-weight: 500;
 }
 
+.fo-table__mono {
+  font-family: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', monospace;
+}
+
 /* Tabela larga rola sozinha, sem empurrar a página inteira. */
 .fo-table__viewport {
   width: 100%;
@@ -32,11 +43,28 @@
 
 table {
   width: 100%;
+  background: transparent;
 }
 
 th.align-center,
 td.align-center {
   text-align: center;
+}
+
+th {
+  color: var(--mat-sys-on-surface-variant);
+  white-space: nowrap;
+}
+
+td {
+  min-width: 7rem;
+  max-width: 24rem;
+  overflow-wrap: break-word;
+}
+
+td:first-child {
+  min-width: 11rem;
+  font-weight: 600;
 }
 
 th.align-end,
@@ -52,6 +80,37 @@ td a {
 td a:hover,
 td a:focus-visible {
   text-decoration: underline;
+}
+
+.fo-table__primary,
+.fo-table__secondary {
+  display: block;
+  white-space: nowrap;
+}
+
+.fo-table__inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.fo-table__inline-actions button {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding-inline: 0.5rem;
+  color: var(--mat-sys-on-surface);
+}
+
+.fo-table__inline-actions button.fo-action--danger {
+  color: #ffa3aa;
+}
+
+.fo-table__secondary {
+  margin-top: 0.2rem;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.8125rem;
+  font-weight: 400;
 }
 
 .fo-table__error {

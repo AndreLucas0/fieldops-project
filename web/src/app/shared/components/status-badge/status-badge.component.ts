@@ -31,6 +31,7 @@ import { describeStatus, type BadgeContext } from './status-catalog';
       font-size: 0.75rem;
       font-weight: 500;
       line-height: 1.25rem;
+      text-transform: uppercase;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -42,63 +43,63 @@ import { describeStatus, type BadgeContext } from './status-catalog';
      * mudar junto com a paleta da marca.
      */
     .tone-gray {
-      --fo-badge-bg: #f1f3f5;
-      --fo-badge-fg: #495057;
-      --fo-badge-border: #dee2e6;
+      --fo-badge-bg: #1b222a;
+      --fo-badge-fg: #b4bdc6;
+      --fo-badge-border: #38434e;
     }
 
     .tone-gray-dark {
-      --fo-badge-bg: #495057;
-      --fo-badge-fg: #ffffff;
-      --fo-badge-border: #343a40;
+      --fo-badge-bg: #303944;
+      --fo-badge-fg: #d5dde5;
+      --fo-badge-border: #566371;
     }
 
     .tone-blue {
-      --fo-badge-bg: #e7f1ff;
-      --fo-badge-fg: #0b4a9e;
-      --fo-badge-border: #b6d4fe;
+      --fo-badge-bg: #182a3c;
+      --fo-badge-fg: #8ec5ff;
+      --fo-badge-border: #365d85;
     }
 
     .tone-yellow {
-      --fo-badge-bg: #fff6e0;
-      --fo-badge-fg: #7a5200;
-      --fo-badge-border: #ffe1a3;
+      --fo-badge-bg: #302918;
+      --fo-badge-fg: #f4cd72;
+      --fo-badge-border: #796331;
     }
 
     .tone-orange {
-      --fo-badge-bg: #ffeddd;
-      --fo-badge-fg: #8a3d00;
-      --fo-badge-border: #ffd0a8;
+      --fo-badge-bg: #36261c;
+      --fo-badge-fg: #ffb47d;
+      --fo-badge-border: #875331;
     }
 
     .tone-indigo {
-      --fo-badge-bg: #e8e7ff;
-      --fo-badge-fg: #35339c;
-      --fo-badge-border: #c5c3ff;
+      --fo-badge-bg: #25243c;
+      --fo-badge-fg: #b9b5ff;
+      --fo-badge-border: #5c588b;
     }
 
     .tone-purple {
-      --fo-badge-bg: #f3e8ff;
-      --fo-badge-fg: #5f2b91;
-      --fo-badge-border: #e0c9fb;
+      --fo-badge-bg: #2c2239;
+      --fo-badge-fg: #d4aff5;
+      --fo-badge-border: #70518a;
     }
 
     .tone-green {
-      --fo-badge-bg: #e4f8ec;
-      --fo-badge-fg: #10633a;
-      --fo-badge-border: #b6e6ca;
+      --fo-badge-bg: #172a23;
+      --fo-badge-fg: #79d9a7;
+      --fo-badge-border: #396c53;
     }
 
     .tone-red {
-      --fo-badge-bg: #fdecec;
-      --fo-badge-fg: #9b1c1c;
-      --fo-badge-border: #f7c6c6;
+      --fo-badge-bg: #362126;
+      --fo-badge-fg: #ffa3aa;
+      --fo-badge-border: #88444e;
     }
 
     .tone-red-dark {
-      --fo-badge-bg: #9b1c1c;
+      --fo-badge-bg: #742c38;
       --fo-badge-fg: #ffffff;
-      --fo-badge-border: #7a1414;
+      --fo-badge-border: #b75d6b;
     }
   `,
 })

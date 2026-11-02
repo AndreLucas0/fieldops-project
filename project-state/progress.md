@@ -1148,3 +1148,231 @@ próximos passos). Continua valendo que `project-state/backend-audit.md` é a fo
 verdade do estado **detalhado** do backend; `ESTADO-DO-PROJETO.md` é a visão geral de
 uma página. As seções §8 (Expo Go) e §9 (armadilhas) foram preservadas na reescrita —
 são as referenciadas por `CLAUDE.md` §10.
+
+### WEB-ADMIN-SHELL-SCAFFOLD-2026-11-01 — base responsiva para implementação paralela
+
+Data: 2026-11-01. Branch: `develop`. Tipo: estrutura inicial do painel web.
+
+**Preparado:**
+- Shell autenticado compartilhado com navegação baseada em permissões, nome/perfil do usuário, logout e consumo de notificações globais.
+- Menu lateral fixo em desktop e recolhível em telas estreitas.
+- Rotas lazy para clientes, locais, equipamentos, usuários e não conformidades; cada rota mostra um placeholder responsivo até a tela funcional ser implementada.
+- Rotas existentes de login, dashboard, lista e construtor de modelos preservadas dentro da área autenticada.
+- README web atualizado com a estrutura atual e regras de implementação.
+
+**Não implementado neste incremento:** tabelas funcionais, formulários, filtros ou ações de domínio das cinco telas. Não houve alteração de dependências ou contratos da API.
+
+**Validação:** build de produção da aplicação web executado após a mudança; resultado registrado no commit correspondente. Testes automatizados não executados neste incremento.
+
+---
+
+### WEB-ADMIN-LISTS-2026-11-01 — primeiras listas administrativas
+
+Branch: `feat/web-admin-lists`. Implementadas as listas FE-W03 (usuários),
+FE-W05 (clientes), FE-W08 (locais), FE-W11 (equipamentos) e FE-W22 (não
+conformidades). Todas usam os serviços de recursos existentes, paginação e
+ordenação do servidor, filtros aceitos pelo contrato e estados comuns da
+`DataTableComponent`. Em locais/equipamentos, os IDs de cliente/local da API são
+resolvidos para nomes na tabela.
+
+Responsividade verificada no navegador em viewport estreita (615 px); a tabela
+mantém a rolagem horizontal restrita ao contêiner. Build de produção aprovado;
+6 testes direcionados e a suíte completa aprovados (214 testes em 20 arquivos).
+
+Escopo pendente: formulários FE-W04/06/09/12 e ações da FE-W03/05/08/11 ainda
+não foram implementados. Nenhuma dependência ou contrato da API foi alterado.
+
+---
+
+### WEB-MASTER-DATA-2026-11-01 — clientes e locais
+
+Em `feat/web-admin-lists`, FE-W05/06 agora inclui cadastro e edição de clientes
+em modal, validação client-side, erros de campo da API, autorização de escrita
+somente para ADMIN e confirmação para ativar/inativar. A inativação mantém o
+registro e explica que ele deixa de ser selecionável em novas inspeções (RN-013).
+
+FE-W08/09 inclui modal de criação/edição de locais. A criação exige cliente
+ativo e nome; a edição mantém `clientId` imutável. Latitude/longitude têm limites
+geográficos, e o contrato de status do local agora está disponível no serviço e
+mock para inativar/reativar com confirmação. O atalho “Ver equipamentos” passa o
+`siteId` como filtro de contexto da lista de equipamentos.
+
+PEND-F01 foi parcialmente resolvida: FE-W06 e FE-W09 usam modal; as opções de
+Usuário/Equipamento ficam pendentes. Build de produção aprovado. Testes
+direcionados aprovados: 37 do mock/services, 6 de clientes e 10 de locais/listas.
+Suíte completa aprovada após este incremento: 225 testes em 22 arquivos.
+
+---
+
+### WEB-EQUIPMENT-ADMIN-2026-11-01 — cadastro, busca QR e situação
+
+FE-W11/12 agora inclui modal de cadastro/edição. A criação exige local ativo,
+nome e QR Code; a edição mantém `siteId` e QR imutáveis. Conflito de QR (RN-011)
+fica visível no formulário. A lista permite buscar por QR usando o endpoint
+existente e oferece edição, inativação, reativação e descomissionamento com
+confirmação, preservando registros e histórico.
+
+PEND-F01 agora permanece somente para a tela de usuário. Build de produção
+aprovado antes do último ajuste de testes; 12 testes direcionados de catálogo e
+formulário passaram. Suíte completa será repetida ao concluir esta rodada.
+
+---
+
+### WEB-USERS-ADMIN-2026-11-01 — cadastro, edição, status e redefinição
+
+FE-W03/04 agora inclui formulário em modal, validação conforme `UserCreateRequest`
+e `UserUpdateRequest`, permissões ADMIN e coluna de telefone. A senha inicial
+(8–255 caracteres) só é enviada na criação; a edição não a inclui. Ativação,
+inativação e bloqueio exigem confirmação. Redefinição chama
+`POST /users/{id}/reset-password` após confirmação e mostra a mensagem exata da
+API, preservando a pendência contratual sobre como a senha é redefinida.
+
+PEND-F01 foi resolvida também para FE-W04. O tema comum foi alinhado ao esquema
+carvão/âmbar do protótipo e o perfil de usuário passou a usar uma badge localizada.
+Nenhuma dependência ou contrato da API foi alterado; o serviço e o mock existentes
+foram ampliados para o endpoint de redefinição já documentado.
+
+Validação focada: 56 testes em 3 arquivos; suíte completa: 241 testes em 24
+arquivos; build de produção aprovado. A lista de clientes foi conferida em
+viewport móvel de 615 px, com rolagem horizontal confinada à tabela.
+
+---
+
+### WEB-NONCONFORMITY-ADMIN-2026-11-01 — consulta de NC e inspeção relacionada
+
+FE-W22 mantém filtro de severidade do contrato, exibe item, descrição, título da
+inspeção (quando disponível), criticidade, estado e data do dispositivo. A ação
+de consulta carrega NC, inspeção e evidências pelos endpoints existentes; o
+modal identifica o item do checklist e conta evidências vinculadas à NC.
+
+A rota FE-W20 ainda não existe no frontend; o modal mantém a consulta funcional
+sem link quebrado. A tela não altera status nem exclui NC, seguindo RN-056/057.
+Validação: 15 testes direcionados em 2 arquivos; suíte completa 243 testes em
+25 arquivos; build de produção aprovado. O modal foi conferido em viewport
+móvel de 615 px.
+
+### WEB-CLIENT-SITE-NAV-2026-11-01 — acesso aos locais pelo cliente
+
+FE-W05 agora oferece “Ver locais” para ADMIN e SUPERVISOR. A ação abre a lista
+FE-W08 filtrada pelo `clientId`; ações de escrita continuam restritas a ADMIN.
+Um teste cobre a permissão de leitura do SUPERVISOR e a navegação contextual.
+Validação direcionada: 5 testes do componente aprovados; suíte web completa:
+244 testes em 25 arquivos; `npm run build`, Prettier e `git diff --check`
+aprovados.
+
+### WEB-EQUIPMENT-QR-COLUMN-2026-11-01 — código QR visível na lista
+
+A lista FE-W11 agora exibe `qrCode` como coluna monoespaçada, conforme a seção
+10.4 de `docs/telas-frontend.md`. A busca pelo endpoint de QR segue disponível;
+não foi adicionada geração de imagem ou etiqueta, ausente do contrato MVP.
+Validação: suíte web completa (244 testes em 25 arquivos), build de produção,
+Prettier e `git diff --check` aprovados.
+
+### WEB-EQUIPMENT-MODEL-COLUMN-2026-11-01 — fabricante e modelo
+
+A listagem de equipamentos também exibe fabricante e modelo, dados existentes
+no contrato e presentes na referência visual. A documentação FE-W11 foi
+atualizada para registrar a coluna composta. Sem mudanças no serviço/API.
+Validação: 14 testes direcionados, suíte web completa (244 testes em 25
+arquivos), build de produção, Prettier e `git diff --check` aprovados.
+
+### WEB-ADMIN-PROTOTYPE-ALIGNMENT-2026-11-01 — revisão das cinco listas
+
+Revisão das telas FE-W03 (usuários), FE-W05 (clientes), FE-W08 (locais), FE-W11
+(equipamentos) e FE-W22 (não conformidades) contra as páginas abertas no protótipo
+Lovable e os requisitos de `docs/telas-frontend.md` e `docs/regras-de-negocio.md`.
+
+As listas agora seguem as colunas e agrupamentos visuais da referência. Contagens
+de locais/equipamentos usam endpoints aninhados paginados; FE-W22 filtra por
+inspeção e exibe a contagem das evidências ligadas à própria NC. FE-W11 gera o QR
+localmente e consulta histórico paginado em modo somente leitura. Campos sem
+dado no contrato, como último acesso do usuário, não recebem valor aproximado.
+Os formulários, permissões e mudanças de estado definidos pela documentação
+permanecem disponíveis, e a consulta de NC não cria ações de edição/exclusão.
+
+Validação: suíte completa `npm test -- --watch=false` — 257 testes em 27 arquivos;
+`npm run build` — sucesso; `git diff --check` — sem erros. Um teste adicional
+confirma que uma resposta antiga de busca não substitui a lista atual. O teste de catálogo
+também confirma que as ações QR e Histórico abrem os diálogos corretos para o
+equipamento selecionado; o teste QR confirma também a revogação do object URL ao
+fechar. Nenhuma rota do backend foi modificada. `qr@0.7.2` foi adicionada para
+gerar SVG no navegador; nenhuma correção automática de dependências foi feita.
+
+Autoria: os 11 commits iniciais desta sequência tinham autor e committer incorretos
+(Andre Lucas Ferreira). A autoria e o committer foram corrigidos para Lucas Ianovski
+<ianovskilucas@gmail.com> sem alterar commits anteriores ao início da sequência.
+O branch `develop` foi atualizado no remoto com proteção contra atualizações
+concorrentes. O PR #292 permanece aberto de `develop` para `main` e acompanha a nova
+ponta. A atualização do título e da descrição do PR não foi permitida pela integração
+GitHub conectada (HTTP 403).
+
+---
+
+### WEB-ADMIN-REVIEW-2026-11-01 — retomada da auditoria das cinco telas
+
+Revisadas as telas FE-W03 (usuários), FE-W05 (clientes), FE-W08 (locais), FE-W11
+(equipamentos) e FE-W22 (não conformidades) contra os componentes atuais e as regras
+registradas em `docs/telas-frontend.md` e `docs/regras-de-negocio.md`. As listas,
+formulários, ações, permissões e estados responsivos previstos já constam na
+implementação de `develop`; nenhum desvio funcional adicional foi confirmado nesta
+revisão somente de código. Corrigida em `pending-web.md` a referência histórica da
+navegação de clientes para a rota efetiva `/clients/:clientId/sites`.
+
+A inspeção visual automatizada do navegador local foi impedida pelo controle de segurança do ambiente; breakpoints não foram conferidos visualmente. Validação: `npm test -- --watch=false` — 257 testes em 27 arquivos; `npm run build` — sucesso; `git diff --check` — sem erros.
+
+### WEB-ADMIN-VISUAL-QA-2026-11-01 — revisão visual e responsiva
+
+Supera a limitação de acesso ao navegador registrada na entrada anterior. As cinco
+referências Lovable foram abertas e comparadas às listas FE-W03, FE-W05, FE-W08,
+FE-W11 e FE-W22. As cinco listas foram conferidas em 1440, 768 e 320 px; a rodada
+inicial também usou 390 px. As medições no DOM não encontraram largura da página
+maior que o viewport; a tabela mantém sua própria rolagem horizontal.
+
+Correções: filtros e tabela agrupados em cartão escuro; badges com cores adequadas
+ao tema; cabeçalhos e nomes/e-mails legíveis; botões de ação sem compressão e
+sobreposição; menu recolhível até 1023 px para aproveitar a largura do tablet.
+O QR Code estava preto sobre transparência no fundo escuro: agora tem fundo branco
+e margem de quatro módulos. Os quatro cadastros foram abertos e cancelados em
+320 px; QR, histórico carregado e detalhe de NC carregado também foram conferidos.
+O menu de tablet foi aberto e usado para navegar. Nenhum erro de console foi
+registrado na consulta final dos diálogos.
+
+A revisão usou os mocks existentes, com ADMIN em uma cópia temporária isolada e
+SUPERVISOR na aplicação original; a inicialização padrão do projeto não foi
+alterada. Não substitui homologação com API real ou aparelhos físicos. Diferenças
+de dados/contrato continuam intencionais: FieldOps mantém sua marca; último acesso
+fica sem valor quando ausente na API; situações e ações seguem os enums e as
+permissões documentadas, inclusive quando diferentes das opções do protótipo.
+
+Validação após os ajustes: `npm test -- --watch=false` — 257 testes em 27 arquivos;
+`npm run build` — sucesso. Sem atualização de dependências ou contratos.
+
+### GIT-ISSUE-OWNERSHIP-AUDIT-2026-11-01 — LucasIanovski
+
+Snapshot auditado: `develop` em `3d24b92`, `main` em `3a38371`, após `git fetch
+origin`. Conferidas 28 branches remotas e 8 locais, 504 commits alcançáveis e
+263 issues. No conjunto remoto há 197 commits únicos; 49 têm autoria Lucas
+Ianovski/LucasIanovski (`ianovskilucas@gmail.com`), sendo 48 sem merge e um merge.
+Os 175 commits adicionais dessa identidade presentes somente nas referências
+locais têm árvores idênticas às de commits remotos; backups e reescritas locais
+não foram contados como novas entregas.
+
+Conferidas com LucasIanovski e Status Done: #2, #3, #23, #65, #66, #67, #72, #74,
+#77, #238, #280 e #288. #3 recebeu a atribuição pela criação/atualização do README
+em `c048ae4` e `ddc28ce`; já estava em Done. Nas issues #2 e #3 a responsabilidade
+atual ficou somente com Lucas conforme solicitação do usuário, sem alterar a
+autoria histórica compartilhada da estrutura/configuração. As nove tasks web já
+tratadas e #238 (testes de autorização, evidência `a8b0e07`) foram preservadas.
+
+Não concluídas por associação parcial: #78 (a seleção encadeada exigida na
+reabertura não é comprovada pelas listas contextuais), #250 (troca de imagem
+MinIO não entrega Dockerfile/Compose completo), #252 (README inicial não é a
+documentação final de demonstração). #230 tem componentes originais de outro
+autor; não foi atribuída ao autor que apenas os reutilizou. O merge `9ca2b56`
+feito por Lucas não prova autoria dos commits de backend de Andre Lucas Ferreira.
+Organograma (`651e322`) e contribuições a aquisições/partes interessadas
+(`fcb2748`) não têm issues específicas no inventário examinado.
+
+Validação desta rodada: leitura de históricos/diffs e conferência das 12 issues
+no navegador autenticado. Sem alteração funcional; testes não repetidos. O
+relatório detalhado e os inventários JSON foram entregues fora do repositório.

@@ -246,6 +246,29 @@ ACTIVE
 
 ---
 
+### [2026-11-01] — a lista de clientes abre os locais no contexto do cliente
+
+Context:
+FE-W05 exige que ADMIN e SUPERVISOR possam acessar os locais de um cliente.
+FE-W08 já interpreta `clientId` na query string para filtrar sua lista.
+
+Decision:
+Expor a ação somente leitura “Ver locais” para ambos os perfis e navegar para
+`/sites?clientId=<id>`. As ações de criar, editar e alterar status continuam
+visíveis somente a ADMIN.
+
+Reason:
+Reutiliza a lista e os filtros existentes, mantendo a autorização documentada
+sem criar rota ou endpoint adicional.
+
+Impact:
+O SUPERVISOR pode consultar locais pelo cliente; não ganha permissão de escrita.
+
+Status:
+ACTIVE
+
+---
+
 ### [2026-10-05] — INT-011: web em dev fala com a API real via proxy do `ng serve`, não via CORS
 
 Context:
@@ -1240,3 +1263,253 @@ futuro, o campo está disponível sem nova migration.
 
 Status:
 ACTIVE
+
+### [2026-11-01] — Shell autenticado como contêiner das telas administrativas
+
+Context:
+O painel tinha rotas lazy independentes, mas não possuía navegação comum, cabeçalho
+com sessão, apresentação de notificações globais ou ponto consistente para
+adaptar a navegação a telas estreitas.
+
+Decision:
+Agrupar as rotas administrativas sob um shell lazy autenticado. O shell filtra
+os links pelo mapa de permissões existente, mostra sessão/perfil, executa o
+logout já definido em AuthService e consome NotificationService. Rotas ainda sem
+tela funcional ficam em placeholders compartilhados.
+
+Reason:
+Permite que implementações paralelas conectem suas telas à navegação sem
+duplicar sessão, permissões ou layout. A navegação colapsa em telas estreitas, mantendo o conteúdo da rota no mesmo outlet.
+
+Alternatives considered:
+Adicionar navegação e cabeçalho em cada tela — rejeitado por duplicar comportamento
+e dificultar consistência responsiva.
+
+Impact:
+Rotas /clients, /sites, /equipment, /users e /non-conformities estão registradas.
+Os placeholders devem ser substituídos pelas telas funcionais conforme os
+contratos de cada área; não simulam dados nem ações de negócio.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-11-01] — Listagens administrativas reutilizam a tabela e os serviços de recursos
+
+Context:
+As listas de usuários, clientes, locais, equipamentos e não conformidades
+precisam manter os padrões de paginação, ordenação, erros e estados vazios sem
+duplicar componentes de tabela ou chamadas HTTP.
+
+Decision:
+Usar `DataTableComponent` nas cinco telas, com componentes específicos para
+clientes e um componente de catálogo configurado pela rota para usuários, locais,
+equipamentos e não conformidades. As buscas usam somente filtros descritos nos
+contratos existentes. Clientes e locais relacionados são resolvidos por ID com
+os serviços existentes quando exibidos nas listas.
+
+Reason:
+Preserva a API de recursos e os mocks já compartilhados; mantém uma única
+implementação de paginação e estados de tabela sem nova dependência.
+
+Impact:
+As listas e seus filtros básicos estão conectados. Formulários e ações de
+criação/edição/inativação permanecem em escopo separado, seguindo as telas e
+confirmações descritas em `docs/telas-frontend.md`.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-11-01] — Formulários de clientes e locais abrem como modais nas listas
+
+Context:
+`docs/telas-frontend.md` PEND-F01 deixa indefinido se FE-W04/06/09/12 devem ser
+rotas próprias ou modais sobre as listas.
+
+Decision:
+FE-W06 (cliente) abre como modal em `/clients`; FE-W09 (local) abre como modal
+em `/sites`. Os formulários de Usuário e Equipamento ainda não foram definidos.
+
+Reason:
+O cadastro e a edição são operações curtas e têm o mesmo conjunto de campos;
+o modal mantém o contexto da lista e permite atualizar a paginação após salvar.
+
+Impact:
+As regras de FE-W06/09 seguem os DTOs atuais. O `clientId` do local é obrigatório
+na criação e imutável na edição. PEND-F01 permanece parcialmente pendente para
+FE-W04/12.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-11-01] — Formulário de equipamento abre como modal na lista
+
+Context:
+FE-W12 não tinha rota definida no catálogo; FE-W12 precisa manter fixos o
+`siteId` e o `qrCode` após a criação, conforme a normalização do contrato.
+
+Decision:
+FE-W12 abre como modal sobre `/equipment`. Na criação, exige local ativo, nome e
+código QR; na edição, mostra local e QR como somente leitura.
+
+Reason:
+Mantém o padrão visual de FE-W06/09 e preserva o contexto dos equipamentos
+enquanto oferece os campos permitidos pelo DTO de atualização.
+
+Impact:
+PEND-F01 permanece somente para o formulário de usuário (FE-W04). A busca QR
+usa `GET /equipment/by-qr/{qrCode}`; conflitos de unicidade (RN-011) são
+apresentados no próprio formulário.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-11-01] — Formulário de usuário abre como modal e redefine senha via resposta da API
+
+Context:
+FE-W04 era a última tela afetada por PEND-F01. O contrato exige senha inicial
+apenas na criação (mínimo de 8 caracteres); atualização não aceita senha. O
+endpoint de redefinição retorna uma mensagem, mas a política de entrega não está
+definida (PEND-01 do contrato-backend-frontend).
+
+Decision:
+FE-W04 abre como modal sobre `/users`. A lista confirma alterações de situação
+e solicita redefinição antes de chamar a API. Após sucesso, a interface mostra
+exatamente `ResetPasswordResponse.message`, sem alegar um método de entrega ou
+exibir senha temporária.
+
+Reason:
+Mantém a lista como contexto e segue os campos e endpoints definidos sem
+inventar um fluxo de senha não estabelecido nos requisitos.
+
+Impact:
+PEND-F01 resolvida para usuários, clientes, locais e equipamentos. PEND-01
+continua em aberto para a política de redefinição e senha inicial.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-11-01] — Tema administrativo segue a paleta do protótipo
+
+Context:
+As telas de referência usam superfícies carvão, textos claros e ações âmbar.
+O shell e componentes Material existentes usavam superfícies claras e destaque
+azul, reduzindo a fidelidade visual das cinco listas administrativas.
+
+Decision:
+Configurar o tema Angular Material em modo escuro com tons neutros carvão e
+âmbar para ações primárias; aplicar as mesmas superfícies no shell e no fundo
+da aplicação.
+
+Reason:
+Alinha as listas e modais com a paleta visível no protótipo, conservando os
+componentes compartilhados e os pontos de quebra responsivos já existentes.
+
+Impact:
+O tema também se aplica às telas existentes do painel. Nenhuma lógica de
+negócio, dependência ou contrato de API foi alterado.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-11-01] — FE-W22 consulta a inspeção relacionada em modal enquanto FE-W20 está pendente
+
+Context:
+O protótipo liga cada não conformidade à inspeção, mas a rota FE-W20 não existe
+no frontend. `docs/telas-frontend.md` requer que a lista permita consultar o
+item relacionado. A API já oferece consulta da NC, da inspeção e das evidências.
+
+Decision:
+Na lista FE-W22, a ação “Ver inspeção relacionada” abre um modal somente leitura
+que consulta os três recursos existentes, identifica o item do checklist e conta
+as evidências associadas à NC. A lista usa o título da inspeção quando disponível
+e mantém o UUID como fallback.
+
+Reason:
+Mantém a ação útil enquanto a rota FE-W20 não está implementada e evita navegar
+para uma rota inexistente. Nenhuma edição, mudança de situação ou exclusão de NC
+é exposta pela lista.
+
+Impact:
+FE-W22 cobre consulta dos detalhes relacionados; FE-W20 continua pendente para
+planejamento, reatribuição, cancelamento e histórico da inspeção.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-11-01] — Alinhamento do protótipo administrativo com dados reais do contrato
+
+Context:
+Revisão das telas FE-W03, FE-W05, FE-W08, FE-W11 e FE-W22 contra o protótipo
+Lovable e os contratos atuais da API. A referência mostra colunas e ações que
+não existem exatamente da mesma forma na tabela genérica atual.
+
+Decision:
+- Nome/e-mail de usuário e contato de local usam campo secundário na mesma célula.
+- A coluna "Último acesso" mostra `—`, pois o modelo `User` e a API não expõem
+  esse dado; `createdAt` não será usado como aproximação.
+- Contagens de locais/equipamentos vêm das rotas aninhadas paginadas existentes;
+  respostas atrasadas de páginas antigas não substituem as contagens atuais.
+- QR Code é codificado localmente a partir de `Equipment.qrCode`; nenhuma
+  informação do ativo é enviada a um gerador externo. O histórico usa a consulta
+  somente leitura `GET /inspections?equipmentId=...`.
+- FE-W22 filtra também por `inspectionId`, parâmetro já implementado pela API,
+  e conta evidências pelo vínculo `nonConformityId`.
+- As cinco telas exibem ações nomeadas na linha; as demais telas continuam com
+  o menu padrão da `DataTableComponent`.
+
+Reason:
+Reproduz a hierarquia visual do protótipo com os dados efetivamente disponíveis,
+sem afirmar um último acesso inexistente, alterar estados de NC ou criar rotas
+de detalhe que ainda não existem.
+
+Impact:
+`web/package.json` e `web/package-lock.json` incluem `qr@0.7.2`, uma biblioteca
+sem dependências de produção para gerar SVG. O `npm audit` antes/depois de sua
+adição reportou 34 vulnerabilidades (21 moderadas, 10 altas e 3 críticas); o
+pacote `qr` não aparece entre os pacotes vulneráveis. Nenhuma correção automática
+de dependências foi executada; atualizar o conjunto é tarefa separada.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-11-01] — Ações de situação preservadas quando o protótipo as omite
+
+Context:
+O protótipo simplifica ações de ativação/inativação em algumas linhas, enquanto
+`docs/telas-frontend.md` exige essas operações para usuários, clientes, locais e
+equipamentos. RN-008 e RN-013 também exigem bloqueio/inativação sem exclusão dos
+registros usados em inspeções.
+
+Decision:
+Manter as ações documentadas de situação, com visibilidade por perfil e diálogo
+de confirmação. A lista de NC continua somente leitura, conforme RN-056/057.
+
+Reason:
+As regras documentadas definem o comportamento de negócio; o protótipo orienta
+a composição visual, mas não substitui os fluxos normativos.
+
+Impact:
+As operações de situação permanecem acessíveis na interface em linha, com
+mensagens que explicam preservação do histórico. Não são adicionadas ações de
+edição ou exclusão de NC.
+
+Status:
+ACTIVE
+
+---

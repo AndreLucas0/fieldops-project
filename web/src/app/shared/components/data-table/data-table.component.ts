@@ -176,6 +176,12 @@ export class DataTableComponent<T> {
     return String(raw);
   }
 
+  protected secondaryText(column: TableColumn<T>, row: T): string {
+    const raw = column.secondaryField ? resolveFieldValue(row, column.secondaryField) : undefined;
+    if (raw == null || raw === '') return column.emptyText ?? EMPTY_CELL;
+    return String(raw);
+  }
+
   protected badgeValue(column: TableColumn<T>, row: T): string | null {
     const raw = resolveFieldValue(row, column.field);
     return raw == null ? null : String(raw);

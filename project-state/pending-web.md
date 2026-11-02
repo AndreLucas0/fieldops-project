@@ -1,8 +1,8 @@
 # Web — Inventário de Telas e Status de Integração
 
-**Data:** 2026-10-14 (atualizado — auditoria documental)
-**Branch analisada:** `main` (HEAD após WEB-MOCK-AUTH + WEB-DISPLAYORDER, não commitados)
-**Tipo:** inventário atualizado em 2026-10-14 com base em evidências de código e testes (205/205 web GREEN)
+**Data da auditoria original:** 2026-10-14 (inventário histórico; os estados das telas abaixo foram atualizados conforme os incrementos de 2026-11-01)
+**Branch atualizada:** `develop` (2026-11-01)
+**Validação atual:** consulte as entradas datadas em `progress.md`; não use o resumo executivo histórico abaixo como estado atual.
 **Fonte primária:** `docs/telas-frontend.md` §2, `docs/auditoria-frontend-backend.md`, `web/src/app/`
 
 ---
@@ -77,11 +77,11 @@ Ressalva: sem shell, navegação para outras telas é impossível sem digitar UR
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
+| Status | **COMPLETA (2026-11-01)** |
 | Rota documentada | `/users` |
-| Serviço existente | `UsersService` em `resources.ts` (list, get, create, update, changeStatus) |
+| Serviço existente | `UsersService` em `resources.ts` (list, get, create, update, setStatus, resetPassword) |
 
-`UsersService` existe e aponta para `/users`. Nenhuma tela ou componente consome esse serviço. Rota ausente de `app.routes.ts`.
+`CatalogListComponent` implementa listagem, filtros, paginação e ações ADMIN para editar, mudar situação com confirmação e solicitar redefinição de senha.
 
 ---
 
@@ -89,10 +89,10 @@ Ressalva: sem shell, navegação para outras telas é impossível sem digitar UR
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
-| Rota documentada | **[A DEFINIR]** (modal sobre `/users` ou rota própria) |
+| Status | **COMPLETA (2026-11-01)** |
+| Rota documentada | Modal sobre `/users` (PEND-F01 resolvida) |
 
-Não existe componente. Depende de FE-W03.
+`UserFormDialogComponent` valida campos do contrato, exige senha com 8–255 caracteres só na criação e não envia senha ao atualizar. A mensagem da redefinição é apresentada como recebida; o mecanismo real permanece pendente em PEND-01.
 
 ---
 
@@ -100,11 +100,13 @@ Não existe componente. Depende de FE-W03.
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
+| Status | **COMPLETA (2026-11-01)** |
 | Rota documentada | `/clients` |
 | Serviço existente | `ClientsService` em `resources.ts` |
 
-Nenhum componente. Rota ausente de `app.routes.ts`.
+`ClientsListComponent` lista, filtra e pagina clientes, com edição/status restritos a ADMIN. ADMIN e SUPERVISOR podem abrir os locais do cliente; o link abre `/clients/:clientId/sites`.
+
+Alinhamento visual (2026-11-01): cabeçalhos Cliente/CNPJ/Contato/Locais/Situação/Ações; a contagem usa `GET /clients/{clientId}/sites` e o link abre `/clients/:clientId/sites`.
 
 ---
 
@@ -112,10 +114,10 @@ Nenhum componente. Rota ausente de `app.routes.ts`.
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
-| Rota documentada | **[A DEFINIR]** |
+| Status | **COMPLETA (2026-11-01)** |
+| Rota documentada | Modal sobre `/clients` (decisão em `docs/telas-frontend.md`) |
 
-Depende de FE-W05.
+`ClientFormDialogComponent` cria e edita clientes com validação e erros de campo da API.
 
 ---
 
@@ -123,13 +125,11 @@ Depende de FE-W05.
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
+| Status | **COMPLETA (2026-11-01)** |
 | Rota documentada | `/clients/:clientId/sites` |
 | Contrato | `GET /clients/{clientId}/sites` → `Page<SiteResponse>` |
 
-Nenhum componente. `ClientsService` não tem método para essa rota nested.
-
-Divergência a resolver ao implementar: `resources.ts` itera response como array — backend retorna `Page`.
+`CatalogListComponent` renderiza a lista no contexto do cliente usando `SitesService.listByClient()`, que preserva a paginação `Page` do contrato. O caminho é alcançado pelo link de contagem em FE-W05.
 
 ---
 
@@ -137,11 +137,13 @@ Divergência a resolver ao implementar: `resources.ts` itera response como array
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
+| Status | **COMPLETA (2026-11-01)** |
 | Rota documentada | `/sites` |
 | Serviço existente | `SitesService` em `resources.ts` |
 
-Nenhum componente. Rota ausente de `app.routes.ts`.
+`CatalogListComponent` lista, filtra, pagina, ordena e resolve o nome do cliente. A criação/edição e ativação/inativação ficam disponíveis conforme perfil; a ação contextual abre equipamentos filtrados pelo local.
+
+Alinhamento visual (2026-11-01): endereço, coordenadas, contato em duas linhas e contagem de equipamentos; a contagem usa `GET /sites/{siteId}/equipment` e abre FE-W10.
 
 ---
 
@@ -149,10 +151,10 @@ Nenhum componente. Rota ausente de `app.routes.ts`.
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
-| Rota documentada | **[A DEFINIR]** |
+| Status | **COMPLETA (2026-11-01)** |
+| Rota documentada | Modal sobre `/sites` (decisão em `docs/telas-frontend.md`) |
 
-Depende de FE-W08.
+`SiteFormDialogComponent` valida os campos e mantém o cliente imutável na edição.
 
 ---
 
@@ -160,11 +162,11 @@ Depende de FE-W08.
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
+| Status | **COMPLETA (2026-11-01)** |
 | Rota documentada | `/sites/:siteId/equipment` |
 | Contrato | `GET /sites/{siteId}/equipment` → `Page<EquipmentResponse>` |
 
-Divergência a resolver: idem FE-W07 — iteração direta vs. `Page`.
+`CatalogListComponent` renderiza a lista no contexto do local usando `EquipmentService.listBySite()`, com paginação `Page`. O caminho é alcançado pelo link de contagem de equipamentos em FE-W08.
 
 ---
 
@@ -172,11 +174,11 @@ Divergência a resolver: idem FE-W07 — iteração direta vs. `Page`.
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
+| Status | **COMPLETA (2026-11-01)** |
 | Rota documentada | `/equipment` |
 | Serviço existente | `EquipmentService` em `resources.ts` |
 
-Nenhum componente. Rota ausente.
+`CatalogListComponent` lista, filtra, pagina e ordena equipamentos; a coluna segue TAG, patrimônio, nº de série, fabricante/modelo, local e situação. A ação QR gera a imagem no navegador usando o `qrCode` persistido; a ação Histórico consulta `GET /inspections?equipmentId=...` em modo somente leitura. Busca por QR continua usando o endpoint existente; edição e mudança de estado seguem as permissões documentadas.
 
 ---
 
@@ -184,10 +186,10 @@ Nenhum componente. Rota ausente.
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
-| Rota documentada | **[A DEFINIR]** |
+| Status | **COMPLETA (2026-11-01)** |
+| Rota documentada | Modal sobre `/equipment` (decisão em `docs/telas-frontend.md`) |
 
-Depende de FE-W11.
+`EquipmentFormDialogComponent` exige local ativo e QR na criação; local e QR permanecem imutáveis na edição.
 
 ---
 
@@ -317,11 +319,11 @@ Nenhum componente de revisão.
 
 | Campo | Valor |
 |---|---|
-| Status | **AUSENTE** |
+| Status | **COMPLETA (2026-11-01)** |
 | Rota documentada | `/non-conformities` |
 | Serviço existente | `NonConformitiesService` em `resources.ts` |
 
-Serviço existe mas nenhum componente o consome. Rota ausente de `app.routes.ts`.
+`CatalogListComponent` apresenta criticidade, item, descrição, contagem de evidências associadas, inspeção relacionada resolvida e data ISO, com filtros por severidade e inspeção. A API já suporta `inspectionId`; evidências são contadas por vínculo `nonConformityId`. A ação de consulta abre um modal somente leitura; a rota FE-W20 permanece ausente e edição/tratamento de NC não pertencem ao MVP.
 
 ---
 
@@ -342,12 +344,14 @@ Sem endpoint de backend definido (PEND-08 — escopo futuro). Mantida no invent�
 |---|---|---|
 | `TemplatesService` | FE-W13 (list), FE-W15 (builder) | PARCIALMENTE CONSUMIDO |
 | `DashboardService` | FE-W02 | CONSUMIDO |
-| `UsersService` | nenhuma | ÓRFÃO |
-| `ClientsService` | nenhuma | ÓRFÃO |
-| `SitesService` | nenhuma | ÓRFÃO |
-| `EquipmentService` | nenhuma | ÓRFÃO |
-| `InspectionsService` | nenhuma | ÓRFÃO |
-| `NonConformitiesService` | nenhuma | ÓRFÃO |
+| `UsersService` | FE-W03/04 | CONSUMIDO |
+| `ClientsService` | FE-W05/06 | CONSUMIDO |
+| `SitesService` | FE-W07/W08/09 | CONSUMIDO |
+| `EquipmentService` | FE-W10/W11/12 | CONSUMIDO |
+| `InspectionsService` | FE-W11 (histórico), FE-W22 (filtro, contagem e detalhes relacionados) | CONSUMIDO |
+| `NonConformitiesService` | FE-W22 | CONSUMIDO |
+
+FE-W07 e FE-W10 usam as operações aninhadas paginadas de `SitesService` e `EquipmentService`; as linhas antigas de F14/F15 foram resolvidas.
 
 ---
 
@@ -358,20 +362,20 @@ Sem endpoint de backend definido (PEND-08 — escopo futuro). Mantida no invent�
 | ~~F1~~ | ~~`createSection()` não envia `displayOrder` → 400~~ | **RESOLVIDA 2026-10-14** (WEB-DISPLAYORDER) |
 | ~~F2~~ | ~~`createItem()` não envia `displayOrder` → 400~~ | **RESOLVIDA 2026-10-14** (WEB-DISPLAYORDER) |
 | F13 | `listVersions()` itera array; backend retorna `Page` | FE-W17 quebraria |
-| F14 | `GET /clients/{clientId}/sites` retorna `Page`, não array | FE-W07 quebraria |
-| F15 | `GET /sites/{siteId}/equipment` retorna `Page`, não array | FE-W10 quebraria |
+| ~~F14~~ | ~~`GET /clients/{clientId}/sites` retorna `Page`, não array~~ | **RESOLVIDA 2026-11-01** — `SitesService.listByClient()` preserva `Page` |
+| ~~F15~~ | ~~`GET /sites/{siteId}/equipment` retorna `Page`, não array~~ | **RESOLVIDA 2026-11-01** — `EquipmentService.listBySite()` preserva `Page` |
 | F16 | ~~Sem proxy/CORS em dev~~ | **RESOLVIDA** INT-011 (`npm run start:api`) |
 | F17 | ~~F5 deslogava (refresh sem `user`)~~ | **RESOLVIDA** INT-011 (`GET /auth/me`) |
 
 ---
 
-## Próximos passos recomendados
+## Próximos passos recomendados (inventário original de 2026-10-14; supersedido para telas já concluídas)
 
 Em ordem de desbloqueio:
 
-1. **WEB-SHELL** — menu lateral, logout, toasts. Desbloqueia navegação para todas as telas.
+1. ~~**WEB-SHELL** — menu lateral, logout, toasts.~~ — concluído em 2026-11-01; ver `progress.md`.
 2. ~~**WEB-DISPLAYORDER** — incluir `displayOrder` nos payloads do construtor.~~ — **RESOLVIDO 2026-10-14**.
 3. ~~**WEB-MOCK-AUTH** — mock de `/auth` para `npm start`.~~ — **RESOLVIDO 2026-10-14**.
-4. **FE-W03 + FE-W04** (Usuários) — menor dependência; bom ponto de entrada para cadastros.
-5. **FE-W05–W12** (Clientes, Locais, Equipamentos) — dependem do shell; podem ser feitas em paralelo.
+4. ~~**FE-W03 + FE-W04** (Usuários)~~ — concluídas em 2026-11-01; ver `progress.md`.
+5. ~~**FE-W05–W12** (Clientes, Locais, Equipamentos)~~ — listas/contextos e modais concluídos em 2026-11-01; ver `progress.md`.
 6. **FE-W18–W21** (Inspeções e Revisão) — maior complexidade; dependem de cadastros e shell.

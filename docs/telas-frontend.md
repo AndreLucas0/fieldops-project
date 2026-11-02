@@ -62,7 +62,7 @@ Duas observações que valem para todo o restante do documento:
 | FE-W01 | Login (web) | Web | Todos | `/login` | Autenticação administrativa |
 | FE-W02 | Dashboard | Web | ADMIN, SUPERVISOR | `/dashboard` | Indicadores gerais |
 | FE-W03 | Usuários — lista | Web | ADMIN | `/users` | Gerenciar usuários |
-| FE-W04 | Usuário — cadastro/edição | Web | ADMIN | **[A DEFINIR]** (modal sobre `/users` ou rota própria) | Criar/editar usuário |
+| FE-W04 | Usuário — cadastro/edição | Web | ADMIN | Modal sobre `/users` | Criar/editar usuário |
 | FE-W05 | Clientes — lista | Web | ADMIN (escrita), SUPERVISOR (leitura) | `/clients` | Gerenciar clientes |
 | FE-W06 | Cliente — cadastro/edição | Web | ADMIN | **[A DEFINIR]** | Criar/editar cliente |
 | FE-W07 | Locais de um cliente | Web | ADMIN, SUPERVISOR | `/clients/:clientId/sites` | Locais do cliente selecionado |
@@ -394,7 +394,7 @@ Detalhamento completo de upload (limites, formatos, retry): seção 15.
 | Ação | Perfil | Endpoint | Payload | Comportamento da UI |
 |---|---|---|---|---|
 | Listar/filtrar/paginar | ADMIN | `GET /users?page=&size=&sort=&name=&email=&role=&status=` | — | Ver seção 9 (paginação padrão) |
-| Abrir cadastro | ADMIN | — (navegação/modal) | — | Abre FE-W04 — **[A DEFINIR]** se modal ou rota |
+| Abrir cadastro | ADMIN | — (navegação/modal) | — | Abre FE-W04 em modal sobre `/users` |
 | Ativar/inativar/bloquear | ADMIN | `PATCH /users/{id}/status` | `UserStatusUpdateRequest{status}` | Confirmação antes de executar (ação crítica, `interface-admnistrativa-web.md` §14.15); sucesso invalida sessões ativas do usuário (RN-008) — UI não recebe confirmação disso além do `200`, apenas deve informar que ocorreu |
 | Redefinir senha | ADMIN | `POST /users/{id}/reset-password` | — | Exibe `ResetPasswordResponse.message`; **[PENDÊNCIA]** o mecanismo real (e-mail? senha temporária exibida uma vez?) não está definido — PEND-01 do documento 20 |
 
@@ -402,7 +402,7 @@ Detalhamento completo de upload (limites, formatos, retry): seção 15.
 
 ### FE-W04 — Usuário (cadastro/edição)
 
-**Objetivo:** criar ou editar um usuário. **Usuários autorizados:** ADMIN. **Rota:** **[A DEFINIR]** — ver PEND-F01. **Pré-condições:** ao editar, usuário existente carregado via `GET /users/{id}`.
+**Objetivo:** criar ou editar um usuário. **Usuários autorizados:** ADMIN. **Apresentação:** modal sobre `/users` (PEND-F01 resolvida). **Pré-condições:** ao editar, usuário existente carregado via `GET /users/{id}`.
 
 **Dados exibidos (edição):** `name`, `email`, `role`, `status` (somente leitura aqui — alterado por ação separada em FE-W03), `phone`.
 
@@ -434,7 +434,7 @@ Detalhamento do formulário: seção 9.1.
 
 ### FE-W06 — Cliente (cadastro/edição)
 
-**Objetivo:** criar/editar cliente. **Usuários autorizados:** ADMIN. **Rota:** **[A DEFINIR]**. **Pré-condições:** ao editar, `GET /clients/{id}`.
+**Objetivo:** criar/editar cliente. **Usuários autorizados:** ADMIN. **Rota:** modal aberto sobre `/clients` (decisão de implementação 2026-11-01). **Pré-condições:** ao editar, os dados atuais do cliente são passados ao modal.
 
 **Ações disponíveis:**
 
@@ -477,7 +477,7 @@ Formulário detalhado: seção 9.2.
 
 ### FE-W09 — Local (cadastro/edição)
 
-**Objetivo:** criar/editar local. **Usuários autorizados:** ADMIN. **Rota:** **[A DEFINIR]**.
+**Objetivo:** criar/editar local. **Usuários autorizados:** ADMIN. **Rota:** modal aberto sobre `/sites` (decisão de implementação 2026-11-01).
 
 **Ações disponíveis:**
 
@@ -513,13 +513,13 @@ Formulário detalhado: seção 9.2.
 | Buscar por QR | ADMIN, SUPERVISOR | `GET /equipment/by-qr/{qrCode}` | — |
 | Abrir cadastro | ADMIN, SUPERVISOR | — (navegação/modal) | Abre FE-W12 — **[A DEFINIR]** |
 | Inativar/reativar/descomissionar | ADMIN, SUPERVISOR | `PATCH /equipment/{id}/status` | `EquipmentStatusUpdateRequest{status}` (`ACTIVE\|INACTIVE\|DECOMMISSIONED`) |
-| Ver histórico de inspeções | ADMIN, SUPERVISOR | *(P1 — `interface-admnistrativa-web.md` §14.7)* | — não integrado no MVP |
+| Ver histórico de inspeções | ADMIN, SUPERVISOR | `GET /inspections?equipmentId=&page=&size=&sort=` | Consulta somente leitura paginada; integrada ao diálogo de histórico |
 
 ---
 
 ### FE-W12 — Equipamento (cadastro/edição)
 
-**Objetivo:** criar/editar equipamento. **Usuários autorizados:** ADMIN, SUPERVISOR. **Rota:** **[A DEFINIR]**.
+**Objetivo:** criar/editar equipamento. **Usuários autorizados:** ADMIN, SUPERVISOR. **Rota:** modal aberto sobre `/equipment` (decisão de implementação 2026-11-01).
 
 **Ações disponíveis:**
 
@@ -683,8 +683,8 @@ A interface **não permite** editar silenciosamente a resposta original do técn
 
 | Ação | Perfil | Endpoint | Comportamento da UI |
 |---|---|---|---|
-| Listar/filtrar por criticidade | ADMIN, SUPERVISOR | `GET /non-conformities?severity=&page=&size=&sort=` | — |
-| Consultar item relacionado | ADMIN, SUPERVISOR | — (navegação para FE-W20 da inspeção correspondente) | — |
+| Listar/filtrar por criticidade e inspeção | ADMIN, SUPERVISOR | `GET /non-conformities?severity=&inspectionId=&page=&size=&sort=` | Ambos os filtros são suportados pela API |
+| Consultar item relacionado | ADMIN, SUPERVISOR | `GET /non-conformities/{id}`, `GET /inspections/{inspectionId}`, `GET /inspections/{inspectionId}/evidence` | Abre detalhe somente leitura com item do checklist e evidências associadas. FE-W20 ainda não está implementada como rota e segue no backlog. |
 
 O acompanhamento completo de plano de ação é P2 (`interface-admnistrativa-web.md` §14.12) — fora do escopo desta tela no MVP.
 
@@ -1373,12 +1373,10 @@ Todo componente também renderiza, quando `required=true`, um indicador visual d
 
 | Coluna | Campo da API | Formatação |
 |---|---|---|
-| Nome | `name` | Texto |
-| E-mail | `email` | Texto |
+| Nome | `name` + `email` | Nome em destaque e e-mail abaixo |
 | Perfil | `role` | Badge |
 | Situação | `status` | Badge (`ACTIVE`=verde, `INACTIVE`=cinza, `BLOCKED`=vermelho — cores não normativas, sugestão) |
-| Telefone | `phone` | Texto |
-| Criado em | `createdAt` | `dd/MM/yyyy HH:mm` |
+| Último acesso | — | `—` até que a API exponha um campo de acesso; `createdAt` não representa último acesso |
 
 **Filtros:** `name`, `email`, `role`, `status`. **Busca:** não há parâmetro dedicado (ver PEND-15 do documento 20; aqui aplicado também a usuários por analogia — **[A DEFINIR]**). **Ordenação:** `sort=createdAt,desc` (padrão sugerido). **Paginação:** padrão da seção 9 do documento 20. **Ações por linha:** editar, ativar/inativar/bloquear, redefinir senha. **Ações em lote:** não previstas em nenhum documento. **Sem resultados:** estado vazio com CTA "cadastrar usuário".
 
@@ -1386,35 +1384,40 @@ Todo componente também renderiza, quando `required=true`, um indicador visual d
 
 | Coluna | Campo da API | Formatação |
 |---|---|---|
-| Nome | `name` | Texto |
-| Razão social | `legalName` | Texto |
-| Documento | `document` | Texto |
+| Cliente | `name` | Texto |
+| CNPJ | `document` | Texto |
+| Contato | `email` (fallback `phone`) | Texto |
+| Locais | `GET /clients/{clientId}/sites` | Total da página; link para FE-W07 |
 | Situação | `status` | Badge |
 
-**Ações por linha:** editar, inativar/reativar, ver locais.
+**Ações por linha:** editar, inativar/reativar. A contagem de locais abre FE-W07; escrita segue restrita a ADMIN.
 
 ## 10.3 FE-W08 — Locais
 
 | Coluna | Campo da API | Formatação |
 |---|---|---|
-| Nome | `name` | Texto |
+| Local | `name` | Texto |
 | Cliente | `clientId` (resolvido) | Texto |
-| Cidade/Estado | `city`/`state` | Texto |
+| Endereço | `addressLine`, `city`, `state` | `endereço — cidade/UF` |
+| Coordenadas | `latitude`, `longitude` | Duas casas decimais; `—` quando ausentes |
+| Contato | `contactName`, `contactPhone` | Nome em destaque e telefone abaixo |
+| Equipamentos | `GET /sites/{siteId}/equipment` | Total da página; link para FE-W10 |
 | Situação | `status` | Badge |
 
-**Ações por linha:** editar, inativar/reativar, ver equipamentos.
+**Ações por linha:** editar e inativar/reativar. A contagem de equipamentos abre FE-W10; escrita segue restrita a ADMIN.
 
 ## 10.4 FE-W11 — Equipamentos
 
 | Coluna | Campo da API | Formatação |
 |---|---|---|
-| Nome | `name` | Texto |
+| TAG | `name` | Texto |
+| Patrimônio | `assetNumber` | Texto |
+| Nº de série | `serialNumber` | Texto |
+| Fabricante / modelo | `manufacturer`/`model` | Texto |
 | Local | `siteId` (resolvido) | Texto |
-| Código QR | `qrCode` | Texto monoespaçado |
-| Patrimônio/Nº de série | `assetNumber`/`serialNumber` | Texto |
 | Situação | `status` | Badge (`DECOMMISSIONED` também deve se distinguir visualmente de `INACTIVE`) |
 
-**Ações por linha:** editar, inativar/reativar/descomissionar, buscar por QR.
+**Ações por linha:** exibir QR Code gerado localmente a partir de `qrCode`, consultar histórico de inspeções, editar, inativar/reativar/descomissionar. Histórico usa `GET /inspections?equipmentId=...`; nenhuma escrita é feita por essas duas consultas.
 
 ## 10.5 FE-W13 — Modelos de inspeção
 
@@ -1449,13 +1452,15 @@ Todo componente também renderiza, quando `required=true`, um indicador visual d
 
 | Coluna | Campo da API | Formatação |
 |---|---|---|
-| Título | `title` | Texto |
-| Inspeção | `inspectionId` (resolvido) | Link |
 | Criticidade | `severity` | Badge |
-| Situação | `status` | Badge (único valor `OPEN` no MVP) |
-| Criada em | `createdAtDevice` | `dd/MM/yyyy HH:mm` |
+| Item relacionado | `title` | Texto |
+| Descrição | `description` | Texto |
+| Evidências | `GET /inspections/{inspectionId}/evidence` | Conta somente evidências com `nonConformityId` igual ao da linha |
+| Inspeção | `inspectionId` (resolvido para título; fallback UUID) | Texto; consulta relacionada abre detalhe somente leitura |
+| Data | `createdAtDevice` | `yyyy-MM-dd` |
+| Ações | — | Consultar inspeção relacionada em detalhe somente leitura |
 
-**Filtros:** `severity`. **Ações por linha:** ver inspeção relacionada.
+**Filtros:** `severity`, `inspectionId`. **Ações por linha:** ver inspeção relacionada. A rota FE-W20 ainda não existe, por isso a consulta abre em modal e não navega para uma rota quebrada.
 
 ## 10.8 FE-M03 — Lista de inspeções (mobile, dados locais)
 
@@ -1963,7 +1968,7 @@ Itens específicos de **composição de tela** descobertos na elaboração deste
 
 | ID | Item | Documentação relacionada | Impacto na tela | Impacto na API | Decisão necessária |
 |---|---|---|---|---|---|
-| PEND-F01 | Rotas de criação/edição de Usuário, Cliente, Local e Equipamento não são definidas em `interface-admnistrativa-web.md` §14.3 (só a lista tem rota própria) — diferente de Modelos e Inspeções, que têm `/new` e `/:id/edit` explícitos | `interface-admnistrativa-web.md` §14.3 vs. §14.6–14.7 | Define se FE-W04/06/09/12 são modais sobre a lista ou rotas próprias — muda a estrutura de componentes (roteamento vs. estado de modal) | Nenhum (mesmos endpoints `POST`/`PUT`) | **[DECISÃO NECESSÁRIA]** |
+| PEND-F01 | Rota de criação/edição de Usuário não é definida em `interface-admnistrativa-web.md` §14.3; Cliente, Local e Equipamento foram definidos como modais sobre as listas | `interface-admnistrativa-web.md` §14.3 vs. §14.6–14.7 | FE-W04/06/09/12 usam modal sobre `/users`, `/clients`, `/sites` e `/equipment` | Nenhum (mesmos endpoints `POST`/`PUT`) | **Resolvida — modal para os quatro formulários** |
 | PEND-F02 | Comportamento do logout mobile (FE-M05) quando existem operações pendentes na outbox | `aplicativo-mobile.md` §13.4 (silente sobre esse cruzamento) | Define se o logout bloqueia, avisa ou é silencioso nesse caso | Nenhum — é decisão 100% client-side | **[A DEFINIR]** |
 | PEND-F03 | Regra que decide, na divergência de equipamento no scanner (FE-M11) ou na tela de início (FE-M07), entre "exigir confirmação" e "bloquear" | `regras-de-negocio.md` RN-064 (menciona ambas as alternativas sem definir quando cada uma se aplica), `criterios-de-aceitacao.md` §17.11 | Define se a tela de scanner tem um modal de confirmação ou uma tela de bloqueio | Define se a regra é parametrizada por modelo/inspeção ou fixa no sistema | **[DECISÃO NECESSÁRIA]** |
 | PEND-F04 | Tela FE-W23 (Auditoria) sem endpoint correspondente | Repetição de INC-05/PEND-08 do documento 20, aplicada especificamente à composição desta tela | Tela não pode ser especificada em detalhe (dados exibidos, filtros) até a lacuna de backend ser resolvida | Precisa de `GET /audit-events` (ou equivalente) com filtros administrativos | **[PENDÊNCIA]** |

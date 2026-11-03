@@ -1,0 +1,323 @@
+<main class="page">
+
+  @if (loading()) {
+    <div class="state-message">
+      <span class="loader"></span>
+      <p>Carregando detalhes da inspeção...</p>
+    </div>
+  } @else if (error()) {
+    <div class="state-message error-message">
+      <h2>Não foi possível abrir a inspeção</h2>
+      <p>{{ error() }}</p>
+      <a routerLink="/inspections">Voltar para a listagem</a>
+    </div>
+  } @else if (inspection(); as item) {
+    <header class="page-header">
+      <div class="header-content">
+        <div class="breadcrumb">
+          <a routerLink="/inspections">Inspeções</a>
+          <span>/</span>
+          <span>Detalhamento</span>
+        </div>
+
+        <div class="title-row">
+          <div>
+            <h1>{{ item.title || 'Inspeção sem título' }}</h1>
+            <p class="subtitle">
+              Código:
+              <span class="code">{{ item.id }}</span>
+            </p>
+          </div>
+
+          <span class="status-badge" [ngClass]="getStatusClass(item.status)">
+            {{ statusLabel(item.status) }}
+          </span>
+        </div>
+
+        <div class="template-info">
+          <span class="template-icon">▤</span>
+          <div>
+            <strong>
+              {{ templateVersion()?.titleSnapshot || 'Modelo de inspeção' }}
+            </strong>
+            <span>
+              @if (templateVersion()) {
+                Versão {{ templateVersion()!.versionNumber }}
+              } @else {
+                Modelo vinculado à inspeção
+              }
+            </span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="content-grid">
+      <div class="main-column">
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">VISÃO GERAL</span>
+              <h2>Dados da inspeção</h2>
+            </div>
+            <span class="section-icon">▤</span>
+          </div>
+
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="detail-label">Cliente</span>
+              <strong>{{ client()?.name || 'Não disponível' }}</strong>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Local</span>
+              <strong>{{ site()?.name || 'Não disponível' }}</strong>
+              @if (site()?.addressLine) {
+                <span class="detail-secondary">{{ site()?.addressLine }}</span>
+              }
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Equipamento</span>
+              <strong>{{ equipment()?.name || 'Não informado' }}</strong>
+              @if (equipment()?.assetNumber) {
+                <span class="detail-secondary">
+                  Patrimônio: {{ equipment()?.assetNumber }}
+                </span>
+              }
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Técnico responsável</span>
+              <strong>{{ technician()?.name || 'Não disponível' }}</strong>
+              @if (technician()?.email) {
+                <span class="detail-secondary">{{ technician()?.email }}</span>
+              }
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Supervisor</span>
+              <strong>{{ supervisor()?.name || 'Não informado' }}</strong>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Data prevista</span>
+              <strong>{{ item.scheduledFor | date:'dd/MM/yyyy' }}</strong>
+              <span class="detail-secondary">
+                {{ item.scheduledFor | date:'HH:mm' }}
+              </span>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Prioridade</span>
+              <strong
+                class="priority"
+                [ngClass]="'priority-' + item.priority.toLowerCase()"
+              >
+                {{ priorityLabel(item.priority) }}
+              </strong>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Criada em</span>
+              <strong>{{ item.createdAt | date:'dd/MM/yyyy HH:mm' }}</strong>
+            </div>
+          </div>
+
+          @if (item.instructions) {
+            <div class="instructions">
+              <span class="detail-label">Instruções para execução</span>
+              <p>{{ item.instructions }}</p>
+            </div>
+          }
+
+          @if (item.canceledReason) {
+            <div class="cancellation-note">
+              <strong>Motivo do cancelamento</strong>
+              <p>{{ item.canceledReason }}</p>
+            </div>
+          }
+        </section>
+
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">ACOMPANHAMENTO</span>
+              <h2>Progresso da inspeção</h2>
+            </div>
+          </div>
+
+          <p class="section-description">
+            Acompanhe as principais etapas registradas no sistema.
+          </p>
+
+          <div class="milestones">
+            <div class="milestone" [class.completed]="!!item.createdAt">
+              <span class="milestone-dot"></span>
+              <div>
+                <strong>Inspeção criada</strong>
+                <span>{{ item.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
+              </div>
+            </div>
+
+            <div class="milestone" [class.completed]="!!item.startedAtServer">
+              <span class="milestone-dot"></span>
+              <div>
+                <strong>Execução iniciada</strong>
+                <span>
+                  @if (item.startedAtServer) {
+                    {{ item.startedAtServer | date:'dd/MM/yyyy HH:mm' }}
+                  } @else {
+                    Aguardando início
+                  }
+                </span>
+              </div>
+            </div>
+
+            <div class="milestone" [class.completed]="!!item.submittedAtServer">
+              <span class="milestone-dot"></span>
+              <div>
+                <strong>Enviada para revisão</strong>
+                <span>
+                  @if (item.submittedAtServer) {
+                    {{ item.submittedAtServer | date:'dd/MM/yyyy HH:mm' }}
+                  } @else {
+                    Ainda não enviada
+                  }
+                </span>
+              </div>
+            </div>
+
+            <div class="milestone" [class.completed]="!!item.approvedAt">
+              <span class="milestone-dot"></span>
+              <div>
+                <strong>Aprovada</strong>
+                <span>
+                  @if (item.approvedAt) {
+                    {{ item.approvedAt | date:'dd/MM/yyyy HH:mm' }}
+                  } @else {
+                    Aguardando aprovação
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <p class="progress-note">
+            As etapas são calculadas com base nas datas retornadas pela API.
+            Uma etapa sem data registrada ainda não foi confirmada pelo sistema.
+          </p>
+        </section>
+
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">ARQUIVOS</span>
+              <h2>Evidências</h2>
+            </div>
+            <span class="count">{{ evidence().length }}</span>
+          </div>
+
+          @if (evidence().length > 0) {
+            <div class="evidence-list">
+              @for (file of evidence(); track file.id) {
+                <article class="evidence-item">
+                  <div class="evidence-icon">▧</div>
+
+                  <div class="evidence-info">
+                    <strong>{{ file.description || file.type }}</strong>
+                    <span>{{ file.mimeType }} · {{ file.sizeBytes }} bytes</span>
+                    <span>
+                      Capturada em
+                      {{ file.capturedAtDevice | date:'dd/MM/yyyy HH:mm' }}
+                    </span>
+                  </div>
+
+                  @if (file.accessUrl) {
+                    <a
+                      class="evidence-link"
+                      [href]="file.accessUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Visualizar
+                    </a>
+                  }
+                </article>
+              }
+            </div>
+          } @else {
+            <p class="empty-message">Nenhuma evidência encontrada.</p>
+          }
+        </section>
+      </div>
+
+      <aside class="side-column">
+        <section class="card history-card">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">REGISTROS</span>
+              <h2>Histórico de estado</h2>
+            </div>
+          </div>
+
+          @if (hasHistory) {
+            <div class="timeline">
+              @for (event of history(); track event.id) {
+                <article class="timeline-item">
+                  <span class="timeline-dot"></span>
+
+                  <div class="timeline-content">
+                    <strong>{{ eventLabel(event.action) }}</strong>
+                    <span class="timeline-date">
+                      {{ event.occurredAt | date:'dd/MM/yyyy HH:mm' }}
+                    </span>
+
+                    <span class="timeline-entity">
+                      {{ event.entityType }}
+                    </span>
+
+                    @if (event.actorId) {
+                      <span class="timeline-actor">
+                        Responsável: {{ event.actorId }}
+                      </span>
+                    }
+                  </div>
+                </article>
+              }
+            </div>
+          } @else {
+            <p class="empty-message">
+              Nenhum evento de histórico encontrado.
+            </p>
+          }
+        </section>
+
+        <section class="card summary-card">
+          <span class="eyebrow">RESUMO</span>
+          <h2>Situação atual</h2>
+
+          <div class="summary-row">
+            <span>Status</span>
+            <strong>{{ statusLabel(item.status) }}</strong>
+          </div>
+
+          <div class="summary-row">
+            <span>Prioridade</span>
+            <strong>{{ priorityLabel(item.priority) }}</strong>
+          </div>
+
+          <div class="summary-row">
+            <span>Última atualização</span>
+            <strong>{{ item.updatedAt | date:'dd/MM/yyyy HH:mm' }}</strong>
+          </div>
+
+          <div class="summary-row">
+            <span>Versão do registro</span>
+            <strong>{{ item.version }}</strong>
+          </div>
+        </section>
+      </aside>
+    </div>
+  }
+</main>

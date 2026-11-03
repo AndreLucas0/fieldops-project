@@ -21,7 +21,7 @@ import {
   updateEntity,
   withinRange,
   dashboardSummary as summaryOf,
-  inspectionsByStatus as byStatusOf,
+  inspectionsByStatus as byStatusOf,    
   nonConformitiesBySeverity as bySeverityOf,
   type MockStore,
 } from '@fieldops/shared';
@@ -48,6 +48,7 @@ import type {
   User,
   UserStatus,
   Uuid,
+  AuditEvent,
 } from '../models/domain';
 import { serializeSort, type Page, type PageParams, type PageQuery } from '../models/page.model';
 import {
@@ -549,8 +550,15 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
 
 @Injectable()
 export class MockInspectionsService extends MockBase implements InspectionsService {
+
+  history(id: Uuid, query: PageQuery = {}): Observable<Page<AuditEvent>> {
+    return this.page<AuditEvent>([], query);
+  }
+
   list(query: PageQuery<InspectionFilters> = {}): Observable<Page<Inspection>> {
     const { scheduledFrom, scheduledTo, overdue, page, size, sort, ...simple } = query;
+
+
 
     const filtered = this.db.inspections.filter((inspection) => {
       if (!matchesFilters(inspection as unknown as Record<string, unknown>, simple)) return false;

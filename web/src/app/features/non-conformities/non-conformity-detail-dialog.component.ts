@@ -4,8 +4,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { catchError, finalize, forkJoin, of } from 'rxjs';
-
-import { isApiError, type Evidence, type InspectionDetail, type NonConformity } from '../../core';
+import {
+  isApiError,
+  type Evidence,
+  type InspectionDetail,
+  type InspectionItemSnapshot,
+  type NonConformity,
+} from '../../core';
 import { InspectionsService, NonConformitiesService } from '../../core/services/resources';
 import { statusLabel } from '../../shared/components';
 
@@ -192,8 +197,10 @@ export class NonConformityDetailDialogComponent {
           ).length ?? null,
         );
         this.relatedItemTitle.set(
-          result.inspection.items?.find((item) => item.id === result.nonConformity.inspectionItemId)
-            ?.itemTitle ?? '',
+          result.inspection.items?.find(
+            (item: InspectionItemSnapshot) =>
+              item.id === result.nonConformity.inspectionItemId,
+          )?.itemTitle ?? '',
         );
       });
   }

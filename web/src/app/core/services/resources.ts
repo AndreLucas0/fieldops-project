@@ -38,6 +38,7 @@ import type {
   UserRole,
   UserStatus,
   Uuid,
+  AuditEvent,
 } from '../models/domain';
 import type { Page, PageQuery } from '../models/page.model';
 
@@ -151,6 +152,7 @@ export abstract class TemplatesService {
 export abstract class InspectionsService {
   abstract list(query?: PageQuery<InspectionFilters>): Observable<Page<Inspection>>;
   abstract get(id: Uuid): Observable<InspectionDetail>;
+  abstract history(id: Uuid, query?: PageQuery): Observable<Page<AuditEvent>>;
   abstract create(input: Partial<Inspection>): Observable<Inspection>;
   abstract update(id: Uuid, input: Partial<Inspection>): Observable<Inspection>;
   abstract cancel(id: Uuid, reason: string): Observable<Inspection>;
@@ -327,7 +329,10 @@ export class HttpInspectionsService extends InspectionsService {
     return this.api.getPage<Inspection, InspectionFilters>('/inspections', query);
   }
   get(id: Uuid) {
-    return this.api.get<InspectionDetail>(`/inspections/${id}`);
+  return this.api.get<InspectionDetail>(`/inspections/${id}`);
+}
+  history(id: Uuid, query: PageQuery = {}) {
+    return this.api.getPage<AuditEvent>(`/inspections/${id}/history`, query);
   }
   create(input: Partial<Inspection>) {
     return this.api.post<Inspection>('/inspections', input);

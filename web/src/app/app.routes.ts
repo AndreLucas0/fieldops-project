@@ -2,6 +2,7 @@ import type { Route, Routes } from '@angular/router';
 
 import { authGuard, guestGuard } from './core/auth/auth.guard';
 
+
 const ADMIN_FEATURE_ROUTES: Routes = [
   {
     path: 'clients',
@@ -11,6 +12,22 @@ const ADMIN_FEATURE_ROUTES: Routes = [
         (module) => module.ClientsListComponent,
       ),
   },
+    {
+  path: 'inspections/new',
+  title: 'Nova inspeção — FieldOps',
+  loadComponent: () =>
+    import('./features/inspections/inspection-create.component').then(
+      (module) => module.InspectionCreateComponent,
+    ),
+  },
+  {
+  path: 'inspections/:inspectionId',
+  title: 'Detalhes da inspeção — FieldOps',
+  loadComponent: () =>
+    import('./features/inspections/inspection-detail.component').then(
+      (module) => module.InspectionDetailComponent,
+    ),
+},
   {
     path: 'inspections',
     title: 'Inspeções — FieldOps',
@@ -19,6 +36,7 @@ const ADMIN_FEATURE_ROUTES: Routes = [
         (module) => module.InspectionsListComponent,
       ),
   },
+
   catalogRoute('clients/:clientId/sites', 'Locais do cliente', 'sites'),
   catalogRoute('sites', 'Locais'),
   catalogRoute('sites/:siteId/equipment', 'Equipamentos do local', 'equipment'),

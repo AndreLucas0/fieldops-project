@@ -44,93 +44,99 @@ import {
     PageHeaderComponent,
   ],
   template: `
-    <div class="page">
-      <app-page-header
-        title="Modelos de inspeção"
-        subtitle="Checklists configuráveis e versionados."
-      >
-        <div actions class="actions">
-          @if (canCreate()) {
-            <a matButton="filled" routerLink="/inspection-templates/new">
-              <mat-icon>add</mat-icon>
-              Novo modelo
-            </a>
-          }
-        </div>
-      </app-page-header>
-
-      <div class="filters">
-        <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Categoria</mat-label>
-          <input
-            matInput
-            [ngModel]="categoryInput()"
-            (ngModelChange)="onCategoryChange($event)"
-            placeholder="Ex.: Extintores"
-          />
-        </mat-form-field>
-
-        <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Situação</mat-label>
-          <mat-select [ngModel]="statusInput()" (ngModelChange)="onStatusChange($event)">
-            <mat-option [value]="null">Todas</mat-option>
-            @for (option of statusChoices; track option.value) {
-              <mat-option [value]="option.value">{{ option.label }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-      </div>
-
-      <app-data-table
-        [columns]="columns"
-        [data]="data()"
-        [loading]="loading()"
-        [error]="error()"
-        [activeFilters]="activeFilters()"
-        [sort]="sort()"
-        ariaLabel="Modelos de inspeção"
-        emptyIcon="fact_check"
-        emptyTitle="Nenhum modelo encontrado"
-        [emptyMessage]="emptyMessage()"
-        [emptyActionLabel]="canCreate() ? 'Novo modelo' : null"
-        (pageChange)="onPageChange($event)"
-        (sortChange)="onSortChange($event)"
-        (filterChange)="onFilterChange($event)"
-        (emptyAction)="createNew()"
-        (retry)="load()"
-      />
+    <section class="page">
+  <app-page-header
+    title="Modelos de inspeção"
+    subtitle="Checklists configuráveis e versionados."
+  >
+    <div actions class="actions">
+      @if (canCreate()) {
+        <a matButton="filled" routerLink="/inspection-templates/new">
+          <mat-icon>add</mat-icon>
+          Novo modelo
+        </a>
+      }
     </div>
+  </app-page-header>
+
+  <div class="catalog-card">
+    <div class="filters" aria-label="Filtros de modelos">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Categoria</mat-label>
+        <input
+          matInput
+          [ngModel]="categoryInput()"
+          (ngModelChange)="onCategoryChange($event)"
+          placeholder="Ex.: Extintores"
+        />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Situação</mat-label>
+        <mat-select
+          [ngModel]="statusInput()"
+          (ngModelChange)="onStatusChange($event)"
+        >
+          <mat-option [value]="null">Todas</mat-option>
+          @for (option of statusChoices; track option.value) {
+            <mat-option [value]="option.value">
+              {{ option.label }}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <app-data-table
+      [columns]="columns"
+      [data]="data()"
+      [loading]="loading()"
+      [error]="error()"
+      [activeFilters]="activeFilters()"
+      [sort]="sort()"
+      ariaLabel="Modelos de inspeção"
+      emptyIcon="fact_check"
+      emptyTitle="Nenhum modelo encontrado"
+      [emptyMessage]="emptyMessage()"
+      [emptyActionLabel]="canCreate() ? 'Novo modelo' : null"
+      (pageChange)="onPageChange($event)"
+      (sortChange)="onSortChange($event)"
+      (filterChange)="onFilterChange($event)"
+      (emptyAction)="createNew()"
+      (retry)="load()"
+    />
+  </div>
+</section>
   `,
   styles: `
     :host {
-      display: block;
-    }
+  display: block;
+  min-width: 0;
+}
 
-    .page {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      max-width: 76rem;
-      margin: 0 auto;
-      padding: 1.5rem;
-    }
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
 
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
 
-    .filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      max-width: 32rem;
-    }
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
 
-    .filters mat-form-field {
-      flex: 1 1 12rem;
-    }
+.filters mat-form-field {
+  flex: 1 1 14rem;
+  max-width: 22rem;
+}
   `,
 })
 export class TemplatesListComponent {

@@ -21,6 +21,13 @@ const ADMIN_FEATURE_ROUTES: Routes = [
     ),
   },
   {
+  path: 'inspections/:inspectionId/review',
+  title: 'Revisão da inspeção — FieldOps',
+  loadComponent: () =>
+    import('./features/inspections/inspection-review.component')
+      .then((m) => m.InspectionReviewComponent),
+},
+  {
   path: 'inspections/:inspectionId',
   title: 'Detalhes da inspeção — FieldOps',
   loadComponent: () =>

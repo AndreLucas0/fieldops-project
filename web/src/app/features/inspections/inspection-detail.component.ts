@@ -3,12 +3,14 @@ import {
   Component,
   DestroyRef,
   inject,
+  computed,
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { catchError, of } from 'rxjs';
+import { AuthStore } from '../../core/auth/auth.store';
 
 import type {
   AuditEvent,
@@ -48,6 +50,12 @@ export class InspectionDetailComponent {
   private readonly equipmentService = inject(EquipmentService);
   private readonly usersService = inject(UsersService);
   private readonly templatesService = inject(TemplatesService);
+
+  private readonly authStore = inject(AuthStore);
+
+protected readonly isSupervisor = computed(
+  () => this.authStore.role() === 'SUPERVISOR',
+);
 
   protected readonly inspection = signal<Inspection | null>(null);
 

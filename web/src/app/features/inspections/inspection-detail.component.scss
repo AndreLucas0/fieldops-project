@@ -161,8 +161,15 @@
 .content-grid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(280px, 0.9fr);
-  align-items: start;
+  align-items: stretch;
   gap: 20px;
+}
+
+.data-card,
+.history-card {
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .data-card,
@@ -573,6 +580,33 @@
   animation: detail-spin 0.8s linear infinite;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.review-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 22px;
+  border: 1px solid var(--detail-accent);
+  border-radius: 9px;
+  background: var(--detail-accent);
+  color: #171717;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+  transition: filter 160ms ease;
+
+  &:hover {
+    filter: brightness(1.1);
+  }
+}
+
 @keyframes detail-spin {
   to {
     transform: rotate(360deg);
@@ -580,41 +614,50 @@
 }
 
 @media (max-width: 1000px) {
-  .detail-page {
-    padding: 24px;
-  }
-
-  .content-grid {
-    grid-template-columns: minmax(0, 1.6fr) minmax(250px, 0.9fr);
-    gap: 14px;
-  }
-
-  .data-card {
-    padding: 22px;
-  }
-
-  .history-card {
-    padding: 21px 17px;
-  }
-}
-
-@media (max-width: 760px) {
-  .detail-page {
-    padding: 16px;
-  }
-
-  .detail-header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 15px;
-  }
-
   .content-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .data-card,
   .history-card {
-    padding: 22px;
+    height: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .content-grid {
+    gap: 16px;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .header-actions {
+  width: 100%;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+}
+
+@media (max-width: 480px) {
+  .content-grid {
+    gap: 12px;
+  }
+
+  .header-actions {
+    align-items: flex-start;
+  }
+
+  .review-button {
+    min-height: 38px;
+    padding: 0 16px;
   }
 }
 

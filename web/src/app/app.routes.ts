@@ -1,6 +1,6 @@
 import type { Route, Routes } from '@angular/router';
 
-import { authGuard, guestGuard } from './core/auth/auth.guard';
+import { authGuard, authGuardChild, guestGuard } from './core/auth/auth.guard';
 
 
 const ADMIN_FEATURE_ROUTES: Routes = [
@@ -77,6 +77,7 @@ export const routes: Routes = [
   {
     path: '',
     canActivate: [authGuard],
+    canActivateChild: [authGuardChild],
     loadComponent: () =>
       import('./features/shell/admin-shell.component').then((module) => module.AdminShellComponent),
     children: [
@@ -95,6 +96,21 @@ export const routes: Routes = [
           import('./features/templates/templates-list.component').then(
             (module) => module.TemplatesListComponent,
           ),
+      },
+      {
+        path: 'inspection-templates/new',
+        title: 'Novo modelo — FieldOps',
+        loadComponent: () => import('./features/templates/template-create.component').then(m => m.TemplateCreateComponent),
+      },
+      {
+        path: 'inspection-templates/:templateId/preview',
+        title: 'Prévia do modelo — FieldOps',
+        loadComponent: () => import('./features/templates/template-preview.component').then(m => m.TemplatePreviewComponent),
+      },
+      {
+        path: 'inspection-templates/:templateId/versions',
+        title: 'Versões do modelo — FieldOps',
+        loadComponent: () => import('./features/templates/template-versions.component').then(m => m.TemplateVersionsComponent),
       },
       {
         path: 'inspection-templates/:templateId/edit',

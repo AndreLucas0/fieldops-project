@@ -11,7 +11,6 @@ $inspection-accent: #e5a43b;
 }
 
 .detail-page {
-
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -560,7 +559,9 @@ $inspection-accent: #e5a43b;
   display: flex;
   align-items: center;
   gap: 12px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .review-button {
@@ -602,6 +603,11 @@ $inspection-accent: #e5a43b;
 }
 
 @media (max-width: 760px) {
+  .detail-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
   .content-grid {
     gap: 16px;
   }

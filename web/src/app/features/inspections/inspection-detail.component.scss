@@ -30,9 +30,7 @@
   margin-bottom: 25px;
   color: var(--detail-muted);
   font-size: 13px;
-  font-weight: 500;
   text-decoration: none;
-  transition: color 160ms ease;
 
   &:hover {
     color: var(--detail-text);
@@ -63,7 +61,6 @@
   margin-bottom: 12px;
   color: var(--detail-subtle);
   font-size: 12px;
-  font-weight: 500;
 }
 
 .breadcrumb-separator {
@@ -74,8 +71,6 @@
   margin: 0;
   color: var(--detail-text);
   font-size: clamp(23px, 2.2vw, 30px);
-  font-weight: 650;
-  letter-spacing: -0.8px;
   line-height: 1.2;
 }
 
@@ -123,7 +118,6 @@
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
 }
 
 .status-dot {
@@ -139,13 +133,11 @@
 
   &.in-progress {
     background: #4da3e6;
-    box-shadow: 0 0 9px rgba(77, 163, 230, 0.35);
   }
 
   &.submitted,
   &.under-review {
     background: var(--detail-accent);
-    box-shadow: 0 0 9px rgba(229, 164, 59, 0.3);
   }
 
   &.approved {
@@ -199,8 +191,6 @@
     margin: 5px 0 0;
     color: var(--detail-text);
     font-size: 18px;
-    font-weight: 620;
-    letter-spacing: -0.3px;
   }
 }
 
@@ -209,7 +199,6 @@
   color: var(--detail-subtle);
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 1.3px;
 }
 
 .card-heading-icon {
@@ -245,20 +234,17 @@
 .field-label {
   color: var(--detail-muted);
   font-size: 11px;
-  font-weight: 500;
 }
 
 .field-value {
   overflow-wrap: anywhere;
   color: #e5e9ec;
   font-size: 13px;
-  font-weight: 550;
   line-height: 1.45;
 }
 
 .priority-value {
   text-transform: uppercase;
-  letter-spacing: 0.3px;
 }
 
 .section-divider {
@@ -324,7 +310,6 @@
     border-color: rgba(229, 164, 59, 0.65);
     background: var(--detail-accent-soft);
     color: var(--detail-accent);
-    box-shadow: 0 0 0 3px rgba(229, 164, 59, 0.06);
   }
 
   &.is-current strong {
@@ -469,7 +454,6 @@
   border: 2px solid var(--detail-accent);
   border-radius: 50%;
   background: var(--detail-card);
-  box-shadow: 0 0 0 3px var(--detail-accent-soft);
 }
 
 .timeline-content {
@@ -504,7 +488,6 @@
   color: var(--detail-subtle);
   font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
 }
 
 .empty-history {
@@ -606,10 +589,6 @@
   text-decoration: none;
 
   cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.2s ease;
 
   &:hover {
     background-color: #ffc247;

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, type EffectCallback, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 /**
@@ -66,7 +66,10 @@ export function usePathname() {
   return '/';
 }
 
-export function useFocusEffect() {}
+/** As telas montadas por este harness estão focadas; executa também o cleanup. */
+export function useFocusEffect(effect: EffectCallback) {
+  useEffect(effect, [effect]);
+}
 
 /** Vira um marcador inspecionável: `redirect-to` guarda o destino. */
 export function Redirect({ href }: { href: string }) {

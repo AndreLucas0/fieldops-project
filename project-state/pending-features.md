@@ -1,5 +1,14 @@
 # Backend — Pending Features
 
+## Revalidação 2026-11-04
+
+Ver [recovery-validation-20261104.md](recovery-validation-20261104.md): projeção
+administrativa InspectionDetail e identificação de versão corrigidas conforme
+OpenAPI já existente; sem alteração de escrita/permissões. Corrigida preparação
+de fixtures de TemplateVersionControllerIT. Reatribuição em ASSIGNED, política
+de edição de planejamento, auditoria global e exposição de GPS continuam
+dependências de decisão/contrato; não considerar resolvidas por este incremento.
+
 ## Status Legend
 
 - `PENDING` — not implemented yet

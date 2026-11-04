@@ -10,11 +10,12 @@
  */
 
 import { Injectable, inject } from '@angular/core';
-import type { Observable } from 'rxjs';
+import { map, type Observable } from 'rxjs';
 
 import { ApiService } from '../http/api.service';
 import type {
   Client,
+  JsonObject,
   ActiveStatus,
   DashboardSummary,
   Equipment,
@@ -114,8 +115,40 @@ export abstract class EquipmentService {
   abstract setStatus(id: Uuid, status: EquipmentStatus): Observable<Equipment>;
 }
 
+/** Adapta JSON textual legado sem alterar os dados persistidos ou o contrato compartilhado. */
+function jsonObject(value: unknown): JsonObject | null {
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonObject) : null;
+}
+
+function normalizeSections(sections: TemplateSectionDetail[]): TemplateSectionDetail[] {
+  return sections.map((section) => ({
+    ...section,
+    items: section.items?.map((item) => ({ ...item, optionsJson: jsonObject(item.optionsJson) })),
+  }));
+}
+
+function normalizeVersion(
+  version: InspectionTemplateVersionDetail & { publishedById?: Uuid },
+): InspectionTemplateVersionDetail {
+  const publisher = version.publishedBy ?? version.publishedById;
+  return {
+    ...version,
+    ...(publisher ? { publishedBy: publisher } : {}),
+    sections: version.sections ? normalizeSections(version.sections) : undefined,
+  };
+}
+
 export abstract class TemplatesService {
-  abstract create(input: Pick<InspectionTemplate, 'title' | 'category' | 'description'>): Observable<InspectionTemplate>;
+  abstract create(
+    input: Pick<InspectionTemplate, 'title' | 'category' | 'description'>,
+  ): Observable<InspectionTemplate>;
   abstract publish(templateId: Uuid): Observable<InspectionTemplateVersionDetail>;
   abstract list(query?: PageQuery<TemplateFilters>): Observable<Page<InspectionTemplate>>;
   abstract get(id: Uuid): Observable<InspectionTemplate>;
@@ -281,7 +314,9 @@ export class HttpTemplatesService extends TemplatesService {
     return this.api.post<InspectionTemplate>('/inspection-templates', input);
   }
   publish(templateId: Uuid) {
-    return this.api.post<InspectionTemplateVersionDetail>(`/inspection-templates/${templateId}/publish`);
+    return this.api.post<InspectionTemplateVersionDetail>(
+      `/inspection-templates/${templateId}/publish`,
+    );
   }
 
   list(query: PageQuery<TemplateFilters> = {}) {
@@ -294,18 +329,22 @@ export class HttpTemplatesService extends TemplatesService {
     return this.api.put<InspectionTemplate>(`/inspection-templates/${id}`, input);
   }
   listVersions(templateId: Uuid, query: PageQuery = {}) {
-    return this.api.getPage<InspectionTemplateVersionDetail>(
-      `/inspection-templates/${templateId}/versions`,
-      query,
-    );
+    return this.api
+      .getPage<InspectionTemplateVersionDetail>(
+        `/inspection-templates/${templateId}/versions`,
+        query,
+      )
+      .pipe(map((page) => ({ ...page, content: page.content.map(normalizeVersion) })));
   }
   getVersion(versionId: Uuid) {
-    return this.api.get<InspectionTemplateVersionDetail>(
-      `/inspection-template-versions/${versionId}`,
-    );
+    return this.api
+      .get<InspectionTemplateVersionDetail>(`/inspection-template-versions/${versionId}`)
+      .pipe(map(normalizeVersion));
   }
   listDraftSections(templateId: Uuid) {
-    return this.api.get<TemplateSectionDetail[]>(`/inspection-templates/${templateId}/sections`);
+    return this.api
+      .get<TemplateSectionDetail[]>(`/inspection-templates/${templateId}/sections`)
+      .pipe(map(normalizeSections));
   }
   createSection(templateId: Uuid, input: Partial<TemplateSection>) {
     return this.api.post<TemplateSectionDetail>(
@@ -338,8 +377,8 @@ export class HttpInspectionsService extends InspectionsService {
     return this.api.getPage<Inspection, InspectionFilters>('/inspections', query);
   }
   get(id: Uuid) {
-  return this.api.get<InspectionDetail>(`/inspections/${id}`);
-}
+    return this.api.get<InspectionDetail>(`/inspections/${id}`);
+  }
   history(id: Uuid, query: PageQuery = {}) {
     return this.api.getPage<AuditEvent>(`/inspections/${id}/history`, query);
   }

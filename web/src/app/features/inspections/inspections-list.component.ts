@@ -204,6 +204,7 @@ function formatDay(day: string): string {
           [columns]="columns()"
           [data]="data()"
           [loading]="loading()"
+          [rowLink]="inspectionRowLink"
           [error]="error()"
           [activeFilters]="activeFilters()"
           [sort]="sort()"
@@ -353,6 +354,11 @@ export class InspectionsListComponent {
     () => this.auth.role() === 'SUPERVISOR',
   );
 
+  protected readonly inspectionRowLink = (row: Inspection) => [
+    '/inspections',
+    row.id,
+  ];
+
   protected readonly technicians = signal<User[]>([]);
   protected readonly clientOptions = signal<Client[]>([]);
 
@@ -380,6 +386,8 @@ export class InspectionsListComponent {
       this.technicians().map((user) => [user.id, user.name])
     );
 
+
+
     const clientNames = new Map(
       this.clientOptions().map((client) => [client.id, client.name])
     );
@@ -388,11 +396,9 @@ export class InspectionsListComponent {
       {
         field: 'title',
         label: 'Inspeção',
-        type: 'link',
         sortable: true,
         width: '18rem',
         emptyText: 'Sem título',
-        link: (row) => ['/inspections', row.id],
       },
       {
         field: 'clientId',
@@ -603,37 +609,37 @@ export class InspectionsListComponent {
   }
 
   protected onRowAction(event: RowActionEvent<Inspection>): void {
-  if (event.action === 'review') {
-    if (
-      !this.isSupervisor() ||
-      !['SUBMITTED', 'UNDER_REVIEW'].includes(event.row.status)
-    ) {
+    if (event.action === 'review') {
+      if (
+        !this.isSupervisor() ||
+        !['SUBMITTED', 'UNDER_REVIEW'].includes(event.row.status)
+      ) {
+        return;
+      }
+
+      void this.router.navigate([
+        '/inspections',
+        event.row.id,
+        'review',
+      ]);
+
       return;
     }
 
-    void this.router.navigate([
-      '/inspections',
-      event.row.id,
-      'review',
-    ]);
+    if (!this.canManage() || event.action !== 'cancel') return;
 
-    return;
+    this.dialog
+      .open(InspectionCancelDialogComponent, {
+        data: { inspection: event.row },
+        width: '32rem',
+        maxWidth: '95vw',
+        autoFocus: 'first-tabbable',
+        restoreFocus: true,
+      })
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((cancelled: boolean | undefined) => {
+        if (cancelled) this.load();
+      });
   }
-
-  if (!this.canManage() || event.action !== 'cancel') return;
-
-  this.dialog
-    .open(InspectionCancelDialogComponent, {
-      data: { inspection: event.row },
-      width: '32rem',
-      maxWidth: '95vw',
-      autoFocus: 'first-tabbable',
-      restoreFocus: true,
-    })
-    .afterClosed()
-    .pipe(takeUntilDestroyed(this.destroyRef))
-    .subscribe((cancelled: boolean | undefined) => {
-      if (cancelled) this.load();
-    });
-}
 }

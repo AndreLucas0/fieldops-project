@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,6 +8,8 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatPaginatorIntl, MatPaginatorModule, type PageEvent } from '@angular/material/paginator';
 import { MatSortModule, type Sort as MatSortEvent } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
+import { Router } from '@angular/router';
+
 
 import type { ApiError, Page, PageParams, Sort, SortDirection } from '../../../core';
 import { EmptyStateComponent } from '../empty-state/empty-state.component';
@@ -115,6 +117,9 @@ export class DataTableComponent<T> {
   /** Descrição da tabela para leitores de tela. */
   readonly ariaLabel = input('Listagem');
 
+  /** Destino opcional ao clicar em uma linha. */
+  readonly rowLink = input<((row: T) => string | unknown[]) | null>(null);
+
   readonly pageChange = output<PageParams>();
   readonly sortChange = output<Sort | null>();
   /** Emite os filtros que sobraram após a remoção. */
@@ -122,6 +127,8 @@ export class DataTableComponent<T> {
   readonly rowAction = output<RowActionEvent<T>>();
   readonly emptyAction = output<void>();
   readonly retry = output<void>();
+
+  private readonly router = inject(Router);
 
   protected readonly dateFormat = TABLE_DATE_FORMAT;
 
@@ -235,5 +242,36 @@ export class DataTableComponent<T> {
 
   protected clearFilters(): void {
     this.filterChange.emit([]);
+  }
+
+  protected onRowClick(row: T, event: MouseEvent): void {
+    const target = event.target;
+
+    // Não navega quando o usuário clica em um botão ou controle da linha.
+    if (
+      target instanceof Element &&
+      target.closest('a, button, input, select, textarea, [role="button"]')
+    ) {
+      return;
+    }
+
+    this.navigateToRow(row);
+  }
+
+  protected onRowKeydown(row: T, event: Event): void {
+    if (event.target !== event.currentTarget) return;
+
+    event.preventDefault();
+    this.navigateToRow(row);
+  }
+
+  private navigateToRow(row: T): void {
+    const destination = this.rowLink()?.(row);
+
+    if (!destination) return;
+
+    void this.router.navigate(
+      typeof destination === 'string' ? [destination] : destination,
+    );
   }
 }

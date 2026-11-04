@@ -18,6 +18,7 @@
   background: transparent;
 }
 
+
 .fo-table__filters {
   display: flex;
   align-items: center;
@@ -153,6 +154,15 @@ td a:focus-visible {
     background: #171e24;
   }
 
+  tr.fo-table__row--clickable {
+    cursor: pointer;
+  }
+
+  tr.fo-table__row--clickable:focus-visible {
+    outline: 2px solid #ffad0a;
+    outline-offset: -2px;
+  }
+
   .fo-table__viewport {
     overflow-x: auto;
   }
@@ -198,17 +208,6 @@ td a:focus-visible {
     font-weight: 600;
   }
 
-  td a {
-    color: #ffad0a;
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  td a:hover {
-    color: #ffc247;
-    text-decoration: underline;
-  }
-
   .fo-table__inline-actions button {
     color: #ff9ca5;
   }
@@ -217,4 +216,3 @@ td a:focus-visible {
     background: rgba(255, 100, 120, 0.08);
   }
 }
-

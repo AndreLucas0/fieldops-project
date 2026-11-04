@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
@@ -35,10 +35,6 @@ export default function SyncScreen() {
     setFailedEntries(failed);
     setOnline(connectivity);
   }, []);
-
-  useEffect(() => {
-    void loadPending();
-  }, [loadPending]);
 
   useFocusEffect(
     useCallback(() => {

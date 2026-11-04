@@ -5,7 +5,7 @@ import { addNetworkStateListener } from 'expo-network';
 import { apiClient } from '@/services/api-client';
 import { syncPendingIfOnline } from '@/services/sync-service';
 
-type NetworkListener = (state: { isInternetReachable: boolean | null }) => void;
+type NetworkListener = (state: { isInternetReachable?: boolean | null }) => void;
 type AddNetworkListener = (fn: NetworkListener) => { remove: () => void };
 
 export function useSyncOnForeground(
@@ -35,6 +35,5 @@ export function useSyncOnForeground(
       networkSub.remove();
       appSub.remove();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

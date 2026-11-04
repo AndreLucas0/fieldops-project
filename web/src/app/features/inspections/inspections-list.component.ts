@@ -418,7 +418,7 @@ export class InspectionsListComponent {
       },
       {
         field: 'scheduledFor',
-        label: 'Prevista',
+        label: 'Agendada para',
         type: 'date',
         sortable: true,
         width: '12rem',
@@ -430,6 +430,11 @@ export class InspectionsListComponent {
         badgeContext: 'inspection',
         align: 'center',
         width: '12rem',
+      },
+      {
+        field: 'overdue',
+        label: 'Prazo',
+        format: (_value, row) => overdueLabel(row, this.now()),
       },
       {
         field: 'updatedAt',

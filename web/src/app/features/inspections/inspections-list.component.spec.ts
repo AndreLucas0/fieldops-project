@@ -154,7 +154,7 @@ describe('InspectionsListComponent', () => {
 
     const actions = component.columns().find((c) => c.field === 'actions')?.actions;
 
-    expect(actions?.map((action) => action.id)).toEqual(['cancel']);
+    expect(actions?.map((action) => action.id)).toEqual(['review', 'cancel']);
   });
 
   it('não oferece cancelar para quem não pode escrever em inspeções', async () => {
@@ -167,7 +167,7 @@ describe('InspectionsListComponent', () => {
 
   it('esconde o cancelamento em inspeções aprovadas, enviadas ou já canceladas', async () => {
     const { component } = await render();
-    const visible = component.columns().find((c) => c.field === 'actions')!.actions![0]!.visible!;
+    const visible = component.columns().find((c) => c.field === 'actions')!.actions!.find((a) => a.id === 'cancel')!.visible!;
 
     for (const status of ['APPROVED', 'SUBMITTED', 'CANCELED'] as const) {
       expect(visible(inspectionWith(status))).toBe(false);

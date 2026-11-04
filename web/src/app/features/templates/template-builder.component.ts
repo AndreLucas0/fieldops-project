@@ -541,9 +541,13 @@ export class TemplateBuilderComponent implements OnInit {
     this.saving.set(true);
     forkJoin([
       this.templates.updateSection(this.templateId(), section.id, {
+        title: section.title,
+        description: section.description,
         displayOrder: neighbor.displayOrder,
       }),
       this.templates.updateSection(this.templateId(), neighbor.id, {
+        title: neighbor.title,
+        description: neighbor.description,
         displayOrder: section.displayOrder,
       }),
     ])
@@ -588,13 +592,22 @@ export class TemplateBuilderComponent implements OnInit {
     this.saving.set(true);
     forkJoin([
       this.templates.updateItem(this.templateId(), item.id, {
+        ...this.itemPayload(item),
         displayOrder: neighbor.displayOrder,
       }),
       this.templates.updateItem(this.templateId(), neighbor.id, {
+        ...this.itemPayload(neighbor),
         displayOrder: item.displayOrder,
       }),
     ])
       .pipe(finalize(() => this.saving.set(false)))
       .subscribe(() => this.reloadSections());
+  }
+
+  private itemPayload(item: TemplateItem): Partial<TemplateItem> {
+    const { code, title, description, responseType, required, observationRequiredOnFailure,
+      evidenceRequiredOnFailure, optionsJson } = item;
+    return { code, title, description, responseType, required, observationRequiredOnFailure,
+      evidenceRequiredOnFailure, optionsJson };
   }
 }

@@ -101,7 +101,7 @@ export class InspectionReviewComponent {
     protected beginReview(): void {
         const id = this.getInspectionId();
 
-        if (!id || !this.isSupervisor()) return;
+        if (!id || !this.isSupervisor() || this.actionLoading() || this.inspection()?.status !== 'SUBMITTED') return;
 
         this.actionLoading.set(true);
         this.actionError.set(null);
@@ -127,7 +127,7 @@ export class InspectionReviewComponent {
     protected approve(): void {
         const id = this.getInspectionId();
 
-        if (!id || !this.isSupervisor()) return;
+        if (!id || !this.isSupervisor() || this.actionLoading() || this.inspection()?.status !== 'UNDER_REVIEW') return;
 
         const confirmed = window.confirm(
             'Tem certeza de que deseja aprovar esta inspeção? Esta decisão será registrada.',
@@ -160,7 +160,7 @@ export class InspectionReviewComponent {
         const id = this.getInspectionId();
         const reason = this.decisionComment().trim();
         
-        if (!id || !this.isSupervisor()) return;
+        if (!id || !this.isSupervisor() || this.actionLoading() || this.inspection()?.status !== 'UNDER_REVIEW') return;
 
         if (!reason) {
             this.actionError.set(

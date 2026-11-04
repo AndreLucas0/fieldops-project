@@ -69,7 +69,7 @@ cópias isoladas antes da aplicação. Sem npm audit fix, force ou legacy-peer-d
   Restantes acompanhados na issue #298: CLI/Router/query-string/decode-uri/
   zod e image-size. Metro 0.84.4 usa image-size ^1.0.2; major corrigida fora
   desse intervalo não será forçada. Decisão de baseline SDK permanece aberta.
-- Última validação local: web 314 testes/38 arquivos e build aprovado; mobile
+- Última validação local: web 317 testes/38 arquivos e build aprovado; mobile
   444 testes/37 arquivos, typecheck e lint sem erros; backend 52 unitários.
 - Avisos mantidos: quatro diretivas eslint históricas sem uso no mobile e
   CSS de detalhe/revisão acima de 4 kB, mas abaixo do limite de erro de 8 kB.
@@ -81,6 +81,10 @@ cópias isoladas antes da aplicação. Sem npm audit fix, force ou legacy-peer-d
   timestamp e usam ConfirmDialogService. Cancelar/Escape não decide e devolve
   foco a Aprovar; confirmação pendente impede duplicação sem desabilitar o
   acionador. Reproduzido por teste antes da correção e confirmado no navegador.
+- Concorrência (§7.11 de telas-frontend): erro 409 em início/decisão recarrega
+  a inspeção antes de permitir ações; falha na releitura remove o estado antigo
+  e bloqueia nova decisão. Reprovar desabilitado até motivo preenchido. Três
+  testes reproduziram as falhas antes da correção. Sem mudança de API/backend.
 - Revisão 320/768/1440 px sem overflow horizontal na revisão; listas em 320 px
   também verificadas na execução anterior. Fotos mock não são URLs reais;
   erro é visível. Homologação com fotos reais permanece separada.

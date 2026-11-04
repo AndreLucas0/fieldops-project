@@ -11,7 +11,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { catchError, finalize, of, switchMap } from 'rxjs';
+import { catchError, finalize, of, switchMap, throwError } from 'rxjs';
 import { EvidenceViewerComponent } from './evidence-viewer.component';
 import { ConfirmDialogService, StatusBadgeComponent, statusLabel } from '../../shared/components';
 
@@ -120,6 +120,7 @@ export class InspectionReviewComponent {
       .beginReview(id)
       .pipe(
         switchMap(() => this.inspectionsService.get(id)),
+        catchError((error: unknown) => this.recoverConflict(id, error)),
         finalize(() => this.actionLoading.set(false)),
         takeUntilDestroyed(this.destroyRef),
       )
@@ -184,6 +185,7 @@ export class InspectionReviewComponent {
               : this.inspectionsService.approve(id, reason || undefined)
           ).pipe(switchMap(() => this.inspectionsService.get(id)));
         }),
+        catchError((error: unknown) => this.recoverConflict(id, error)),
         finalize(() => {
           this.confirmationPending = false;
           this.actionLoading.set(false);
@@ -200,6 +202,24 @@ export class InspectionReviewComponent {
           );
         },
       });
+  }
+
+  private recoverConflict(id: string, error: unknown) {
+    if (!error || typeof error !== 'object' || !('status' in error) || error.status !== 409) {
+      return throwError(() => error);
+    }
+    this.inspection.set(null);
+    this.loading.set(true);
+    this.actionError.set('A inspeção foi alterada por outra pessoa. Os dados foram atualizados.');
+    return this.inspectionsService.get(id).pipe(
+      catchError((refreshError: unknown) => {
+        this.error.set(
+          'Não foi possível atualizar a inspeção. Volte à listagem e tente novamente.',
+        );
+        return throwError(() => refreshError);
+      }),
+      finalize(() => this.loading.set(false)),
+    );
   }
 
   protected evidenceForItem(itemId: string): Evidence[] {

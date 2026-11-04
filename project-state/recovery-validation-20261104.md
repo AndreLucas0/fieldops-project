@@ -99,6 +99,13 @@ cópias isoladas antes da aplicação. Sem npm audit fix, force ou legacy-peer-d
 
 ## Dependências de decisão ou recurso externo
 
+Reexecução CI 10 expôs mais dependência de ordem: 31 erros de fixture em
+UserControllerIT/ClientControllerIT ao apagar usuários referenciados por modelos
+de outra classe. Aplicado o isolamento TRUNCATE users CASCADE já adotado em
+SiteControllerIT, somente na preparação do PostgreSQL efêmero. Não altera regra,
+FK, migração nem dado da aplicação. Novo verify completo deve aprovar antes do
+merge; resultados verdes anteriores não substituem esta verificação.
+
 Quadro conciliado: #97, #98, #103–106, #174–175, #213–214, #218 e #285–287
 encerradas e em Done, atribuídas a LucasIanovski, com referências aos merges
 e evidências. Comentários distinguem implementação inicial dos colegas das

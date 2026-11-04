@@ -81,7 +81,7 @@ cópias isoladas antes da aplicação. Sem npm audit fix, force ou legacy-peer-d
   timestamp e usam ConfirmDialogService. Cancelar/Escape não decide e devolve
   foco a Aprovar; confirmação pendente impede duplicação sem desabilitar o
   acionador. Reproduzido por teste antes da correção e confirmado no navegador.
-- Concorrência (§7.11 de telas-frontend): erro 409 em início/decisão recarrega
+- Concorrência (seção 8 de telas-frontend): erro 409 em início/decisão recarrega
   a inspeção antes de permitir ações; falha na releitura remove o estado antigo
   e bloqueia nova decisão. Reprovar desabilitado até motivo preenchido. Três
   testes reproduziram as falhas antes da correção. Sem mudança de API/backend.

@@ -101,9 +101,7 @@ describe('InspectionsListComponent', () => {
     component.onPage({ page: 2, size: 20 });
     component.setStatus('ASSIGNED');
 
-    expect(list).toHaveBeenLastCalledWith(
-      expect.objectContaining({ status: 'ASSIGNED', page: 0 }),
-    );
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'ASSIGNED', page: 0 }));
   });
 
   it('envia técnico e cliente ao serviço', async () => {
@@ -129,9 +127,7 @@ describe('InspectionsListComponent', () => {
     expect(new Date(query.scheduledFrom!).getTime()).toBe(
       new Date('2026-11-01T00:00:00').getTime(),
     );
-    expect(new Date(query.scheduledTo!).getTime()).toBe(
-      new Date('2026-11-30T23:59:59').getTime(),
-    );
+    expect(new Date(query.scheduledTo!).getTime()).toBe(new Date('2026-11-30T23:59:59').getTime());
   });
 
   it('mostra etiquetas dos filtros ativos e remove o filtro ao fechar a etiqueta', async () => {
@@ -144,9 +140,7 @@ describe('InspectionsListComponent', () => {
     component.onFilter([]);
 
     expect(component.activeFilters()).toEqual([]);
-    expect(list).toHaveBeenLastCalledWith(
-      expect.objectContaining({ status: undefined, page: 0 }),
-    );
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ status: undefined, page: 0 }));
   });
 
   it('oferece cancelar para o SUPERVISOR', async () => {
@@ -154,7 +148,7 @@ describe('InspectionsListComponent', () => {
 
     const actions = component.columns().find((c) => c.field === 'actions')?.actions;
 
-    expect(actions?.map((action) => action.id)).toEqual(['cancel']);
+    expect(actions?.map((action) => action.id)).toEqual(['review', 'cancel']);
   });
 
   it('não oferece cancelar para quem não pode escrever em inspeções', async () => {
@@ -167,12 +161,21 @@ describe('InspectionsListComponent', () => {
 
   it('esconde o cancelamento em inspeções aprovadas, enviadas ou já canceladas', async () => {
     const { component } = await render();
-    const visible = component.columns().find((c) => c.field === 'actions')!.actions![0]!.visible!;
+    const visible = component
+      .columns()
+      .find((c) => c.field === 'actions')!
+      .actions!.find((a) => a.id === 'cancel')!.visible!;
 
     for (const status of ['APPROVED', 'SUBMITTED', 'CANCELED'] as const) {
       expect(visible(inspectionWith(status))).toBe(false);
     }
-    for (const status of ['DRAFT', 'ASSIGNED', 'IN_PROGRESS', 'UNDER_REVIEW', 'REJECTED'] as const) {
+    for (const status of [
+      'DRAFT',
+      'ASSIGNED',
+      'IN_PROGRESS',
+      'UNDER_REVIEW',
+      'REJECTED',
+    ] as const) {
       expect(visible(inspectionWith(status))).toBe(true);
     }
   });

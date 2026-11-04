@@ -11,9 +11,13 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { toApiError, type ApiError, type Evidence } from '@/models';
 import { apiClient, type ApiClient } from '@/services';
+import { getPendingEntries, type OutboxRow } from '@/services/local-db';
+import { cachedGet } from '@/services/offline-cache';
 
 export interface UseEvidencesResult {
   evidences: Evidence[];
+  /** Fotos ainda no outbox (EVIDENCE): contam para a conclusão, sem miniatura. */
+  pending: OutboxRow[];
   loading: boolean;
   error: ApiError | null;
   reload: () => void;
@@ -24,6 +28,7 @@ export function useEvidences(
   client: ApiClient = apiClient,
 ): UseEvidencesResult {
   const [evidences, setEvidences] = useState<Evidence[]>([]);
+  const [pending, setPending] = useState<OutboxRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -37,8 +42,13 @@ export function useEvidences(
         return;
       }
 
+      // O outbox é local: lido mesmo quando o servidor (ou o cache) falha.
+      const queued = await getPendingEntries(inspectionId).catch(() => []);
+      if (!active) return;
+      setPending(queued.filter((row) => row.entity_type === 'EVIDENCE'));
+
       try {
-        const list = await client.get<Evidence[]>(`/inspections/${inspectionId}/evidence`);
+        const list = await cachedGet<Evidence[]>(client, `/inspections/${inspectionId}/evidence`);
         if (!active) return;
         setEvidences(Array.isArray(list) ? list : []);
         setError(null);
@@ -61,5 +71,5 @@ export function useEvidences(
     setReloadToken((token) => token + 1);
   }, []);
 
-  return { evidences, loading, error, reload };
+  return { evidences, pending, loading, error, reload };
 }

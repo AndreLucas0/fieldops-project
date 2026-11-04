@@ -34,6 +34,9 @@ fieldops:
       secret: ${JWT_SECRET:troque-este-valor-antes-de-subir-qualquer-ambiente-compartilhado}
       access-token-expiration-seconds: ${JWT_ACCESS_TOKEN_EXPIRATION_SECONDS:900}
       refresh-token-expiration-seconds: ${JWT_REFRESH_TOKEN_EXPIRATION_SECONDS:604800}
+    cors:
+      # Lista separada por vírgula. Padrão de dev: web (ng serve) e preview web do mobile (Expo).
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:8081}
   storage:
     evidence:
       endpoint: ${EVIDENCE_STORAGE_ENDPOINT:http://localhost:9000}

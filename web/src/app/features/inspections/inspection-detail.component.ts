@@ -3,12 +3,19 @@ import {
   Component,
   DestroyRef,
   inject,
+  computed,
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { catchError, of } from 'rxjs';
+import { AuthStore } from '../../core/auth/auth.store';
+import { canWrite } from '../../core/auth/permissions';
+import { MatDialog } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
+import { InspectionPlanningDialogComponent } from './inspection-planning-dialog.component';
+import { InspectionCancelDialogComponent } from './inspection-cancel-dialog.component';
 
 import type {
   AuditEvent,
@@ -33,7 +40,7 @@ import {
 @Component({
   selector: 'app-inspection-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, MatButtonModule],
   templateUrl: './inspection-detail.component.html',
   styleUrl: './inspection-detail.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -49,6 +56,62 @@ export class InspectionDetailComponent {
   private readonly usersService = inject(UsersService);
   private readonly templatesService = inject(TemplatesService);
 
+  private readonly authStore = inject(AuthStore);
+  private readonly dialog = inject(MatDialog);
+  protected readonly canEditPlanning = computed(
+    () =>
+      canWrite('inspections', this.authStore.role()) &&
+      ['DRAFT', 'ASSIGNED'].includes(this.inspection()?.status ?? ''),
+  );
+  protected readonly canCancel = computed(
+    () =>
+      canWrite('inspections', this.authStore.role()) &&
+      !!this.inspection() &&
+      !['APPROVED', 'SUBMITTED', 'CANCELED'].includes(this.inspection()!.status),
+  );
+
+  protected editPlanning(): void {
+    const inspection = this.inspection();
+    if (!inspection || !this.canEditPlanning()) return;
+    this.dialog
+      .open(InspectionPlanningDialogComponent, {
+        data: { inspection },
+        width: '38rem',
+        maxWidth: '95vw',
+        restoreFocus: true,
+      })
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((updated) => {
+        if (updated) {
+          this.loadInspection(inspection.id);
+          this.loadHistory(inspection.id);
+        }
+      });
+  }
+
+  protected cancelInspection(): void {
+    const inspection = this.inspection();
+    if (!inspection || !this.canCancel()) return;
+    this.dialog
+      .open(InspectionCancelDialogComponent, {
+        data: { inspection },
+        width: '32rem',
+        maxWidth: '95vw',
+        restoreFocus: true,
+      })
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((cancelled) => {
+        if (cancelled) {
+          this.loadInspection(inspection.id);
+          this.loadHistory(inspection.id);
+        }
+      });
+  }
+
+  protected readonly isSupervisor = computed(() => this.authStore.role() === 'SUPERVISOR');
+
   protected readonly inspection = signal<Inspection | null>(null);
 
   protected readonly client = signal<Client | null>(null);
@@ -56,8 +119,7 @@ export class InspectionDetailComponent {
   protected readonly equipment = signal<Equipment | null>(null);
   protected readonly technician = signal<User | null>(null);
   protected readonly supervisor = signal<User | null>(null);
-  protected readonly templateVersion =
-    signal<InspectionTemplateVersionDetail | null>(null);
+  protected readonly templateVersion = signal<InspectionTemplateVersionDetail | null>(null);
 
   protected readonly history = signal<AuditEvent[]>([]);
   protected readonly evidence = signal<Evidence[]>([]);

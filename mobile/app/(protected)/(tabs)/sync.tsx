@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
@@ -6,7 +6,19 @@ import { LoadingSpinner } from '@/components';
 import { Button, Panel, Screen, spacing, Text } from '@/design-system';
 import { apiClient } from '@/services';
 import { countPendingEntries, getFailedEntries, getSyncMetadata, type OutboxRow } from '@/services/local-db';
-import { isOnline, syncPendingIfOnline, type SyncResult } from '@/services/sync-service';
+import {
+  discardOutboxEntry,
+  isOnline,
+  syncPendingIfOnline,
+  type SyncResult,
+} from '@/services/sync-service';
+
+const ENTITY_LABELS: Record<string, string> = {
+  INSPECTION: 'Inspeção',
+  INSPECTION_RESPONSE: 'Resposta',
+  NON_CONFORMITY: 'Não conformidade',
+  EVIDENCE: 'Evidência',
+};
 
 /**
  * FE-M04 — Sincronização.
@@ -36,10 +48,6 @@ export default function SyncScreen() {
     setOnline(connectivity);
   }, []);
 
-  useEffect(() => {
-    void loadPending();
-  }, [loadPending]);
-
   useFocusEffect(
     useCallback(() => {
       void loadPending();
@@ -56,6 +64,13 @@ export default function SyncScreen() {
     } finally {
       setSyncing(false);
     }
+  }
+
+  // Recusa definitiva não volta a ser enviada (REJECTED): o técnico decide
+  // quando tirá-la do aparelho — e, se for foto, apagar o arquivo.
+  async function handleDiscard(entry: OutboxRow): Promise<void> {
+    await discardOutboxEntry(entry);
+    await loadPending();
   }
 
   return (
@@ -83,6 +98,26 @@ export default function SyncScreen() {
                 {failedEntries.length}{' '}
                 {failedEntries.length === 1 ? 'operação com erro' : 'operações com erro'}
               </Text>
+              {failedEntries
+                .filter((entry) => entry.status === 'REJECTED')
+                .map((entry) => (
+                  <Panel key={entry.id} testID={`sync-rejected-${entry.id}`} style={styles.panel}>
+                    <Text variant="label">
+                      {ENTITY_LABELS[entry.entity_type] ?? entry.entity_type} recusada pelo servidor
+                    </Text>
+                    {entry.last_error !== null && (
+                      <Text variant="caption" tone="muted">
+                        {entry.last_error}
+                      </Text>
+                    )}
+                    <Button
+                      testID={`sync-rejected-${entry.id}-discard`}
+                      label="Descartar"
+                      variant="outline"
+                      onPress={() => void handleDiscard(entry)}
+                    />
+                  </Panel>
+                ))}
             </Panel>
           )}
 

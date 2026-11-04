@@ -328,6 +328,11 @@ class InspectionSchedulingControllerIT {
             .hasStatusOk()
             .bodyJson()
             .extractingPath("$.id").asString().isEqualTo(id);
+
+        // GET promises InspectionDetail in openapi.yaml; metadata alone is not
+        // sufficient to review the immutable execution snapshot (RN-024/079).
+        assertThat(mvc.get().uri("/inspections/" + id).header("Authorization", bearer(adminToken)))
+            .hasStatusOk().bodyJson().extractingPath("$.items").asList().isNotEmpty();
     }
 
     @Test

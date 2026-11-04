@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, type EffectCallback, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 /**
@@ -40,8 +40,22 @@ export function useRouter() {
   return routerMock;
 }
 
+/**
+ * Como o `useLocalSearchParams` real do expo-router 57, decodifica cada valor
+ * (`decodeURIComponent`). Sem isso, um parâmetro com `%` — por exemplo a URI de
+ * arquivo do Expo Go, `.../ExperienceData/%2540anonymous%252F...` — passaria
+ * intacto nos testes e quebraria só no aparelho.
+ */
 export function useLocalSearchParams() {
-  return searchParams;
+  return Object.fromEntries(
+    Object.entries(searchParams).map(([key, value]) => {
+      try {
+        return [key, decodeURIComponent(value)];
+      } catch {
+        return [key, value];
+      }
+    }),
+  );
 }
 
 export function useSegments() {
@@ -52,7 +66,10 @@ export function usePathname() {
   return '/';
 }
 
-export function useFocusEffect() {}
+/** As telas montadas por este harness estão focadas; executa também o cleanup. */
+export function useFocusEffect(effect: EffectCallback) {
+  useEffect(effect, [effect]);
+}
 
 /** Vira um marcador inspecionável: `redirect-to` guarda o destino. */
 export function Redirect({ href }: { href: string }) {

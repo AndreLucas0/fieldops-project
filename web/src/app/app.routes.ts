@@ -1,7 +1,6 @@
 import type { Route, Routes } from '@angular/router';
 
-import { authGuard, guestGuard } from './core/auth/auth.guard';
-
+import { authGuard, authGuardChild, guestGuard } from './core/auth/auth.guard';
 
 const ADMIN_FEATURE_ROUTES: Routes = [
   {
@@ -12,22 +11,30 @@ const ADMIN_FEATURE_ROUTES: Routes = [
         (module) => module.ClientsListComponent,
       ),
   },
-    {
-  path: 'inspections/new',
-  title: 'Nova inspeção — FieldOps',
-  loadComponent: () =>
-    import('./features/inspections/inspection-create.component').then(
-      (module) => module.InspectionCreateComponent,
-    ),
+  {
+    path: 'inspections/new',
+    title: 'Nova inspeção — FieldOps',
+    loadComponent: () =>
+      import('./features/inspections/inspection-create.component').then(
+        (module) => module.InspectionCreateComponent,
+      ),
   },
   {
-  path: 'inspections/:inspectionId',
-  title: 'Detalhes da inspeção — FieldOps',
-  loadComponent: () =>
-    import('./features/inspections/inspection-detail.component').then(
-      (module) => module.InspectionDetailComponent,
-    ),
-},
+    path: 'inspections/:inspectionId/review',
+    title: 'Revisão da inspeção — FieldOps',
+    loadComponent: () =>
+      import('./features/inspections/inspection-review.component').then(
+        (m) => m.InspectionReviewComponent,
+      ),
+  },
+  {
+    path: 'inspections/:inspectionId',
+    title: 'Detalhes da inspeção — FieldOps',
+    loadComponent: () =>
+      import('./features/inspections/inspection-detail.component').then(
+        (module) => module.InspectionDetailComponent,
+      ),
+  },
   {
     path: 'inspections',
     title: 'Inspeções — FieldOps',
@@ -70,6 +77,7 @@ export const routes: Routes = [
   {
     path: '',
     canActivate: [authGuard],
+    canActivateChild: [authGuardChild],
     loadComponent: () =>
       import('./features/shell/admin-shell.component').then((module) => module.AdminShellComponent),
     children: [
@@ -87,6 +95,30 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/templates/templates-list.component').then(
             (module) => module.TemplatesListComponent,
+          ),
+      },
+      {
+        path: 'inspection-templates/new',
+        title: 'Novo modelo — FieldOps',
+        loadComponent: () =>
+          import('./features/templates/template-create.component').then(
+            (m) => m.TemplateCreateComponent,
+          ),
+      },
+      {
+        path: 'inspection-templates/:templateId/preview',
+        title: 'Prévia do modelo — FieldOps',
+        loadComponent: () =>
+          import('./features/templates/template-preview.component').then(
+            (m) => m.TemplatePreviewComponent,
+          ),
+      },
+      {
+        path: 'inspection-templates/:templateId/versions',
+        title: 'Versões do modelo — FieldOps',
+        loadComponent: () =>
+          import('./features/templates/template-versions.component').then(
+            (m) => m.TemplateVersionsComponent,
           ),
       },
       {

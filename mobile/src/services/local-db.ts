@@ -11,7 +11,12 @@
 
 import * as SQLite from 'expo-sqlite';
 
-export type OutboxStatus = 'PENDING' | 'FAILED' | 'CONFLICT' | 'COMPLETED';
+/**
+ * `REJECTED`: o servidor recusou de vez (reenviar não mudaria a resposta). A
+ * entrada sai da fila, mas fica guardada — com o arquivo, se for evidência — até
+ * o técnico descartá-la na aba Sincronização.
+ */
+export type OutboxStatus = 'PENDING' | 'FAILED' | 'CONFLICT' | 'REJECTED' | 'COMPLETED';
 
 /** Linha crua da tabela `outbox` (nomes em snake_case = colunas do SQLite). */
 export interface OutboxRow {
@@ -55,6 +60,11 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
         key   TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS read_cache (
+        key      TEXT PRIMARY KEY,
+        value    TEXT NOT NULL,
+        saved_at TEXT NOT NULL
+      );
     `);
   }
   return db;
@@ -89,17 +99,17 @@ export async function upsertOutboxEntry(entry: NewOutboxEntry): Promise<void> {
   );
 }
 
-/** Retorna todas as entradas não sincronizadas, ordenadas por criação. */
+/** Retorna as entradas ainda a enviar (não sincronizadas nem recusadas), por criação. */
 export async function getPendingEntries(inspectionId?: string): Promise<OutboxRow[]> {
   const database = await getDb();
   if (inspectionId) {
     return database.getAllAsync<OutboxRow>(
-      'SELECT * FROM outbox WHERE synced = 0 AND inspection_id = ? ORDER BY created_at ASC',
+      "SELECT * FROM outbox WHERE synced = 0 AND status != 'REJECTED' AND inspection_id = ? ORDER BY created_at ASC",
       [inspectionId],
     );
   }
   return database.getAllAsync<OutboxRow>(
-    'SELECT * FROM outbox WHERE synced = 0 ORDER BY created_at ASC',
+    "SELECT * FROM outbox WHERE synced = 0 AND status != 'REJECTED' ORDER BY created_at ASC",
   );
 }
 
@@ -107,7 +117,7 @@ export async function getPendingEntries(inspectionId?: string): Promise<OutboxRo
 export async function countPendingEntries(): Promise<number> {
   const database = await getDb();
   const row = await database.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(*) AS count FROM outbox WHERE synced = 0',
+    "SELECT COUNT(*) AS count FROM outbox WHERE synced = 0 AND status != 'REJECTED'",
   );
   return row?.count ?? 0;
 }
@@ -123,18 +133,47 @@ export async function markEntriesSynced(ids: string[]): Promise<void> {
   );
 }
 
-/** Retorna entradas com status FAILED ou CONFLICT (visíveis na tela de sync). */
+/** Uma entrada pelo id, em qualquer status, ou `null` se não existe mais. */
+export async function getOutboxEntry(id: string): Promise<OutboxRow | null> {
+  const database = await getDb();
+  return database.getFirstAsync<OutboxRow>('SELECT * FROM outbox WHERE id = ?', [id]);
+}
+
+/**
+ * Refaz a base de uma entrada depois de um CONFLICT: novo id (o servidor já
+ * gravou o resultado do antigo e o repetiria), nova `base_version`, volta a
+ * PENDING. Mantém `created_at`, para a ordem de envio não mudar.
+ */
+export async function rebaseOutboxEntry(
+  id: string,
+  newId: string,
+  baseVersion: number,
+): Promise<void> {
+  const database = await getDb();
+  await database.runAsync(
+    "UPDATE outbox SET id = ?, base_version = ?, status = 'PENDING', last_error = NULL WHERE id = ?",
+    [newId, baseVersion, id],
+  );
+}
+
+/** Remove uma entrada — usado quando o servidor a recusa de forma definitiva. */
+export async function deleteOutboxEntry(id: string): Promise<void> {
+  const database = await getDb();
+  await database.runAsync('DELETE FROM outbox WHERE id = ?', [id]);
+}
+
+/** Retorna entradas com status FAILED, CONFLICT ou REJECTED (visíveis na tela de sync). */
 export async function getFailedEntries(): Promise<OutboxRow[]> {
   const database = await getDb();
   return database.getAllAsync<OutboxRow>(
-    "SELECT * FROM outbox WHERE status IN ('FAILED', 'CONFLICT') ORDER BY created_at ASC",
+    "SELECT * FROM outbox WHERE status IN ('FAILED', 'CONFLICT', 'REJECTED') ORDER BY created_at ASC",
   );
 }
 
 /** Marca a entrada como falha, incrementando o contador e registrando o status e a mensagem. */
 export async function markEntryFailed(
   id: string,
-  status: 'FAILED' | 'CONFLICT',
+  status: 'FAILED' | 'CONFLICT' | 'REJECTED',
   lastError?: string,
 ): Promise<void> {
   const database = await getDb();
@@ -142,6 +181,25 @@ export async function markEntryFailed(
     'UPDATE outbox SET error_count = error_count + 1, status = ?, last_error = ? WHERE id = ?',
     [status, lastError ?? null, id],
   );
+}
+
+/** Guarda a última resposta lida do servidor para uma consulta (leitura offline). */
+export async function saveCachedResponse(key: string, value: unknown): Promise<void> {
+  const database = await getDb();
+  await database.runAsync(
+    'INSERT OR REPLACE INTO read_cache (key, value, saved_at) VALUES (?, ?, ?)',
+    [key, JSON.stringify(value), new Date().toISOString()],
+  );
+}
+
+/** Última resposta guardada para a consulta, ou `null` se nunca foi lida. */
+export async function readCachedResponse<T>(key: string): Promise<T | null> {
+  const database = await getDb();
+  const row = await database.getFirstAsync<{ value: string }>(
+    'SELECT value FROM read_cache WHERE key = ?',
+    [key],
+  );
+  return row ? (JSON.parse(row.value) as T) : null;
 }
 
 /** Grava ou sobrescreve um par chave/valor na tabela de metadados de sync. */

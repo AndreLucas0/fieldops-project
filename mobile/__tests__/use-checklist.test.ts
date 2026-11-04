@@ -1,12 +1,17 @@
 /**
  * BASEVERSION-STALENESS — RN-075: versão base obsoleta na 2ª edição do mesmo item.
  *
- * BUG: versionsRef nunca é atualizado após upsertOutboxEntry bem-sucedido.
+ * BUG (corrigido antes): versionsRef nunca era atualizado após upsertOutboxEntry bem-sucedido.
  * A segunda edição do mesmo item na mesma sessão reutiliza a versão antiga,
  * enviando baseVersion obsoleto → servidor retorna CONFLICT → dado perdido.
  *
  * FIX aplicado: após cada upsertOutboxEntry bem-sucedido, incrementar
  * versionsRef via re-leitura atômica do ref (não closure stale).
+ *
+ * VERSION-ON-CREATE (2026-10-21): criar a resposta não incrementa a versão no
+ * servidor (fica 0); só as atualizações somam 1. Para item sem resposta a
+ * sequência de baseVersion é 0, 0, 1, 2… — antes era 0, 1, 2…, e a 2ª edição
+ * recebia CONFLICT (visto em sync_operations no banco real).
  */
 
 import { act, renderHook, waitFor } from '@testing-library/react-native';
@@ -48,7 +53,7 @@ beforeEach(() => { counter = 0; });
 describe('BASEVERSION-STALENESS — RN-075: base_version na 2ª edição do mesmo item', () => {
   const generateId = () => `op-bvs-${(counter += 1)}`;
 
-  it('2ª edição (sem resposta pré-existente) envia base_version 1, não 0', async () => {
+  it('item sem resposta: 1ª edição cria (base 0), 2ª também vai com base 0, 3ª com base 1', async () => {
     const { result } = await renderHook(() =>
       useChecklist(makeInspection([]), { debounceMs: 0, generateId }),
     );
@@ -57,11 +62,16 @@ describe('BASEVERSION-STALENESS — RN-075: base_version na 2ª edição do mesm
     await waitFor(() => expect(outboxRow('op-bvs-1')).toBeDefined());
     expect(outboxRow('op-bvs-1')!.base_version).toBe(0);
 
-    // 2ª edição do mesmo item na mesma sessão: base_version deve ser 1 (fix).
-    // SEM O FIX: versionsRef não é atualizado → base_version = 0 → FALHA aqui (RED).
+    // Criar a resposta no servidor não incrementa a versão (fica 0 — conferido no
+    // banco real em 2026-10-21): a 2ª edição atualiza a partir de 0.
     await act(async () => { result.current.change(BASE_ITEM, { valueText: 'correção' }); });
     await waitFor(() => expect(outboxRow('op-bvs-2')).toBeDefined());
-    expect(outboxRow('op-bvs-2')!.base_version).toBe(1);
+    expect(outboxRow('op-bvs-2')!.base_version).toBe(0);
+
+    // Cada atualização soma 1: a 3ª edição parte da versão 1.
+    await act(async () => { result.current.change(BASE_ITEM, { valueText: 'outra correção' }); });
+    await waitFor(() => expect(outboxRow('op-bvs-3')).toBeDefined());
+    expect(outboxRow('op-bvs-3')!.base_version).toBe(1);
   });
 
   it('2ª edição (item com resposta server version=2) envia base_version 3, não 2', async () => {
@@ -142,7 +152,8 @@ describe('BASEVERSION-STALENESS — RN-075: base_version na 2ª edição do mesm
 
     expect(outboxRow('op-bvs-1')!.base_version).toBe(0); // v1 started when ref=0
     expect(outboxRow('op-bvs-2')!.base_version).toBe(0); // v2 started concurrently (ref=0)
-    expect(outboxRow('op-bvs-3')!.base_version).toBe(2); // ref=2 after both write-backs settled
+    // Item novo com duas gravações = criação (v0) + uma atualização (v1).
+    expect(outboxRow('op-bvs-3')!.base_version).toBe(1); // after both write-backs settled
   });
 
   it('falha no upsertOutboxEntry não incrementa o contador de versão', async () => {

@@ -21,12 +21,13 @@ import {
   updateEntity,
   withinRange,
   dashboardSummary as summaryOf,
-  inspectionsByStatus as byStatusOf,    
+  inspectionsByStatus as byStatusOf,
   nonConformitiesBySeverity as bySeverityOf,
   type MockStore,
 } from '@fieldops/shared';
 
 import { ApiError } from '../models/api-error.model';
+import { AuthStore } from '../auth/auth.store';
 import type {
   Client,
   ActiveStatus,
@@ -362,6 +363,75 @@ export class MockEquipmentService extends MockBase implements EquipmentService {
 
 @Injectable()
 export class MockTemplatesService extends MockBase implements TemplatesService {
+  private readonly auth = inject(AuthStore);
+
+  create(
+    input: Pick<InspectionTemplate, 'title' | 'category' | 'description'>,
+  ): Observable<InspectionTemplate> {
+    return this.respond(() => {
+      if (!input.title.trim() || !input.category.trim()) {
+        throw new ApiError({
+          kind: 'BAD_REQUEST',
+          status: 400,
+          code: 'VALIDATION_ERROR',
+          userMessage: 'Informe título e categoria.',
+        });
+      }
+      return insertEntity(this.db.templates, {
+        ...input,
+        id: nextMockId('5400'),
+        status: 'DRAFT',
+        createdBy: this.auth.user()?.id,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+        version: 0,
+      });
+    });
+  }
+
+  publish(templateId: Uuid): Observable<InspectionTemplateVersionDetail> {
+    return this.respond(() => {
+      const template = this.requireDraftTemplate(templateId);
+      const sections = this.draftSectionsOf(templateId);
+      if (!sections.length || !sections.some((section) => section.items?.length)) {
+        throw new ApiError({
+          kind: 'UNPROCESSABLE',
+          status: 422,
+          code: 'TEMPLATE_HAS_NO_ITEMS',
+          userMessage: 'Adicione pelo menos uma seção com itens antes de publicar.',
+        });
+      }
+      const publisher = this.auth.user()?.id;
+      if (!publisher)
+        throw new ApiError({
+          kind: 'UNAUTHORIZED',
+          status: 401,
+          code: 'AUTH_REQUIRED',
+          userMessage: 'Entre novamente para publicar.',
+        });
+      const version: InspectionTemplateVersionDetail = {
+        id: nextMockId('5500'),
+        templateId,
+        versionNumber: (template.currentVersion ?? 0) + 1,
+        titleSnapshot: template.title,
+        descriptionSnapshot: template.description,
+        publishedBy: publisher,
+        publishedAt: nowIso(),
+        createdAt: nowIso(),
+        activeForNewInspections: true,
+        sections: structuredClone(sections),
+      };
+      for (const previous of this.db.templateVersions.filter((v) => v.templateId === templateId))
+        previous.activeForNewInspections = false;
+      for (const section of version.sections ?? []) section.templateVersionId = version.id;
+      this.db.templateVersions.push(version);
+      template.status = 'ACTIVE';
+      template.currentVersion = version.versionNumber;
+      template.updatedAt = nowIso();
+      delete this.db.draftSections[templateId];
+      return version;
+    });
+  }
   list(query: PageQuery<TemplateFilters> = {}): Observable<Page<InspectionTemplate>> {
     const { category, status } = query;
     const filtered = this.db.templates.filter((template) =>
@@ -550,15 +620,12 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
 
 @Injectable()
 export class MockInspectionsService extends MockBase implements InspectionsService {
-
   history(id: Uuid, query: PageQuery = {}): Observable<Page<AuditEvent>> {
     return this.page<AuditEvent>([], query);
   }
 
   list(query: PageQuery<InspectionFilters> = {}): Observable<Page<Inspection>> {
     const { scheduledFrom, scheduledTo, overdue, page, size, sort, ...simple } = query;
-
-
 
     const filtered = this.db.inspections.filter((inspection) => {
       if (!matchesFilters(inspection as unknown as Record<string, unknown>, simple)) return false;

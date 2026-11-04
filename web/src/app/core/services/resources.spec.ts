@@ -59,6 +59,23 @@ describe('HttpTemplatesService — contratos HTTP', () => {
 
   afterEach(() => backend.verify());
 
+  it('cria um rascunho no contrato canônico', () => {
+    const input = { title: 'Checklist', category: 'Operação' };
+    service.create(input).subscribe();
+    const req = backend.expectOne('/api/v1/inspection-templates');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(input);
+    req.flush(FAKE_TEMPLATE);
+  });
+
+  it('publica o rascunho sem reenviar ou alterar suas seções', () => {
+    service.publish('tpl-1').subscribe();
+    const req = backend.expectOne('/api/v1/inspection-templates/tpl-1/publish');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toBeNull();
+    req.flush({ id: 'v1' });
+  });
+
   describe('list()', () => {
     it('emite GET para /api/v1/templates', () => {
       service.list().subscribe();
@@ -86,6 +103,14 @@ describe('HttpTemplatesService — contratos HTTP', () => {
       expect(req.request.method).toBe('GET');
       req.flush(FAKE_TEMPLATE);
     });
+  });
+
+  it('normaliza opções serializadas como texto pela API legada', async () => {
+    const promise = firstValueFrom(service.listDraftSections('tpl-1'));
+    backend
+      .expectOne('/api/v1/inspection-templates/tpl-1/sections')
+      .flush([{ id: 's1', items: [{ id: 'i1', optionsJson: '{"options":["Sim","Não"]}' }] }]);
+    expect((await promise)[0].items?.[0].optionsJson).toEqual({ options: ['Sim', 'Não'] });
   });
 });
 

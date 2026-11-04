@@ -115,6 +115,8 @@ export abstract class EquipmentService {
 }
 
 export abstract class TemplatesService {
+  abstract create(input: Pick<InspectionTemplate, 'title' | 'category' | 'description'>): Observable<InspectionTemplate>;
+  abstract publish(templateId: Uuid): Observable<InspectionTemplateVersionDetail>;
   abstract list(query?: PageQuery<TemplateFilters>): Observable<Page<InspectionTemplate>>;
   abstract get(id: Uuid): Observable<InspectionTemplate>;
   /** Dados gerais (título, descrição, categoria) — só vale para modelos DRAFT (RN-018). */
@@ -274,6 +276,13 @@ export class HttpEquipmentService extends EquipmentService {
 @Injectable()
 export class HttpTemplatesService extends TemplatesService {
   private readonly api = inject(ApiService);
+
+  create(input: Pick<InspectionTemplate, 'title' | 'category' | 'description'>) {
+    return this.api.post<InspectionTemplate>('/inspection-templates', input);
+  }
+  publish(templateId: Uuid) {
+    return this.api.post<InspectionTemplateVersionDetail>(`/inspection-templates/${templateId}/publish`);
+  }
 
   list(query: PageQuery<TemplateFilters> = {}) {
     return this.api.getPage<InspectionTemplate, TemplateFilters>('/templates', query);

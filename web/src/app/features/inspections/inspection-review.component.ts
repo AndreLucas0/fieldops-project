@@ -1,198 +1,254 @@
-
 import {
-    ChangeDetectionStrategy,
-    Component,
-    DestroyRef,
-    computed,
-    inject,
-    signal,
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { MatDialog } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { catchError, finalize, of } from 'rxjs';
+import { catchError, finalize, of, switchMap } from 'rxjs';
+import { EvidenceViewerComponent } from './evidence-viewer.component';
 
 import { AuthStore } from '../../core/auth/auth.store';
-import type {
-    Evidence,
-    InspectionDetail,
-} from '../../core/models/domain';
+import type { Evidence, InspectionDetail } from '../../core/models/domain';
 
 import { InspectionsService } from '../../core/services/resources';
 
 @Component({
-    selector: 'app-inspection-review',
-    standalone: true,
-    imports: [CommonModule, RouterLink],
-    templateUrl: './inspection-review.component.html',
-    styleUrl: './inspection-review.component.scss',
-    changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-inspection-review',
+  standalone: true,
+  imports: [CommonModule, RouterLink, MatButtonModule],
+  templateUrl: './inspection-review.component.html',
+  styleUrl: './inspection-review.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class InspectionReviewComponent {
-    private readonly route = inject(ActivatedRoute);
-    private readonly destroyRef = inject(DestroyRef);
-    private readonly inspectionsService = inject(InspectionsService);
-    private readonly authStore = inject(AuthStore);
+  private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly inspectionsService = inject(InspectionsService);
+  private readonly authStore = inject(AuthStore);
+  private readonly dialog = inject(MatDialog);
 
-    protected readonly isSupervisor = computed(
-        () => this.authStore.role() === 'SUPERVISOR',
+  protected readonly isSupervisor = computed(() => this.authStore.role() === 'SUPERVISOR');
+
+  protected readonly approvalComments = signal('');
+  protected readonly rejectionReason = signal('');
+
+  protected readonly actionLoading = signal(false);
+  protected readonly actionError = signal<string | null>(null);
+
+  protected readonly inspection = signal<InspectionDetail | null>(null);
+  protected readonly evidence = signal<Evidence[]>([]);
+  protected readonly evidenceError = signal(false);
+
+  protected readonly loading = signal(true);
+  protected readonly error = signal<string | null>(null);
+
+  protected readonly decisionComment = signal('');
+
+  constructor() {
+    const inspectionId = this.route.snapshot.paramMap.get('inspectionId');
+
+    if (!inspectionId) {
+      this.error.set('Identificador da inspeção não encontrado.');
+      this.loading.set(false);
+      return;
+    }
+
+    this.loadInspection(inspectionId);
+    this.loadEvidence(inspectionId);
+  }
+
+  private loadInspection(id: string): void {
+    this.inspectionsService
+      .get(id)
+      .pipe(
+        catchError(() => {
+          this.error.set('Não foi possível carregar os dados da inspeção.');
+          return of(null);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => {
+        this.inspection.set(result);
+        this.loading.set(false);
+      });
+  }
+
+  private loadEvidence(id: string): void {
+    this.evidenceError.set(false);
+    this.inspectionsService
+      .listEvidence(id)
+      .pipe(
+        catchError(() => {
+          this.evidenceError.set(true);
+          return of([]);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => this.evidence.set(result));
+  }
+
+  private getInspectionId(): string | null {
+    return this.route.snapshot.paramMap.get('inspectionId');
+  }
+
+  protected beginReview(): void {
+    const id = this.getInspectionId();
+
+    if (
+      !id ||
+      !this.isSupervisor() ||
+      this.actionLoading() ||
+      this.inspection()?.status !== 'SUBMITTED'
+    )
+      return;
+
+    this.actionLoading.set(true);
+    this.actionError.set(null);
+
+    this.inspectionsService
+      .beginReview(id)
+      .pipe(
+        switchMap(() => this.inspectionsService.get(id)),
+        finalize(() => this.actionLoading.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (inspection) => {
+          this.inspection.set(inspection);
+        },
+        error: () => {
+          this.actionError.set(
+            'Não foi possível iniciar a revisão. Verifique o status da inspeção.',
+          );
+        },
+      });
+  }
+
+  protected approve(): void {
+    const id = this.getInspectionId();
+
+    if (
+      !id ||
+      !this.isSupervisor() ||
+      this.actionLoading() ||
+      this.inspection()?.status !== 'UNDER_REVIEW'
+    )
+      return;
+
+    const confirmed = window.confirm(
+      'Tem certeza de que deseja aprovar esta inspeção? Esta decisão será registrada.',
     );
 
-    protected readonly approvalComments = signal('');
-    protected readonly rejectionReason = signal('');
+    if (!confirmed) return;
 
-    protected readonly actionLoading = signal(false);
-    protected readonly actionError = signal<string | null>(null);
+    this.actionLoading.set(true);
+    this.actionError.set(null);
 
-    protected readonly inspection = signal<InspectionDetail | null>(null);
-    protected readonly evidence = signal<Evidence[]>([]);
+    this.inspectionsService
+      .approve(id, this.decisionComment().trim() || undefined)
+      .pipe(
+        switchMap(() => this.inspectionsService.get(id)),
+        finalize(() => this.actionLoading.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (inspection) => {
+          this.inspection.set(inspection);
+        },
+        error: () => {
+          this.actionError.set(
+            'Não foi possível aprovar a inspeção. Verifique se ela ainda está em revisão.',
+          );
+        },
+      });
+  }
 
-    protected readonly loading = signal(true);
-    protected readonly error = signal<string | null>(null);
+  protected reject(): void {
+    const id = this.getInspectionId();
+    const reason = this.decisionComment().trim();
 
-    protected readonly decisionComment = signal('');
+    if (
+      !id ||
+      !this.isSupervisor() ||
+      this.actionLoading() ||
+      this.inspection()?.status !== 'UNDER_REVIEW'
+    )
+      return;
 
-    constructor() {
-        const inspectionId =
-            this.route.snapshot.paramMap.get('inspectionId');
-
-        if (!inspectionId) {
-            this.error.set('Identificador da inspeção não encontrado.');
-            this.loading.set(false);
-            return;
-        }
-
-        this.loadInspection(inspectionId);
-        this.loadEvidence(inspectionId);
+    if (!reason) {
+      this.actionError.set('Informe uma justificativa para rejeitar a inspeção.');
+      return;
     }
 
-    private loadInspection(id: string): void {
-        this.inspectionsService
-            .get(id)
-            .pipe(
-                catchError(() => {
-                    this.error.set(
-                        'Não foi possível carregar os dados da inspeção.',
-                    );
-                    return of(null);
-                }),
-                takeUntilDestroyed(this.destroyRef),
-            )
-            .subscribe((result) => {
-                this.inspection.set(result);
-                this.loading.set(false);
-            });
-    }
+    const confirmed = window.confirm(
+      'Tem certeza de que deseja rejeitar esta inspeção? A justificativa será registrada.',
+    );
 
-    private loadEvidence(id: string): void {
-        this.inspectionsService
-            .listEvidence(id)
-            .pipe(
-                catchError(() => of([])),
-                takeUntilDestroyed(this.destroyRef),
-            )
-            .subscribe((result) => this.evidence.set(result));
-    }
+    if (!confirmed) return;
 
-    private getInspectionId(): string | null {
-        return this.route.snapshot.paramMap.get('inspectionId');
-    }
+    this.actionLoading.set(true);
+    this.actionError.set(null);
 
-    protected beginReview(): void {
-        const id = this.getInspectionId();
+    this.inspectionsService
+      .reject(id, reason)
+      .pipe(
+        switchMap(() => this.inspectionsService.get(id)),
+        finalize(() => this.actionLoading.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (inspection) => {
+          this.inspection.set(inspection);
+        },
+        error: () => {
+          this.actionError.set(
+            'Não foi possível rejeitar a inspeção. Verifique se ela ainda está em revisão.',
+          );
+        },
+      });
+  }
 
-        if (!id || !this.isSupervisor() || this.actionLoading() || this.inspection()?.status !== 'SUBMITTED') return;
+  protected evidenceForItem(itemId: string): Evidence[] {
+    const detail = this.inspection();
+    const responseIds = new Set(
+      detail?.responses
+        ?.filter((response) => response.inspectionItemId === itemId)
+        .map((response) => response.id),
+    );
+    const ncIds = new Set(
+      detail?.nonConformities?.filter((nc) => nc.inspectionItemId === itemId).map((nc) => nc.id),
+    );
+    return this.evidence().filter(
+      (file) =>
+        (file.responseId && responseIds.has(file.responseId)) ||
+        (file.nonConformityId && ncIds.has(file.nonConformityId)),
+    );
+  }
 
-        this.actionLoading.set(true);
-        this.actionError.set(null);
+  protected openEvidence(id: string): void {
+    const images = this.evidence().filter(
+      (file) => file.mimeType.startsWith('image/') && file.accessUrl,
+    );
+    const initialIndex = images.findIndex((file) => file.id === id);
+    if (initialIndex < 0) return;
+    this.dialog.open(EvidenceViewerComponent, {
+      data: { images, initialIndex },
+      width: '68rem',
+      maxWidth: '95vw',
+      maxHeight: '95vh',
+      restoreFocus: true,
+    });
+  }
 
-        this.inspectionsService
-            .beginReview(id)
-            .pipe(
-                finalize(() => this.actionLoading.set(false)),
-                takeUntilDestroyed(this.destroyRef),
-            )
-            .subscribe({
-                next: () => {
-                    this.loadInspection(id);
-                },
-                error: () => {
-                    this.actionError.set(
-                        'Não foi possível iniciar a revisão. Verifique o status da inspeção.',
-                    );
-                },
-            });
-    }
-
-    protected approve(): void {
-        const id = this.getInspectionId();
-
-        if (!id || !this.isSupervisor() || this.actionLoading() || this.inspection()?.status !== 'UNDER_REVIEW') return;
-
-        const confirmed = window.confirm(
-            'Tem certeza de que deseja aprovar esta inspeção? Esta decisão será registrada.',
-        );
-
-        if (!confirmed) return;
-
-        this.actionLoading.set(true);
-        this.actionError.set(null);
-
-        this.inspectionsService
-            .approve(id, this.decisionComment().trim() || undefined)
-            .pipe(
-                finalize(() => this.actionLoading.set(false)),
-                takeUntilDestroyed(this.destroyRef),
-            )
-            .subscribe({
-                next: () => {
-                    this.loadInspection(id);
-                },
-                error: () => {
-                    this.actionError.set(
-                        'Não foi possível aprovar a inspeção. Verifique se ela ainda está em revisão.',
-                    );
-                },
-            });
-    }
-
-    protected reject(): void {
-        const id = this.getInspectionId();
-        const reason = this.decisionComment().trim();
-        
-        if (!id || !this.isSupervisor() || this.actionLoading() || this.inspection()?.status !== 'UNDER_REVIEW') return;
-
-        if (!reason) {
-            this.actionError.set(
-                'Informe uma justificativa para rejeitar a inspeção.',
-            );
-            return;
-        }
-
-        const confirmed = window.confirm(
-            'Tem certeza de que deseja rejeitar esta inspeção? A justificativa será registrada.',
-        );
-
-        if (!confirmed) return;
-
-        this.actionLoading.set(true);
-        this.actionError.set(null);
-
-        this.inspectionsService
-            .reject(id, reason)
-            .pipe(
-                finalize(() => this.actionLoading.set(false)),
-                takeUntilDestroyed(this.destroyRef),
-            )
-            .subscribe({
-                next: () => {
-                    this.loadInspection(id);
-                },
-                error: () => {
-                    this.actionError.set(
-                        'Não foi possível rejeitar a inspeção. Verifique se ela ainda está em revisão.',
-                    );
-                },
-            });
-    }
+  protected retryEvidence(): void {
+    const id = this.getInspectionId();
+    if (id) this.loadEvidence(id);
+  }
 }

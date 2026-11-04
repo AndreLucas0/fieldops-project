@@ -1,366 +1,350 @@
-
 <main class="page">
-    @if (loading()) {
+  @if (loading()) {
     <section class="state-message">
-        <p>Carregando dados da inspeção...</p>
+      <p>Carregando dados da inspeção...</p>
     </section>
-    } @else if (error()) {
+  } @else if (error()) {
     <section class="state-message error">
-        <p>{{ error() }}</p>
-        <a routerLink="/inspections">Voltar para inspeções</a>
+      <p>{{ error() }}</p>
+      <a routerLink="/inspections">Voltar para inspeções</a>
     </section>
-    } @else if (inspection(); as data) {
+  } @else if (inspection(); as data) {
     <header class="page-header">
-        <a routerLink="/inspections" class="back-link">
-            ← Voltar para inspeções
-        </a>
+      <a routerLink="/inspections" class="back-link"> ← Voltar para inspeções </a>
 
-        <div class="header-content">
-            <div>
-                <span class="eyebrow">INSPEÇÕES / REVISÃO</span>
-                <h1>Revisão da inspeção</h1>
-                <p>
-                    Analise as informações e os registros antes de tomar
-                    uma decisão sobre a inspeção.
-                </p>
-            </div>
-
-            <span class="status-badge">
-                {{ data.status }}
-            </span>
+      <div class="header-content">
+        <div>
+          <span class="eyebrow">INSPEÇÕES / REVISÃO</span>
+          <h1>Revisão da inspeção</h1>
+          <p>Analise as informações e os registros antes de tomar uma decisão sobre a inspeção.</p>
         </div>
+
+        <span class="status-badge">
+          {{ data.status }}
+        </span>
+      </div>
     </header>
 
     <!-- Resumo da inspeção -->
     <section class="summary-card">
-        <div class="card-heading">
-            <div>
-                <span class="eyebrow">VISÃO GERAL</span>
-                <h2>Dados da inspeção</h2>
-            </div>
-            <span class="summary-id">
-                {{ data.id }}
-            </span>
+      <div class="card-heading">
+        <div>
+          <span class="eyebrow">VISÃO GERAL</span>
+          <h2>Dados da inspeção</h2>
+        </div>
+        <span class="summary-id">
+          {{ data.id }}
+        </span>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-item">
+          <span class="info-label">Status</span>
+          <strong>{{ data.status }}</strong>
         </div>
 
-        <div class="summary-grid">
-            <div class="summary-item">
-                <span class="info-label">Status</span>
-                <strong>{{ data.status }}</strong>
-            </div>
-
-            <div class="summary-item">
-                <span class="info-label">Prioridade</span>
-                <strong>{{ data.priority }}</strong>
-            </div>
-
-            <div class="summary-item">
-                <span class="info-label">Agendada para</span>
-                <strong>
-                    {{
-                    data.scheduledFor
-                    ? (data.scheduledFor | date: 'dd/MM/yyyy HH:mm')
-                    : 'Não informada'
-                    }}
-                </strong>
-            </div>
-
-            <div class="summary-item">
-                <span class="info-label">Enviada em</span>
-                <strong>
-                    {{
-                    data.submittedAtServer
-                    ? (data.submittedAtServer | date: 'dd/MM/yyyy HH:mm')
-                    : 'Não informada'
-                    }}
-                </strong>
-            </div>
+        <div class="summary-item">
+          <span class="info-label">Prioridade</span>
+          <strong>{{ data.priority }}</strong>
         </div>
+
+        <div class="summary-item">
+          <span class="info-label">Agendada para</span>
+          <strong>
+            {{
+              data.scheduledFor ? (data.scheduledFor | date: 'dd/MM/yyyy HH:mm') : 'Não informada'
+            }}
+          </strong>
+        </div>
+
+        <div class="summary-item">
+          <span class="info-label">Enviada em</span>
+          <strong>
+            {{
+              data.submittedAtServer
+                ? (data.submittedAtServer | date: 'dd/MM/yyyy HH:mm')
+                : 'Não informada'
+            }}
+          </strong>
+        </div>
+      </div>
     </section>
 
     <!-- Conteúdo principal -->
     <div class="review-layout">
-        <section class="main-column">
-            <section class="content-card checklist-card">
-                <div class="card-heading">
-                    <div>
-                        <span class="eyebrow">EXECUÇÃO</span>
-                        <h2>Checklist executado</h2>
-                        <p>Respostas registradas durante a inspeção.</p>
-                    </div>
+      <section class="main-column">
+        <section class="content-card checklist-card">
+          <div class="card-heading">
+            <div>
+              <span class="eyebrow">EXECUÇÃO</span>
+              <h2>Checklist executado</h2>
+              <p>Respostas registradas durante a inspeção.</p>
+            </div>
 
-                    <span class="section-count">
-                        {{ data.items?.length ?? 0 }} itens
-                    </span>
+            <span class="section-count"> {{ data.items?.length ?? 0 }} itens </span>
+          </div>
+
+          @if (data.items?.length) {
+            @for (item of data.items; track item.id) {
+              <article class="checklist-item">
+                <div class="item-topline">
+                  <span class="item-section">
+                    {{ item.sectionTitle }}
+                  </span>
+
+                  @if (item.required) {
+                    <span class="required-label">Obrigatório</span>
+                  }
                 </div>
 
-                @if (data.items?.length) {
-                @for (item of data.items; track item.id) {
-                <article class="checklist-item">
-                    <div class="item-topline">
-                        <span class="item-section">
-                            {{ item.sectionTitle }}
-                        </span>
+                <h3>{{ item.itemTitle }}</h3>
 
-                        @if (item.required) {
-                        <span class="required-label">Obrigatório</span>
-                        }
-                    </div>
+                @if (item.itemDescription) {
+                  <p class="item-description">
+                    {{ item.itemDescription }}
+                  </p>
+                }
 
-                    <h3>{{ item.itemTitle }}</h3>
+                @if (
+                  data.responses?.find((response) => response.inspectionItemId === item.id);
+                  as response
+                ) {
+                  <div class="response-content">
+                    <span class="info-label">Resposta registrada</span>
 
-                    @if (item.itemDescription) {
-                    <p class="item-description">
-                        {{ item.itemDescription }}
-                    </p>
-                    }
-
-                    @if (
-                    data.responses?.find(
-                    response => response.inspectionItemId === item.id
-                    ); as response
+                    @if (response.valueText !== null && response.valueText !== undefined) {
+                      <p>{{ response.valueText }}</p>
+                    } @else if (
+                      response.valueNumber !== null && response.valueNumber !== undefined
                     ) {
-                    <div class="response-content">
-                        <span class="info-label">Resposta registrada</span>
-
-                        @if (
-                        response.valueText !== null &&
-                        response.valueText !== undefined
-                        ) {
-                        <p>{{ response.valueText }}</p>
-                        } @else if (
-                        response.valueNumber !== null &&
-                        response.valueNumber !== undefined
-                        ) {
-                        <p>{{ response.valueNumber }}</p>
-                        } @else if (
-                        response.valueBoolean !== null &&
-                        response.valueBoolean !== undefined
-                        ) {
-                        <p>{{ response.valueBoolean ? 'Sim' : 'Não' }}</p>
-                        } @else if (response.valueDate) {
-                        <p>{{ response.valueDate | date: 'dd/MM/yyyy' }}</p>
-                        } @else if (response.valueJson) {
-                        <pre>{{ response.valueJson | json }}</pre>
-                        } @else {
-                        <p class="no-response">
-                            Resposta sem valor informado.
-                        </p>
-                        }
-
-                        @if (response.conformity) {
-                        <div class="response-conformity">
-                            <span class="info-label">Conformidade</span>
-                            <strong>{{ response.conformity }}</strong>
-                        </div>
-                        }
-
-                        @if (response.observation) {
-                        <div class="observation">
-                            <span class="info-label">Observação</span>
-                            <p>{{ response.observation }}</p>
-                        </div>
-                        }
-                    </div>
+                      <p>{{ response.valueNumber }}</p>
+                    } @else if (
+                      response.valueBoolean !== null && response.valueBoolean !== undefined
+                    ) {
+                      <p>{{ response.valueBoolean ? 'Sim' : 'Não' }}</p>
+                    } @else if (response.valueDate) {
+                      <p>{{ response.valueDate | date: 'dd/MM/yyyy' }}</p>
+                    } @else if (response.valueJson) {
+                      <pre>{{ response.valueJson | json }}</pre>
                     } @else {
-                    <div class="response-content">
-                        <span class="info-label">Resposta registrada</span>
-                        <p class="no-response">
-                            Nenhuma resposta encontrada para este item.
-                        </p>
-                    </div>
+                      <p class="no-response">Resposta sem valor informado.</p>
                     }
-                </article>
-                }
+
+                    @if (response.conformity) {
+                      <div class="response-conformity">
+                        <span class="info-label">Conformidade</span>
+                        <strong>{{ response.conformity }}</strong>
+                      </div>
+                    }
+
+                    @if (response.observation) {
+                      <div class="observation">
+                        <span class="info-label">Observação</span>
+                        <p>{{ response.observation }}</p>
+                      </div>
+                    }
+                  </div>
                 } @else {
-                <p class="empty-value">
-                    Nenhum item de checklist encontrado.
-                </p>
+                  <div class="response-content">
+                    <span class="info-label">Resposta registrada</span>
+                    <p class="no-response">Nenhuma resposta encontrada para este item.</p>
+                  </div>
                 }
-            </section>
+                @for (file of evidenceForItem(item.id); track file.id) {
+                  <p>
+                    Evidência: {{ file.description || 'Sem descrição' }}
+                    @if (file.accessUrl && file.mimeType.startsWith('image/')) {
+                      <button matButton type="button" (click)="openEvidence(file.id)">
+                        Ver foto
+                      </button>
+                    }
+                  </p>
+                }
+              </article>
+            }
+          } @else {
+            <p class="empty-value">Nenhum item de checklist encontrado.</p>
+          }
+        </section>
+      </section>
+
+      <!-- Painel lateral -->
+      <aside class="sidebar-column">
+        <section class="content-card review-status-card">
+          <span class="eyebrow">ACOMPANHAMENTO</span>
+          <h2>Situação da revisão</h2>
         </section>
 
-        <!-- Painel lateral -->
-        <aside class="sidebar-column">
+        @if (isSupervisor()) {
+          <section class="content-card decision-card">
+            <div class="decision-header">
+              <h2>DECISÃO</h2>
+            </div>
 
-            <section class="content-card review-status-card">
-                <span class="eyebrow">ACOMPANHAMENTO</span>
-                <h2>Situação da revisão</h2>
+            @if (data.status === 'SUBMITTED') {
+              <div class="decision-body">
+                <p class="decision-description">A inspeção aguarda o início da revisão.</p>
 
-                
-            </section>
+                <button
+                  type="button"
+                  class="action-button start-review-button"
+                  [disabled]="actionLoading()"
+                  (click)="beginReview()"
+                >
+                  {{ actionLoading() ? 'Iniciando...' : 'Iniciar revisão' }}
+                </button>
+              </div>
+            } @else if (data.status === 'UNDER_REVIEW') {
+              <div class="decision-body">
+                <div class="decision-field">
+                  <label for="decision-comment"> MOTIVO / PARECER </label>
 
-            @if (isSupervisor()) {
-            <section class="content-card decision-card">
-                <div class="decision-header">
-                    <h2>DECISÃO</h2>
+                  <textarea
+                    id="decision-comment"
+                    rows="3"
+                    placeholder="Obrigatório para reprovar"
+                    [value]="decisionComment()"
+                    (input)="decisionComment.set($any($event.target).value)"
+                    [disabled]="actionLoading()"
+                  ></textarea>
                 </div>
 
-                @if (data.status === 'SUBMITTED') {
-                <div class="decision-body">
-                    <p class="decision-description">
-                        A inspeção aguarda o início da revisão.
-                    </p>
+                <div class="decision-actions">
+                  <button
+                    type="button"
+                    class="action-button reject-button"
+                    [disabled]="actionLoading()"
+                    (click)="reject()"
+                  >
+                    {{ actionLoading() ? 'Processando...' : 'Reprovar' }}
+                  </button>
 
-                    <button
-                        type="button"
-                        class="action-button start-review-button"
-                        [disabled]="actionLoading()"
-                        (click)="beginReview()">
-                        {{ actionLoading() ? 'Iniciando...' : 'Iniciar revisão'
-                        }}
-                    </button>
+                  <button
+                    type="button"
+                    class="action-button approve-button"
+                    [disabled]="actionLoading()"
+                    (click)="approve()"
+                  >
+                    {{ actionLoading() ? 'Processando...' : 'Aprovar' }}
+                  </button>
                 </div>
-                } @else if (data.status === 'UNDER_REVIEW') {
-                <div class="decision-body">
-                    <div class="decision-field">
-                        <label for="decision-comment">
-                            MOTIVO / PARECER
-                        </label>
-
-                        <textarea
-                            id="decision-comment"
-                            rows="3"
-                            placeholder="Obrigatório para reprovar"
-                            [value]="decisionComment()"
-                            (input)="decisionComment.set($any($event.target).value)"
-                            [disabled]="actionLoading()"></textarea>
-                    </div>
-
-                    <div class="decision-actions">
-                        <button
-                            type="button"
-                            class="action-button reject-button"
-                            [disabled]="actionLoading()"
-                            (click)="reject()">
-                            {{ actionLoading() ? 'Processando...' : 'Reprovar'
-                            }}
-                        </button>
-
-                        <button
-                            type="button"
-                            class="action-button approve-button"
-                            [disabled]="actionLoading()"
-                            (click)="approve()">
-                            {{ actionLoading() ? 'Processando...' : 'Aprovar' }}
-                        </button>
-                    </div>
-                </div>
-                } @else {
-                <div class="decision-body">
-                    <p class="decision-description">
-                        Esta inspeção já possui uma decisão registrada.
-                    </p>
-                </div>
-                }
-
-                @if (actionError()) {
-                <p class="decision-error" role="alert">
-                    {{ actionError() }}
-                </p>
-                }
-            </section>
+              </div>
+            } @else {
+              <div class="decision-body">
+                <p class="decision-description">Esta inspeção já possui uma decisão registrada.</p>
+              </div>
             }
 
-            <section class="content-card">
-                <div class="card-heading compact">
-                    <h2>Não conformidades</h2>
-                    <span class="section-count">
-                        {{ data.nonConformities?.length ?? 0 }}
-                    </span>
+            @if (actionError()) {
+              <p class="decision-error" role="alert">
+                {{ actionError() }}
+              </p>
+            }
+          </section>
+        }
+
+        <section class="content-card">
+          <div class="card-heading compact">
+            <h2>Não conformidades</h2>
+            <span class="section-count">
+              {{ data.nonConformities?.length ?? 0 }}
+            </span>
+          </div>
+
+          @if (data.nonConformities?.length) {
+            @for (nc of data.nonConformities; track nc.id) {
+              <article class="sidebar-item nonconformity-item">
+                <div class="sidebar-item-heading">
+                  <strong>{{ nc.title }}</strong>
+                  <span class="severity-label">
+                    {{ nc.severity }}
+                  </span>
                 </div>
 
-                @if (data.nonConformities?.length) {
-                @for (nc of data.nonConformities; track nc.id) {
-                <article class="sidebar-item nonconformity-item">
-                    <div class="sidebar-item-heading">
-                        <strong>{{ nc.title }}</strong>
-                        <span class="severity-label">
-                            {{ nc.severity }}
-                        </span>
-                    </div>
+                <p>{{ nc.description }}</p>
 
-                    <p>{{ nc.description }}</p>
+                <span class="info-label"> Status: {{ nc.status }} </span>
+              </article>
+            }
+          } @else {
+            <p class="empty-value">Nenhuma não conformidade registrada.</p>
+          }
+        </section>
 
-                    <span class="info-label">
-                        Status: {{ nc.status }}
-                    </span>
-                </article>
-                }
-                } @else {
-                <p class="empty-value">
-                    Nenhuma não conformidade registrada.
-                </p>
-                }
-            </section>
+        <section class="content-card">
+          <div class="card-heading compact">
+            <h2>Evidências</h2>
+            <span class="section-count">
+              {{ evidence().length }}
+            </span>
+          </div>
 
-            <section class="content-card">
-                <div class="card-heading compact">
-                    <h2>Evidências</h2>
-                    <span class="section-count">
-                        {{ evidence().length }}
-                    </span>
-                </div>
-
-                @if (evidence().length) {
-                @for (file of evidence(); track file.id) {
-                <article class="evidence-item">
-                    @if (file.accessUrl && file.mimeType.startsWith('image/')) {
+          @if (evidenceError()) {
+            <p role="alert">Não foi possível carregar as evidências.</p>
+            <button matButton type="button" (click)="retryEvidence()">Tentar novamente</button>
+          } @else if (evidence().length) {
+            @for (file of evidence(); track file.id) {
+              <article class="evidence-item">
+                @if (file.accessUrl && file.mimeType.startsWith('image/')) {
+                  <button
+                    matButton
+                    type="button"
+                    (click)="openEvidence(file.id)"
+                    [attr.aria-label]="
+                      'Abrir foto: ' + (file.description || 'Evidência da inspeção')
+                    "
+                  >
                     <img
-                        [src]="file.accessUrl"
-                        [alt]="file.description || 'Evidência da inspeção'" />
-                    }
-
-                    <div class="evidence-info">
-                        <strong>
-                            {{ file.description || 'Evidência sem descrição' }}
-                        </strong>
-                        <span>{{ file.mimeType }}</span>
-                        <span>
-                            {{ file.sizeBytes / 1024 | number: '1.0-0' }} KB
-                        </span>
-                    </div>
-                </article>
+                      [src]="file.accessUrl"
+                      [alt]="file.description || 'Evidência da inspeção'"
+                    />
+                  </button>
                 }
-                } @else {
-                <p class="empty-value">
-                    Nenhuma evidência encontrada.
-                </p>
-                }
-            </section>
 
-            <section class="content-card">
-                <div class="card-heading compact">
-                    <h2>Histórico de revisões</h2>
-                    <span class="section-count">
-                        {{ data.reviews?.length ?? 0 }}
-                    </span>
+                <div class="evidence-info">
+                  <strong>
+                    {{ file.description || 'Evidência sem descrição' }}
+                  </strong>
+                  <span>{{ file.mimeType }}</span>
+                  <span> {{ file.sizeBytes / 1024 | number: '1.0-0' }} KB </span>
                 </div>
+              </article>
+            }
+          } @else {
+            <p class="empty-value">Nenhuma evidência encontrada.</p>
+          }
+        </section>
 
-                @if (data.reviews?.length) {
-                @for (review of data.reviews; track review.id) {
-                <article class="history-item">
-                    <strong>{{ review.decision }}</strong>
-                    <span>
-                        {{ review.reviewedAt | date: 'dd/MM/yyyy HH:mm' }}
-                    </span>
+        <section class="content-card">
+          <div class="card-heading compact">
+            <h2>Histórico de revisões</h2>
+            <span class="section-count">
+              {{ data.reviews?.length ?? 0 }}
+            </span>
+          </div>
 
-                    @if (review.reason) {
-                    <p>{{ review.reason }}</p>
-                    }
+          @if (data.reviews?.length) {
+            @for (review of data.reviews; track review.id) {
+              <article class="history-item">
+                <strong>{{ review.decision }}</strong>
+                <span>
+                  {{ review.reviewedAt | date: 'dd/MM/yyyy HH:mm' }}
+                </span>
 
-                    @if (review.comments) {
-                    <p>{{ review.comments }}</p>
-                    }
-                </article>
+                @if (review.reason) {
+                  <p>{{ review.reason }}</p>
                 }
-                } @else {
-                <p class="empty-value">
-                    Nenhuma revisão anterior registrada.
-                </p>
+
+                @if (review.comments) {
+                  <p>{{ review.comments }}</p>
                 }
-            </section>
-        </aside>
+              </article>
+            }
+          } @else {
+            <p class="empty-value">Nenhuma revisão anterior registrada.</p>
+          }
+        </section>
+      </aside>
     </div>
-    }
+  }
 </main>

@@ -25,6 +25,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -50,6 +51,9 @@ class ClientControllerIT {
     private UserRepository userRepository;
 
     @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -67,9 +71,10 @@ class ClientControllerIT {
 
     @BeforeEach
     void setUp() {
+        // Same test-container isolation used by SiteControllerIT; no application data.
+        jdbcTemplate.execute("TRUNCATE TABLE users CASCADE");
         siteRepository.deleteAll();
         clientRepository.deleteAll();
-        userRepository.deleteAll();
         adminUser = userRepository.save(newUser("Admin User", "admin.client@fieldops.local", UserRole.ADMIN));
         supervisorUser = userRepository.save(newUser("Supervisor User", "supervisor.client@fieldops.local", UserRole.SUPERVISOR));
         technicianUser = userRepository.save(newUser("Tech User", "tech.client@fieldops.local", UserRole.TECHNICIAN));

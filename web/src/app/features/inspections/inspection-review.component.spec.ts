@@ -5,9 +5,11 @@ import { Subject, of } from 'rxjs';
 import { AuthStore } from '../../core/auth/auth.store';
 import { InspectionsService } from '../../core/services/resources';
 import { InspectionReviewComponent } from './inspection-review.component';
+import { ConfirmDialogService } from '../../shared/components';
 
 describe('Revisão — RN-079/080/082', () => {
   function setup(status = 'SUBMITTED', role = 'SUPERVISOR') {
+    const confirm = { open: vi.fn(() => of({ confirmed: true })) };
     const service = {
       get: vi.fn(() => of({ id: 'i1', status })),
       listEvidence: vi.fn(() => of([])),
@@ -17,6 +19,7 @@ describe('Revisão — RN-079/080/082', () => {
     };
     TestBed.configureTestingModule({
       providers: [
+        { provide: ConfirmDialogService, useValue: confirm },
         { provide: AuthStore, useValue: { role: signal(role) } },
         { provide: InspectionsService, useValue: service },
         {
@@ -33,9 +36,33 @@ describe('Revisão — RN-079/080/082', () => {
       decisionComment: ReturnType<typeof signal<string>>;
     };
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    return { service, component };
+    return { service, component, fixture, confirm };
   }
   afterEach(() => vi.restoreAllMocks());
+
+  it('não decide quando a confirmação padrão do projeto é cancelada', () => {
+    const { service, component, confirm } = setup('UNDER_REVIEW');
+    confirm.open.mockReturnValue(of({ confirmed: false }));
+    component.approve();
+    expect(service.approve).not.toHaveBeenCalled();
+  });
+
+  it('mostra conformidade registrada sem dizer que a resposta está vazia', () => {
+    const { fixture } = setup();
+    const component = fixture.componentInstance as unknown as {
+      inspection: { set(value: unknown): void };
+    };
+    component.inspection.set({
+      id: 'i1',
+      status: 'SUBMITTED',
+      items: [{ id: 'item1', itemTitle: 'Proteção', sectionTitle: 'Segurança', required: true }],
+      responses: [{ inspectionItemId: 'item1', conformity: 'CONFORMING' }],
+    });
+    fixture.detectChanges();
+    const text = (fixture.nativeElement as HTMLElement).textContent!;
+    expect(text).toContain('Conforme');
+    expect(text).not.toContain('Resposta sem valor informado');
+  });
 
   it('continua bloqueando novo envio enquanto atualiza os dados após a transição', () => {
     const { service, component } = setup();

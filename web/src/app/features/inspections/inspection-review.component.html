@@ -19,9 +19,7 @@
           <p>Analise as informações e os registros antes de tomar uma decisão sobre a inspeção.</p>
         </div>
 
-        <span class="status-badge">
-          {{ data.status }}
-        </span>
+        <app-status-badge [value]="data.status" context="inspection" />
       </div>
     </header>
 
@@ -40,12 +38,12 @@
       <div class="summary-grid">
         <div class="summary-item">
           <span class="info-label">Status</span>
-          <strong>{{ data.status }}</strong>
+          <strong>{{ label('inspection', data.status) }}</strong>
         </div>
 
         <div class="summary-item">
           <span class="info-label">Prioridade</span>
-          <strong>{{ data.priority }}</strong>
+          <strong>{{ label('priority', data.priority) }}</strong>
         </div>
 
         <div class="summary-item">
@@ -126,14 +124,14 @@
                       <p>{{ response.valueDate | date: 'dd/MM/yyyy' }}</p>
                     } @else if (response.valueJson) {
                       <pre>{{ response.valueJson | json }}</pre>
-                    } @else {
+                    } @else if (!response.conformity) {
                       <p class="no-response">Resposta sem valor informado.</p>
                     }
 
                     @if (response.conformity) {
                       <div class="response-conformity">
                         <span class="info-label">Conformidade</span>
-                        <strong>{{ response.conformity }}</strong>
+                        <strong>{{ label('conformity', response.conformity) }}</strong>
                       </div>
                     }
 
@@ -256,14 +254,12 @@
               <article class="sidebar-item nonconformity-item">
                 <div class="sidebar-item-heading">
                   <strong>{{ nc.title }}</strong>
-                  <span class="severity-label">
-                    {{ nc.severity }}
-                  </span>
+                  <app-status-badge [value]="nc.severity" context="severity" />
                 </div>
 
                 <p>{{ nc.description }}</p>
 
-                <span class="info-label"> Status: {{ nc.status }} </span>
+                <span class="info-label"> Situação: {{ label('nonConformity', nc.status) }} </span>
               </article>
             }
           } @else {
@@ -326,7 +322,7 @@
           @if (data.reviews?.length) {
             @for (review of data.reviews; track review.id) {
               <article class="history-item">
-                <strong>{{ review.decision }}</strong>
+                <strong>{{ label('inspection', review.decision) }}</strong>
                 <span>
                   {{ review.reviewedAt | date: 'dd/MM/yyyy HH:mm' }}
                 </span>

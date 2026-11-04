@@ -13,6 +13,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { catchError, finalize, of, switchMap } from 'rxjs';
 import { EvidenceViewerComponent } from './evidence-viewer.component';
+import { ConfirmDialogService, StatusBadgeComponent, statusLabel } from '../../shared/components';
 
 import { AuthStore } from '../../core/auth/auth.store';
 import type { Evidence, InspectionDetail } from '../../core/models/domain';
@@ -22,17 +23,19 @@ import { InspectionsService } from '../../core/services/resources';
 @Component({
   selector: 'app-inspection-review',
   standalone: true,
-  imports: [CommonModule, RouterLink, MatButtonModule],
+  imports: [CommonModule, RouterLink, MatButtonModule, StatusBadgeComponent],
   templateUrl: './inspection-review.component.html',
   styleUrl: './inspection-review.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class InspectionReviewComponent {
+  protected readonly label = statusLabel;
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly inspectionsService = inject(InspectionsService);
   private readonly authStore = inject(AuthStore);
   private readonly dialog = inject(MatDialog);
+  private readonly confirmation = inject(ConfirmDialogService);
 
   protected readonly isSupervisor = computed(() => this.authStore.role() === 'SUPERVISOR');
 
@@ -132,45 +135,14 @@ export class InspectionReviewComponent {
   }
 
   protected approve(): void {
-    const id = this.getInspectionId();
-
-    if (
-      !id ||
-      !this.isSupervisor() ||
-      this.actionLoading() ||
-      this.inspection()?.status !== 'UNDER_REVIEW'
-    )
-      return;
-
-    const confirmed = window.confirm(
-      'Tem certeza de que deseja aprovar esta inspeção? Esta decisão será registrada.',
-    );
-
-    if (!confirmed) return;
-
-    this.actionLoading.set(true);
-    this.actionError.set(null);
-
-    this.inspectionsService
-      .approve(id, this.decisionComment().trim() || undefined)
-      .pipe(
-        switchMap(() => this.inspectionsService.get(id)),
-        finalize(() => this.actionLoading.set(false)),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe({
-        next: (inspection) => {
-          this.inspection.set(inspection);
-        },
-        error: () => {
-          this.actionError.set(
-            'Não foi possível aprovar a inspeção. Verifique se ela ainda está em revisão.',
-          );
-        },
-      });
+    this.decide(false);
   }
 
   protected reject(): void {
+    this.decide(true);
+  }
+
+  private decide(rejection: boolean): void {
     const id = this.getInspectionId();
     const reason = this.decisionComment().trim();
 
@@ -182,34 +154,42 @@ export class InspectionReviewComponent {
     )
       return;
 
-    if (!reason) {
+    if (rejection && !reason) {
       this.actionError.set('Informe uma justificativa para rejeitar a inspeção.');
       return;
     }
 
-    const confirmed = window.confirm(
-      'Tem certeza de que deseja rejeitar esta inspeção? A justificativa será registrada.',
-    );
-
-    if (!confirmed) return;
-
     this.actionLoading.set(true);
     this.actionError.set(null);
 
-    this.inspectionsService
-      .reject(id, reason)
+    this.confirmation
+      .open({
+        title: rejection ? 'Reprovar inspeção' : 'Aprovar inspeção',
+        message: rejection
+          ? 'A inspeção retornará para correção e a justificativa será registrada.'
+          : 'Esta decisão será registrada e a inspeção aprovada ficará bloqueada para edição comum.',
+        confirmLabel: rejection ? 'Reprovar' : 'Aprovar',
+        variant: rejection ? 'danger' : 'primary',
+      })
       .pipe(
-        switchMap(() => this.inspectionsService.get(id)),
+        switchMap((result) =>
+          result.confirmed
+            ? (rejection
+                ? this.inspectionsService.reject(id, reason)
+                : this.inspectionsService.approve(id, reason || undefined)
+              ).pipe(switchMap(() => this.inspectionsService.get(id)))
+            : of(null),
+        ),
         finalize(() => this.actionLoading.set(false)),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
         next: (inspection) => {
-          this.inspection.set(inspection);
+          if (inspection) this.inspection.set(inspection);
         },
         error: () => {
           this.actionError.set(
-            'Não foi possível rejeitar a inspeção. Verifique se ela ainda está em revisão.',
+            'Não foi possível registrar a decisão. Verifique se a inspeção ainda está em revisão.',
           );
         },
       });

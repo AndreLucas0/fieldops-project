@@ -35,10 +35,26 @@ describe('Revisão — RN-079/080/082', () => {
       reject(): void;
       decisionComment: ReturnType<typeof signal<string>>;
     };
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     return { service, component, fixture, confirm };
   }
   afterEach(() => vi.restoreAllMocks());
+
+  it('mantém o acionador habilitado para restaurar foco e impede confirmações duplicadas', () => {
+    const { service, component, fixture, confirm } = setup('UNDER_REVIEW');
+    const decision = new Subject<{ confirmed: boolean }>();
+    confirm.open.mockReturnValue(decision as never);
+    component.approve();
+    fixture.detectChanges();
+    const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
+    expect(buttons.find((button) => button.textContent?.trim() === 'Aprovar')?.disabled).toBe(
+      false,
+    );
+    component.approve();
+    expect(confirm.open).toHaveBeenCalledTimes(1);
+    decision.next({ confirmed: false });
+    decision.complete();
+    expect(service.approve).not.toHaveBeenCalled();
+  });
 
   it('não decide quando a confirmação padrão do projeto é cancelada', () => {
     const { service, component, confirm } = setup('UNDER_REVIEW');

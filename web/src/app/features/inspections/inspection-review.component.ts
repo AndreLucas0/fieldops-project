@@ -36,6 +36,7 @@ export class InspectionReviewComponent {
   private readonly authStore = inject(AuthStore);
   private readonly dialog = inject(MatDialog);
   private readonly confirmation = inject(ConfirmDialogService);
+  private confirmationPending = false;
 
   protected readonly isSupervisor = computed(() => this.authStore.role() === 'SUPERVISOR');
 
@@ -150,6 +151,7 @@ export class InspectionReviewComponent {
       !id ||
       !this.isSupervisor() ||
       this.actionLoading() ||
+      this.confirmationPending ||
       this.inspection()?.status !== 'UNDER_REVIEW'
     )
       return;
@@ -159,7 +161,7 @@ export class InspectionReviewComponent {
       return;
     }
 
-    this.actionLoading.set(true);
+    this.confirmationPending = true;
     this.actionError.set(null);
 
     this.confirmation
@@ -172,15 +174,20 @@ export class InspectionReviewComponent {
         variant: rejection ? 'danger' : 'primary',
       })
       .pipe(
-        switchMap((result) =>
-          result.confirmed
-            ? (rejection
-                ? this.inspectionsService.reject(id, reason)
-                : this.inspectionsService.approve(id, reason || undefined)
-              ).pipe(switchMap(() => this.inspectionsService.get(id)))
-            : of(null),
-        ),
-        finalize(() => this.actionLoading.set(false)),
+        switchMap((result) => {
+          this.confirmationPending = false;
+          if (!result.confirmed) return of(null);
+          this.actionLoading.set(true);
+          return (
+            rejection
+              ? this.inspectionsService.reject(id, reason)
+              : this.inspectionsService.approve(id, reason || undefined)
+          ).pipe(switchMap(() => this.inspectionsService.get(id)));
+        }),
+        finalize(() => {
+          this.confirmationPending = false;
+          this.actionLoading.set(false);
+        }),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({

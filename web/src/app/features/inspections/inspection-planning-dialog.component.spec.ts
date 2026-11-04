@@ -6,7 +6,7 @@ import { InspectionsService } from '../../core/services/resources';
 import { InspectionPlanningDialogComponent } from './inspection-planning-dialog.component';
 
 describe('FE-W20 — editar planejamento', () => {
-  function setup(status = 'ASSIGNED') {
+  function setup(status = 'ASSIGNED', scheduledFor = '2026-11-05T15:00:00.000Z') {
     const update = vi.fn(() => of({ id: 'i1' }));
     TestBed.configureTestingModule({
       providers: [
@@ -18,7 +18,7 @@ describe('FE-W20 — editar planejamento', () => {
               status,
               title: 'Inspeção',
               priority: 'MEDIUM',
-              scheduledFor: '2026-11-05T15:00:00Z',
+              scheduledFor,
             },
           },
         },
@@ -52,5 +52,14 @@ describe('FE-W20 — editar planejamento', () => {
     const { component, update } = setup('APPROVED');
     component.submit();
     expect(update).not.toHaveBeenCalled();
+  });
+  it('preserva segundos e milissegundos quando somente o título muda', () => {
+    const { component, update } = setup('ASSIGNED', '2026-11-05T15:00:37.123Z');
+    component.form.controls.title.setValue('Título revisado');
+    component.submit();
+    expect(update).toHaveBeenCalledWith(
+      'i1',
+      expect.objectContaining({ scheduledFor: '2026-11-05T15:00:37.123Z' }),
+    );
   });
 });

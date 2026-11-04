@@ -111,7 +111,10 @@ export class InspectionPlanningDialogComponent {
         title: value.title.trim() || null,
         instructions: value.instructions.trim() || null,
         priority: value.priority,
-        scheduledFor: date.toISOString(),
+        scheduledFor:
+          value.scheduledFor === localDateTime(this.data.inspection.scheduledFor)
+            ? this.data.inspection.scheduledFor
+            : date.toISOString(),
       })
       .pipe(finalize(() => this.saving.set(false)))
       .subscribe({

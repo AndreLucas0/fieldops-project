@@ -200,6 +200,7 @@ describe('TemplateBuilderComponent', () => {
     const update = vi.spyOn(TestBed.inject(TemplatesService), 'updateItem');
     const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[aria-label="Mover item para baixo"]')!;
     button.click();
+    expect(update).toHaveBeenCalledTimes(3);
     expect(update).toHaveBeenCalledWith(TEMPLATE_IDS.eletrico, expect.any(String), expect.objectContaining({
       title: expect.any(String), responseType: expect.any(String), required: expect.any(Boolean), displayOrder: expect.any(Number),
     }));

@@ -544,12 +544,24 @@ export class TemplateBuilderComponent implements OnInit {
     const second = { title: neighbor.title, description: neighbor.description };
     const temporaryOrder = Math.max(...ordered.map((entry) => entry.displayOrder)) + 1;
     this.saving.set(true);
-    this.templates.updateSection(this.templateId(), section.id, { ...first, displayOrder: temporaryOrder })
+    this.templates
+      .updateSection(this.templateId(), section.id, { ...first, displayOrder: temporaryOrder })
       .pipe(
-        concatMap(() => this.templates.updateSection(this.templateId(), neighbor.id, { ...second, displayOrder: originalOrder })),
-        concatMap(() => this.templates.updateSection(this.templateId(), section.id, { ...first, displayOrder: targetOrder })),
+        concatMap(() =>
+          this.templates.updateSection(this.templateId(), neighbor.id, {
+            ...second,
+            displayOrder: originalOrder,
+          }),
+        ),
+        concatMap(() =>
+          this.templates.updateSection(this.templateId(), section.id, {
+            ...first,
+            displayOrder: targetOrder,
+          }),
+        ),
         finalize(() => this.saving.set(false)),
-      ).subscribe({ next: () => this.reloadSections(), error: () => this.orderFailed() });
+      )
+      .subscribe({ next: () => this.reloadSections(), error: () => this.orderFailed() });
   }
 
   protected addItem(section: TemplateSectionDetail): void {
@@ -557,7 +569,10 @@ export class TemplateBuilderComponent implements OnInit {
       if (!result) return;
       this.saving.set(true);
       this.templates
-        .createItem(this.templateId(), section.id, { ...result, displayOrder: (section.items ?? []).length + 1 })
+        .createItem(this.templateId(), section.id, {
+          ...result,
+          displayOrder: (section.items ?? []).length + 1,
+        })
         .pipe(finalize(() => this.saving.set(false)))
         .subscribe(() => {
           this.reloadSections();
@@ -592,23 +607,53 @@ export class TemplateBuilderComponent implements OnInit {
     const second = this.itemPayload(neighbor);
     const temporaryOrder = Math.max(...items.map((entry) => entry.displayOrder)) + 1;
     this.saving.set(true);
-    this.templates.updateItem(this.templateId(), item.id, { ...first, displayOrder: temporaryOrder })
+    this.templates
+      .updateItem(this.templateId(), item.id, { ...first, displayOrder: temporaryOrder })
       .pipe(
-        concatMap(() => this.templates.updateItem(this.templateId(), neighbor.id, { ...second, displayOrder: originalOrder })),
-        concatMap(() => this.templates.updateItem(this.templateId(), item.id, { ...first, displayOrder: targetOrder })),
+        concatMap(() =>
+          this.templates.updateItem(this.templateId(), neighbor.id, {
+            ...second,
+            displayOrder: originalOrder,
+          }),
+        ),
+        concatMap(() =>
+          this.templates.updateItem(this.templateId(), item.id, {
+            ...first,
+            displayOrder: targetOrder,
+          }),
+        ),
         finalize(() => this.saving.set(false)),
-      ).subscribe({ next: () => this.reloadSections(), error: () => this.orderFailed() });
+      )
+      .subscribe({ next: () => this.reloadSections(), error: () => this.orderFailed() });
   }
 
   private orderFailed(): void {
-    this.notifications.error('A ordenação não foi concluída. Confira a ordem recarregada antes de tentar novamente.');
+    this.notifications.error(
+      'A ordenação não foi concluída. Confira a ordem recarregada antes de tentar novamente.',
+    );
     this.reloadSections();
   }
 
   private itemPayload(item: TemplateItem): Partial<TemplateItem> {
-    const { code, title, description, responseType, required, observationRequiredOnFailure,
-      evidenceRequiredOnFailure, optionsJson } = item;
-    return { code, title, description, responseType, required, observationRequiredOnFailure,
-      evidenceRequiredOnFailure, optionsJson };
+    const {
+      code,
+      title,
+      description,
+      responseType,
+      required,
+      observationRequiredOnFailure,
+      evidenceRequiredOnFailure,
+      optionsJson,
+    } = item;
+    return {
+      code,
+      title,
+      description,
+      responseType,
+      required,
+      observationRequiredOnFailure,
+      evidenceRequiredOnFailure,
+      optionsJson,
+    };
   }
 }

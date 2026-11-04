@@ -59,8 +59,6 @@ const NOT_CANCELABLE: ReadonlySet<InspectionStatus> = new Set<InspectionStatus>(
   'CANCELED',
 ]);
 
-
-
 /** `yyyy-MM-dd` do input de data → ISO 8601 no início/fim do dia local. */
 function toIso(day: string, endOfDay: boolean): string | undefined {
   if (!day) return undefined;
@@ -94,247 +92,229 @@ function formatDay(day: string): string {
     PageHeaderComponent,
   ],
   template: `
-  <section class="page inspection-list-page">
+    <section class="page inspection-list-page">
+      <app-page-header
+        title="Inspeções"
+        subtitle="Acompanhe o planejamento e cancele quando necessário."
+      >
+        <div actions>
+          @if (canManage()) {
+            <button matButton="filled" (click)="createNew()">
+              <mat-icon>add</mat-icon>
+              Nova inspeção
+            </button>
+          }
+        </div>
+      </app-page-header>
 
-    <app-page-header
-      title="Inspeções"
-      subtitle="Acompanhe o planejamento e cancele quando necessário."
-    >
-      <div actions>
-        @if (canManage()) {
-          <button matButton="filled" (click)="createNew()">
-            <mat-icon>add</mat-icon>
-            Nova inspeção
-          </button>
-        }
-      </div>
-    </app-page-header>
+      <section class="content-panel">
+        <div class="filter-section">
+          <div class="filter-heading">
+            <div>
+              <h2>Filtros</h2>
+              <p>Encontre inspeções usando os critérios abaixo.</p>
+            </div>
 
-    <section class="content-panel">
-
-      <div class="filter-section">
-
-        <div class="filter-heading">
-          <div>
-            <h2>Filtros</h2>
-            <p>Encontre inspeções usando os critérios abaixo.</p>
+            <button matButton type="button" (click)="onFilter([])">
+              <mat-icon>filter_alt_off</mat-icon>
+              Limpar filtros
+            </button>
           </div>
 
-          <button matButton type="button" (click)="onFilter([])">
-            <mat-icon>filter_alt_off</mat-icon>
-            Limpar filtros
-          </button>
+          <div class="filters" aria-label="Filtros de inspeções">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Estado</mat-label>
+              <mat-select [ngModel]="status()" (ngModelChange)="setStatus($event)">
+                <mat-option [value]="null">Todos</mat-option>
+                @for (option of statusOptions; track option.value) {
+                  <mat-option [value]="option.value">
+                    {{ option.label }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Técnico</mat-label>
+              <mat-select [ngModel]="technicianId()" (ngModelChange)="setTechnician($event)">
+                <mat-option [value]="null">Todos</mat-option>
+                @for (technician of technicians(); track technician.id) {
+                  <mat-option [value]="technician.id">
+                    {{ technician.name }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Cliente</mat-label>
+              <mat-select [ngModel]="clientId()" (ngModelChange)="setClient($event)">
+                <mat-option [value]="null">Todos</mat-option>
+                @for (client of clientOptions(); track client.id) {
+                  <mat-option [value]="client.id">
+                    {{ client.name }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Agendada a partir de</mat-label>
+              <input
+                matInput
+                type="date"
+                [ngModel]="from()"
+                [max]="to() || null"
+                (ngModelChange)="setFrom($event)"
+              />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Agendada até</mat-label>
+              <input
+                matInput
+                type="date"
+                [ngModel]="to()"
+                [min]="from() || null"
+                (ngModelChange)="setTo($event)"
+              />
+            </mat-form-field>
+          </div>
         </div>
 
-        <div class="filters" aria-label="Filtros de inspeções">
-
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Estado</mat-label>
-            <mat-select
-              [ngModel]="status()"
-              (ngModelChange)="setStatus($event)"
-            >
-              <mat-option [value]="null">Todos</mat-option>
-              @for (option of statusOptions; track option.value) {
-                <mat-option [value]="option.value">
-                  {{ option.label }}
-                </mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Técnico</mat-label>
-            <mat-select
-              [ngModel]="technicianId()"
-              (ngModelChange)="setTechnician($event)"
-            >
-              <mat-option [value]="null">Todos</mat-option>
-              @for (technician of technicians(); track technician.id) {
-                <mat-option [value]="technician.id">
-                  {{ technician.name }}
-                </mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Cliente</mat-label>
-            <mat-select
-              [ngModel]="clientId()"
-              (ngModelChange)="setClient($event)"
-            >
-              <mat-option [value]="null">Todos</mat-option>
-              @for (client of clientOptions(); track client.id) {
-                <mat-option [value]="client.id">
-                  {{ client.name }}
-                </mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Agendada a partir de</mat-label>
-            <input
-              matInput
-              type="date"
-              [ngModel]="from()"
-              [max]="to() || null"
-              (ngModelChange)="setFrom($event)"
-            />
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Agendada até</mat-label>
-            <input
-              matInput
-              type="date"
-              [ngModel]="to()"
-              [min]="from() || null"
-              (ngModelChange)="setTo($event)"
-            />
-          </mat-form-field>
-
+        <div class="table-section">
+          <app-data-table
+            [columns]="columns()"
+            [data]="data()"
+            [loading]="loading()"
+            [error]="error()"
+            [activeFilters]="activeFilters()"
+            [sort]="sort()"
+            ariaLabel="Inspeções"
+            emptyIcon="assignment"
+            emptyTitle="Nenhuma inspeção encontrada"
+            [emptyMessage]="emptyMessage()"
+            (pageChange)="onPage($event)"
+            (sortChange)="onSort($event)"
+            (filterChange)="onFilter($event)"
+            (rowAction)="onRowAction($event)"
+            (retry)="load()"
+          />
         </div>
-      </div>
-
-      <div class="table-section">
-
-        <app-data-table
-          [columns]="columns()"
-          [data]="data()"
-          [loading]="loading()"
-          [error]="error()"
-          [activeFilters]="activeFilters()"
-          [sort]="sort()"
-          ariaLabel="Inspeções"
-          emptyIcon="assignment"
-          emptyTitle="Nenhuma inspeção encontrada"
-          [emptyMessage]="emptyMessage()"
-          (pageChange)="onPage($event)"
-          (sortChange)="onSort($event)"
-          (filterChange)="onFilter($event)"
-          (rowAction)="onRowAction($event)"
-          (retry)="load()"
-        />
-
-      </div>
-
+      </section>
     </section>
-
-  </section>
   `,
 
   styles: `
-  :host {
-    display: block;
-    min-width: 0;
-  }
-
-  /* Estrutura da página */
-  .page {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-    min-width: 0;
-  }
-
-  /* Container único */
-  .content-panel {
-    min-width: 0;
-    padding: 1.5rem;
-    border: 1px solid var(--mat-sys-outline-variant);
-    border-radius: 1rem;
-    background: linear-gradient(135deg, #1b232b, #161c22);
-  }
-
-  /* Área dos filtros */
-  .filter-section {
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-  /* Cabeçalho dos filtros */
-  .filter-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-bottom: 1.25rem;
-  }
-
-  .filter-heading h2 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--mat-sys-on-surface);
-  }
-
-  .filter-heading p {
-    margin: 0.3rem 0 0;
-    color: var(--mat-sys-on-surface-variant);
-    font-size: 0.85rem;
-  }
-
-  .filter-heading button {
-    flex-shrink: 0;
-  }
-
-  /* Cinco filtros em uma única linha */
-  .filters {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.75rem;
-    align-items: center;
-  }
-
-  .filters mat-form-field {
-    width: 100%;
-    min-width: 0;
-    margin: 0;
-  }
-
-  /* Tabela diretamente abaixo dos filtros */
- .table-section {
-  min-width: 0;
-  padding-top: 0.75rem;
-}
-
-  .table-section app-data-table {
-    display: block;
-    min-width: 0;
-  }
-
-  /* Telas intermediárias */
-  @media (max-width: 1100px) {
-    .filters {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+    :host {
+      display: block;
+      min-width: 0;
     }
-  }
 
-  /* Tablets */
-  @media (max-width: 700px) {
+    /* Estrutura da página */
+    .page {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      min-width: 0;
+    }
+
+    /* Container único */
     .content-panel {
-      padding: 1rem;
+      min-width: 0;
+      padding: 1.5rem;
+      border: 1px solid var(--mat-sys-outline-variant);
+      border-radius: 1rem;
+      background: linear-gradient(135deg, #1b232b, #161c22);
     }
 
-    .filters {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  /* Celulares */
-  @media (max-width: 480px) {
-    .filters {
-      grid-template-columns: 1fr;
+    /* Área dos filtros */
+    .filter-section {
+      padding-bottom: 0;
+      border-bottom: none;
     }
 
+    /* Cabeçalho dos filtros */
     .filter-heading {
-      align-items: flex-start;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
     }
-  }
-`,
+
+    .filter-heading h2 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--mat-sys-on-surface);
+    }
+
+    .filter-heading p {
+      margin: 0.3rem 0 0;
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 0.85rem;
+    }
+
+    .filter-heading button {
+      flex-shrink: 0;
+    }
+
+    /* Cinco filtros em uma única linha */
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .filters mat-form-field {
+      width: 100%;
+      min-width: 0;
+      margin: 0;
+    }
+
+    /* Tabela diretamente abaixo dos filtros */
+    .table-section {
+      min-width: 0;
+      padding-top: 0.75rem;
+    }
+
+    .table-section app-data-table {
+      display: block;
+      min-width: 0;
+    }
+
+    /* Telas intermediárias */
+    @media (max-width: 1100px) {
+      .filters {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    /* Tablets */
+    @media (max-width: 700px) {
+      .content-panel {
+        padding: 1rem;
+      }
+
+      .filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    /* Celulares */
+    @media (max-width: 480px) {
+      .filters {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-heading {
+        align-items: flex-start;
+      }
+    }
+  `,
 })
 export class InspectionsListComponent {
   private readonly inspections = inject(InspectionsService);
@@ -349,9 +329,7 @@ export class InspectionsListComponent {
   /** Escrita em inspeções: ADMIN e SUPERVISOR (`RESOURCE_WRITE_ROLES`). */
   protected readonly canManage = computed(() => canWrite('inspections', this.auth.role()));
 
-  protected readonly isSupervisor = computed(
-    () => this.auth.role() === 'SUPERVISOR',
-  );
+  protected readonly isSupervisor = computed(() => this.auth.role() === 'SUPERVISOR');
 
   protected readonly technicians = signal<User[]>([]);
   protected readonly clientOptions = signal<Client[]>([]);
@@ -373,16 +351,10 @@ export class InspectionsListComponent {
     return sort && typeof sort === 'object' && !Array.isArray(sort) ? (sort as Sort) : null;
   });
 
-
-
   protected readonly columns = computed<readonly TableColumn<Inspection>[]>(() => {
-    const technicianNames = new Map(
-      this.technicians().map((user) => [user.id, user.name])
-    );
+    const technicianNames = new Map(this.technicians().map((user) => [user.id, user.name]));
 
-    const clientNames = new Map(
-      this.clientOptions().map((client) => [client.id, client.name])
-    );
+    const clientNames = new Map(this.clientOptions().map((client) => [client.id, client.name]));
 
     return [
       {
@@ -398,15 +370,13 @@ export class InspectionsListComponent {
         field: 'clientId',
         label: 'Cliente / local',
         width: '13rem',
-        format: (value) =>
-          clientNames.get(String(value)) ?? '—',
+        format: (value) => clientNames.get(String(value)) ?? '—',
       },
       {
         field: 'technicianId',
         label: 'Técnico',
         width: '12rem',
-        format: (value) =>
-          technicianNames.get(String(value)) ?? '—',
+        format: (value) => technicianNames.get(String(value)) ?? '—',
       },
       {
         field: 'priority',
@@ -452,35 +422,31 @@ export class InspectionsListComponent {
         actions: [
           ...(this.isSupervisor()
             ? [
-              {
-                id: 'review',
-                label: 'Continuar revisão',
-                icon: 'rate_review',
-                visible: (row: Inspection) =>
-                  row.status === 'SUBMITTED' ||
-                  row.status === 'UNDER_REVIEW',
-              },
-            ]
+                {
+                  id: 'review',
+                  label: 'Continuar revisão',
+                  icon: 'rate_review',
+                  visible: (row: Inspection) =>
+                    row.status === 'SUBMITTED' || row.status === 'UNDER_REVIEW',
+                },
+              ]
             : []),
 
           ...(this.canManage()
             ? [
-              {
-                id: 'cancel',
-                label: 'Cancelar',
-                icon: 'cancel',
-                danger: true,
-                visible: (row: Inspection) =>
-                  !NOT_CANCELABLE.has(row.status),
-              },
-            ]
+                {
+                  id: 'cancel',
+                  label: 'Cancelar',
+                  icon: 'cancel',
+                  danger: true,
+                  visible: (row: Inspection) => !NOT_CANCELABLE.has(row.status),
+                },
+              ]
             : []),
         ],
       },
     ];
   });
-
-
 
   protected readonly activeFilters = computed<ActiveFilter[]>(() => {
     const filters: ActiveFilter[] = [];
@@ -608,37 +574,30 @@ export class InspectionsListComponent {
   }
 
   protected onRowAction(event: RowActionEvent<Inspection>): void {
-  if (event.action === 'review') {
-    if (
-      !this.isSupervisor() ||
-      !['SUBMITTED', 'UNDER_REVIEW'].includes(event.row.status)
-    ) {
+    if (event.action === 'review') {
+      if (!this.isSupervisor() || !['SUBMITTED', 'UNDER_REVIEW'].includes(event.row.status)) {
+        return;
+      }
+
+      void this.router.navigate(['/inspections', event.row.id, 'review']);
+
       return;
     }
 
-    void this.router.navigate([
-      '/inspections',
-      event.row.id,
-      'review',
-    ]);
+    if (!this.canManage() || event.action !== 'cancel') return;
 
-    return;
+    this.dialog
+      .open(InspectionCancelDialogComponent, {
+        data: { inspection: event.row },
+        width: '32rem',
+        maxWidth: '95vw',
+        autoFocus: 'first-tabbable',
+        restoreFocus: true,
+      })
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((cancelled: boolean | undefined) => {
+        if (cancelled) this.load();
+      });
   }
-
-  if (!this.canManage() || event.action !== 'cancel') return;
-
-  this.dialog
-    .open(InspectionCancelDialogComponent, {
-      data: { inspection: event.row },
-      width: '32rem',
-      maxWidth: '95vw',
-      autoFocus: 'first-tabbable',
-      restoreFocus: true,
-    })
-    .afterClosed()
-    .pipe(takeUntilDestroyed(this.destroyRef))
-    .subscribe((cancelled: boolean | undefined) => {
-      if (cancelled) this.load();
-    });
-}
 }

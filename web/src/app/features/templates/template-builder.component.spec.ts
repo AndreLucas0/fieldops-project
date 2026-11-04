@@ -198,12 +198,21 @@ describe('TemplateBuilderComponent', () => {
   it('reordenar itens preserva os campos obrigatórios do PUT (RN-023)', () => {
     const fixture = setup(TEMPLATE_IDS.eletrico);
     const update = vi.spyOn(TestBed.inject(TemplatesService), 'updateItem');
-    const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[aria-label="Mover item para baixo"]')!;
+    const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      '[aria-label="Mover item para baixo"]',
+    )!;
     button.click();
     expect(update).toHaveBeenCalledTimes(3);
-    expect(update).toHaveBeenCalledWith(TEMPLATE_IDS.eletrico, expect.any(String), expect.objectContaining({
-      title: expect.any(String), responseType: expect.any(String), required: expect.any(Boolean), displayOrder: expect.any(Number),
-    }));
+    expect(update).toHaveBeenCalledWith(
+      TEMPLATE_IDS.eletrico,
+      expect.any(String),
+      expect.objectContaining({
+        title: expect.any(String),
+        responseType: expect.any(String),
+        required: expect.any(Boolean),
+        displayOrder: expect.any(Number),
+      }),
+    );
   });
 
   it('modelo inexistente mostra o erro com botão de nova tentativa', () => {

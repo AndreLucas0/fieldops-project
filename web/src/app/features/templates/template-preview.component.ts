@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnChanges, computed, inject, input, signal } from '@angular/core';
-import { JsonPipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { finalize, map, of, Subscription, switchMap } from 'rxjs';
@@ -13,7 +12,7 @@ import { RESPONSE_TYPE_LABELS } from './template-item-form-dialog.component';
 
 @Component({
   selector: 'app-template-preview', changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, MatButtonModule, PageHeaderComponent, JsonPipe],
+  imports: [RouterLink, MatButtonModule, PageHeaderComponent],
   template: `
     <section class="page">
       <app-page-header [title]="'Prévia — ' + (template()?.title ?? 'Modelo')" subtitle="Confira como o checklist será apresentado ao técnico."
@@ -47,7 +46,7 @@ import { RESPONSE_TYPE_LABELS } from './template-item-form-dialog.component';
                   }
                   @if(item.observationRequiredOnFailure){<p class="hint">Observação obrigatória em caso de falha</p>}
                   @if(item.evidenceRequiredOnFailure){<p class="hint">Foto obrigatória em caso de falha</p>}
-                  @if(item.responseType === 'SINGLE_CHOICE' && !options(item).length){<p>Configuração de opções: {{item.optionsJson | json}}</p>}
+                  @if(item.responseType === 'SINGLE_CHOICE' && !options(item).length){<p>As alternativas deste item ainda não estão configuradas.</p>}
                 </article>
               } @empty {<p>Esta seção ainda não tem itens.</p>}
             </section>
@@ -91,8 +90,15 @@ export class TemplatePreviewComponent implements OnChanges {
     });
   }
   options(item: TemplateItem): string[] {
-    const options = item.optionsJson?.['options'];
-    return Array.isArray(options) ? options.filter((value): value is string => typeof value === 'string') : [];
+    // Mesmo formato provisório de readChoiceOptions no mobile (PEND-03).
+    const options = item.optionsJson?.['options'] ?? item.optionsJson?.['choices'];
+    if (!Array.isArray(options)) return [];
+    return options.flatMap((option): string[] => {
+      if (typeof option === 'string') return [option];
+      if (typeof option !== 'object' || !option || Array.isArray(option)) return [];
+      const value = option['value'];
+      return typeof value === 'string' && value ? [typeof option['label'] === 'string' ? option['label'] : value] : [];
+    });
   }
   typeLabel(item: TemplateItem): string { return RESPONSE_TYPE_LABELS[item.responseType]; }
   publish(): void {

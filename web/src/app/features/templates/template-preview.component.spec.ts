@@ -28,4 +28,13 @@ describe('FE-W16 — prévia e publicação', () => {
     const { component, service } = setup('DRAFT', [{id:'s1',title:'Segurança',displayOrder:1,items:[{id:'i1',title:'Verificar',responseType:'TEXT_SHORT',displayOrder:1}]}]);
     component.publish(); expect(service.publish).not.toHaveBeenCalled();
   });
+  it('renderiza alternativas com value/label já usadas no mobile, sem mostrar JSON', () => {
+    const {fixture}=setup('DRAFT',[{id:'s1',title:'Painéis',displayOrder:1,items:[{
+      id:'i1',title:'Proteção',displayOrder:1,responseType:'SINGLE_CHOICE',
+      optionsJson:{options:[{value:'IP54',label:'Proteção IP54'},{value:'IP65',label:'Proteção IP65'}]},
+    }]}]);
+    const text=(fixture.nativeElement as HTMLElement).textContent!;
+    expect(text).toContain('Proteção IP54');expect(text).toContain('Proteção IP65');
+    expect(text).not.toContain('"options"');
+  });
 });

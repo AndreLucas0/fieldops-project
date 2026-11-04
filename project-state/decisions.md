@@ -1,5 +1,15 @@
 # Technical Decisions
 
+## 2026-11-04 — recuperação preserva contrato e histórico
+
+Autorizada execução integral pelo usuário. Base isolada de develop incorpora
+main, web_front_2 e branch_leo sem reescrita ou exclusão. Correções de leitura
+implementam InspectionDetail/templateId/publishedBy já previstos no OpenAPI;
+não alteram persistência, escrita ou autorização. publishedById legado mantido.
+Atualizações de segurança preservam Angular 21/Expo 57; não executar correções
+automáticas que mudem SDK ou regras de produto. Evidências, limites e decisões
+ainda necessárias em [recovery-validation-20261104.md](recovery-validation-20261104.md).
+
 This file records important project decisions that future Claude Code
 sessions should understand.
 

@@ -8,6 +8,8 @@ import com.codemind.fieldops.inspection.dto.AssignInspectionRequest;
 import com.codemind.fieldops.inspection.dto.CancelInspectionRequest;
 import com.codemind.fieldops.inspection.dto.InspectionCreateRequest;
 import com.codemind.fieldops.inspection.dto.InspectionResponse;
+import com.codemind.fieldops.inspection.dto.AdminInspectionDetailResponse;
+import com.codemind.fieldops.inspection.application.InspectionDetailQuery;
 import com.codemind.fieldops.inspection.dto.InspectionUpdateRequest;
 import com.codemind.fieldops.inspection.mapper.InspectionMapper;
 import com.codemind.fieldops.shared.audit.AuditEventDto;
@@ -42,10 +44,13 @@ public class InspectionController {
 
     private final InspectionService inspectionService;
     private final InspectionMapper inspectionMapper;
+    private final InspectionDetailQuery detailQuery;
 
-    public InspectionController(InspectionService inspectionService, InspectionMapper inspectionMapper) {
+    public InspectionController(InspectionService inspectionService, InspectionMapper inspectionMapper,
+                                InspectionDetailQuery detailQuery) {
         this.inspectionService = inspectionService;
         this.inspectionMapper = inspectionMapper;
+        this.detailQuery = detailQuery;
     }
 
     @GetMapping
@@ -81,8 +86,8 @@ public class InspectionController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
-    public InspectionResponse get(@PathVariable UUID id) {
-        return inspectionMapper.toResponse(inspectionService.getById(id));
+    public AdminInspectionDetailResponse get(@PathVariable UUID id) {
+        return detailQuery.get(id);
     }
 
     @PutMapping("/{id}")

@@ -144,3 +144,77 @@ td a:focus-visible {
 .fo-table__error button {
   margin-top: 0.75rem;
 }
+
+/* Personalização exclusiva da listagem de inspeções */
+:host-context(.inspection-list-page) {
+  .fo-table {
+    border: 1px solid #303a43;
+    border-radius: 0.75rem;
+    background: #171e24;
+  }
+
+  .fo-table__viewport {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    background: transparent;
+  }
+
+  th {
+    height: 3.25rem;
+    padding: 0 1rem;
+    color: #929ba5;
+    font-size: 0.82rem;
+    font-weight: 500;
+    border-bottom: 1px solid #303a43;
+    white-space: nowrap;
+  }
+
+  td {
+    height: 4.1rem;
+    padding: 0 1rem;
+    color: #e0e5e9;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #303a43;
+    white-space: nowrap;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  tr.mat-mdc-row {
+    transition: background 150ms ease;
+  }
+
+  tr.mat-mdc-row:hover {
+    background: #202a32;
+  }
+
+  td:first-child {
+    min-width: 16rem;
+    font-weight: 600;
+  }
+
+  td a {
+    color: #ffad0a;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  td a:hover {
+    color: #ffc247;
+    text-decoration: underline;
+  }
+
+  .fo-table__inline-actions button {
+    color: #ff9ca5;
+  }
+
+  .fo-table__inline-actions button:hover {
+    background: rgba(255, 100, 120, 0.08);
+  }
+}
+

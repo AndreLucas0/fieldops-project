@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
@@ -19,10 +19,6 @@ export default function SyncDetailsScreen() {
     const rows = await getPendingEntries();
     setEntries(rows);
   }, []);
-
-  useEffect(() => {
-    void loadEntries();
-  }, [loadEntries]);
 
   useFocusEffect(
     useCallback(() => {

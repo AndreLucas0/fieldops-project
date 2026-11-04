@@ -15,7 +15,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { forkJoin } from 'rxjs';
-import { catchError, finalize, of } from 'rxjs';
+import { catchError, concatMap, finalize, of } from 'rxjs';
 
 import { AuthStore, canWrite, isApiError, type ApiError } from '../../core';
 import type {
@@ -536,19 +536,32 @@ export class TemplateBuilderComponent implements OnInit {
     const ordered = this.sections();
     const index = ordered.findIndex((candidate) => candidate.id === section.id);
     const neighbor = ordered[index + direction];
-    if (!neighbor || this.saving()) return;
+    if (!neighbor || this.saving() || !this.canEditDraft()) return;
 
+    const originalOrder = section.displayOrder;
+    const targetOrder = neighbor.displayOrder;
+    const first = { title: section.title, description: section.description };
+    const second = { title: neighbor.title, description: neighbor.description };
+    const temporaryOrder = Math.max(...ordered.map((entry) => entry.displayOrder)) + 1;
     this.saving.set(true);
-    forkJoin([
-      this.templates.updateSection(this.templateId(), section.id, {
-        displayOrder: neighbor.displayOrder,
-      }),
-      this.templates.updateSection(this.templateId(), neighbor.id, {
-        displayOrder: section.displayOrder,
-      }),
-    ])
-      .pipe(finalize(() => this.saving.set(false)))
-      .subscribe(() => this.reloadSections());
+    this.templates
+      .updateSection(this.templateId(), section.id, { ...first, displayOrder: temporaryOrder })
+      .pipe(
+        concatMap(() =>
+          this.templates.updateSection(this.templateId(), neighbor.id, {
+            ...second,
+            displayOrder: originalOrder,
+          }),
+        ),
+        concatMap(() =>
+          this.templates.updateSection(this.templateId(), section.id, {
+            ...first,
+            displayOrder: targetOrder,
+          }),
+        ),
+        finalize(() => this.saving.set(false)),
+      )
+      .subscribe({ next: () => this.reloadSections(), error: () => this.orderFailed() });
   }
 
   protected addItem(section: TemplateSectionDetail): void {
@@ -556,7 +569,10 @@ export class TemplateBuilderComponent implements OnInit {
       if (!result) return;
       this.saving.set(true);
       this.templates
-        .createItem(this.templateId(), section.id, { ...result, displayOrder: (section.items ?? []).length + 1 })
+        .createItem(this.templateId(), section.id, {
+          ...result,
+          displayOrder: (section.items ?? []).length + 1,
+        })
         .pipe(finalize(() => this.saving.set(false)))
         .subscribe(() => {
           this.reloadSections();
@@ -583,18 +599,61 @@ export class TemplateBuilderComponent implements OnInit {
     const items = section.items ?? [];
     const index = items.findIndex((candidate) => candidate.id === item.id);
     const neighbor = items[index + direction];
-    if (!neighbor || this.saving()) return;
+    if (!neighbor || this.saving() || !this.canEditDraft()) return;
 
+    const originalOrder = item.displayOrder;
+    const targetOrder = neighbor.displayOrder;
+    const first = this.itemPayload(item);
+    const second = this.itemPayload(neighbor);
+    const temporaryOrder = Math.max(...items.map((entry) => entry.displayOrder)) + 1;
     this.saving.set(true);
-    forkJoin([
-      this.templates.updateItem(this.templateId(), item.id, {
-        displayOrder: neighbor.displayOrder,
-      }),
-      this.templates.updateItem(this.templateId(), neighbor.id, {
-        displayOrder: item.displayOrder,
-      }),
-    ])
-      .pipe(finalize(() => this.saving.set(false)))
-      .subscribe(() => this.reloadSections());
+    this.templates
+      .updateItem(this.templateId(), item.id, { ...first, displayOrder: temporaryOrder })
+      .pipe(
+        concatMap(() =>
+          this.templates.updateItem(this.templateId(), neighbor.id, {
+            ...second,
+            displayOrder: originalOrder,
+          }),
+        ),
+        concatMap(() =>
+          this.templates.updateItem(this.templateId(), item.id, {
+            ...first,
+            displayOrder: targetOrder,
+          }),
+        ),
+        finalize(() => this.saving.set(false)),
+      )
+      .subscribe({ next: () => this.reloadSections(), error: () => this.orderFailed() });
+  }
+
+  private orderFailed(): void {
+    this.notifications.error(
+      'A ordenação não foi concluída. Confira a ordem recarregada antes de tentar novamente.',
+    );
+    this.reloadSections();
+  }
+
+  private itemPayload(item: TemplateItem): Partial<TemplateItem> {
+    const {
+      code,
+      title,
+      description,
+      responseType,
+      required,
+      observationRequiredOnFailure,
+      evidenceRequiredOnFailure,
+      optionsJson,
+    } = item;
+    return {
+      code,
+      title,
+      description,
+      responseType,
+      required,
+      observationRequiredOnFailure,
+      evidenceRequiredOnFailure,
+      optionsJson,
+    };
   }
 }

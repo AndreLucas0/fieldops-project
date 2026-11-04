@@ -44,7 +44,7 @@ import {
     PageHeaderComponent,
   ],
   template: `
-    <div class="page">
+    <section class="page">
       <app-page-header
         title="Modelos de inspeção"
         subtitle="Checklists configuráveis e versionados."
@@ -59,60 +59,63 @@ import {
         </div>
       </app-page-header>
 
-      <div class="filters">
-        <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Categoria</mat-label>
-          <input
-            matInput
-            [ngModel]="categoryInput()"
-            (ngModelChange)="onCategoryChange($event)"
-            placeholder="Ex.: Extintores"
-          />
-        </mat-form-field>
+      <div class="catalog-card">
+        <div class="filters" aria-label="Filtros de modelos">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Categoria</mat-label>
+            <input
+              matInput
+              [ngModel]="categoryInput()"
+              (ngModelChange)="onCategoryChange($event)"
+              placeholder="Ex.: Extintores"
+            />
+          </mat-form-field>
 
-        <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Situação</mat-label>
-          <mat-select [ngModel]="statusInput()" (ngModelChange)="onStatusChange($event)">
-            <mat-option [value]="null">Todas</mat-option>
-            @for (option of statusChoices; track option.value) {
-              <mat-option [value]="option.value">{{ option.label }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Situação</mat-label>
+            <mat-select [ngModel]="statusInput()" (ngModelChange)="onStatusChange($event)">
+              <mat-option [value]="null">Todas</mat-option>
+              @for (option of statusChoices; track option.value) {
+                <mat-option [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <app-data-table
+          [columns]="columns"
+          [data]="data()"
+          [loading]="loading()"
+          [error]="error()"
+          [activeFilters]="activeFilters()"
+          [sort]="sort()"
+          ariaLabel="Modelos de inspeção"
+          emptyIcon="fact_check"
+          emptyTitle="Nenhum modelo encontrado"
+          [emptyMessage]="emptyMessage()"
+          [emptyActionLabel]="canCreate() ? 'Novo modelo' : null"
+          (pageChange)="onPageChange($event)"
+          (sortChange)="onSortChange($event)"
+          (filterChange)="onFilterChange($event)"
+          (emptyAction)="createNew()"
+          (retry)="load()"
+        />
       </div>
-
-      <app-data-table
-        [columns]="columns"
-        [data]="data()"
-        [loading]="loading()"
-        [error]="error()"
-        [activeFilters]="activeFilters()"
-        [sort]="sort()"
-        ariaLabel="Modelos de inspeção"
-        emptyIcon="fact_check"
-        emptyTitle="Nenhum modelo encontrado"
-        [emptyMessage]="emptyMessage()"
-        [emptyActionLabel]="canCreate() ? 'Novo modelo' : null"
-        (pageChange)="onPageChange($event)"
-        (sortChange)="onSortChange($event)"
-        (filterChange)="onFilterChange($event)"
-        (emptyAction)="createNew()"
-        (retry)="load()"
-      />
-    </div>
+    </section>
   `,
   styles: `
     :host {
       display: block;
+      min-width: 0;
     }
 
     .page {
       display: flex;
       flex-direction: column;
       gap: 1rem;
-      max-width: 76rem;
-      margin: 0 auto;
-      padding: 1.5rem;
+      min-width: 0;
     }
 
     .actions {
@@ -125,11 +128,11 @@ import {
       display: flex;
       flex-wrap: wrap;
       gap: 0.75rem;
-      max-width: 32rem;
     }
 
     .filters mat-form-field {
-      flex: 1 1 12rem;
+      flex: 1 1 14rem;
+      max-width: 22rem;
     }
   `,
 })
@@ -163,6 +166,20 @@ export class TemplatesListComponent {
       emptyText: 'Nenhuma publicada',
     },
     { field: 'updatedAt', label: 'Atualizado em', type: 'date', sortable: true },
+    {
+      field: 'preview',
+      label: 'Prévia',
+      type: 'link',
+      link: (row) => ['/inspection-templates', row.id, 'preview'],
+      format: () => 'Ver prévia',
+    },
+    {
+      field: 'versions',
+      label: 'Versões',
+      type: 'link',
+      link: (row) => ['/inspection-templates', row.id, 'versions'],
+      format: () => 'Ver versões',
+    },
   ];
 
   protected readonly loading = signal(false);

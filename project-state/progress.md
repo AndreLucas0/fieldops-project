@@ -1,6 +1,13 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-21 (SYNC-EVIDENCE-LINK — achados 2, 3 e 5 do offline-first resolvidos)
+Last updated: 2026-11-04 — recuperação integrada, PR #296.
+
+Estado mais recente: [recovery-validation-20261104.md](recovery-validation-20261104.md).
+Preservação inicial: [recovery-20261103.md](recovery-20261103.md).
+As entradas históricas abaixo não substituem essa revalidação. Web: 310 testes
+e build aprovados; mobile: 444 testes, tipos e lint sem erros; backend: 52
+unitários. CI completa e merge ainda em validação; não registrar conclusão
+global nem encerrar pendências de produto por associação com este PR.
 
 ## Current State
 

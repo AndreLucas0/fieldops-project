@@ -6,9 +6,14 @@ import { ErrorState, LoadingSpinner, ProgressBar } from '@/components';
 import { Button, colors, Feedback, Panel, Screen, spacing, Text } from '@/design-system';
 import { BLOCKER_LABELS, evaluateCompletion } from '@/features/checklist/completion';
 import { captureLocation, describeAccuracy } from '@/features/inspections/location';
+import {
+  queueInspectionTransition,
+  settleQueuedOperation,
+} from '@/features/inspections/inspection-outbox';
+import { withPendingEvidences } from '@/features/inspections/pending-overlay';
 import { useEvidences } from '@/features/inspections/use-evidences';
 import { useInspectionDetail } from '@/features/inspections/use-inspection-detail';
-import { toApiError, type GeoLocation, type Inspection, type SubmitInspectionRequest } from '@/models';
+import { toApiError, type GeoLocation } from '@/models';
 import { apiClient, isOnline, syncPending } from '@/services';
 
 /**
@@ -22,7 +27,11 @@ export default function SummaryScreen() {
   const { inspectionId } = useLocalSearchParams<{ inspectionId: string }>();
 
   const { inspection, loading, error, reload } = useInspectionDetail(inspectionId);
-  const { evidences, loading: loadingEvidences } = useEvidences(inspectionId);
+  const {
+    evidences,
+    pending: pendingEvidences,
+    loading: loadingEvidences,
+  } = useEvidences(inspectionId);
 
   const [submitting, setSubmitting] = useState(false);
   const [locationNotice, setLocationNotice] = useState<string | null>(null);
@@ -77,7 +86,8 @@ export default function SummaryScreen() {
   const summary = evaluateCompletion(
     detail.items ?? [],
     detail.responses ?? [],
-    evidences,
+    // Fotos ainda no aparelho contam: subirão antes da conclusão (sync-service).
+    withPendingEvidences(evidences, pendingEvidences, detail.responses ?? []),
     detail.nonConformities ?? [],
   );
 
@@ -95,20 +105,6 @@ export default function SummaryScreen() {
     setFailure(null);
 
     try {
-      const online = await isOnline();
-      if (!online) {
-        setFailure('Sem conexão com a internet. Conecte-se e tente novamente.');
-        setSubmitting(false);
-        return;
-      }
-
-      const syncResult = await syncPending(apiClient, detail.id);
-      if (syncResult.failed > 0) {
-        setFailure('Falha ao sincronizar respostas pendentes. Tente novamente.');
-        setSubmitting(false);
-        return;
-      }
-
       const outcome = await captureLocation();
       let location: GeoLocation | null = null;
 
@@ -124,12 +120,19 @@ export default function SummaryScreen() {
         );
       }
 
-      const body: SubmitInspectionRequest = {
+      // Offline-first: a conclusão entra no outbox depois das respostas já
+      // gravadas, então o push as envia antes dela, na mesma ordem.
+      const operationId = await queueInspectionTransition(detail.id, {
+        status: 'SUBMITTED',
         completedAtDevice: new Date().toISOString(),
-        ...(location ? { location } : {}),
-      };
+        location,
+      });
 
-      await apiClient.post<Inspection>(`/inspections/${detail.id}/submit`, body);
+      const result = await settleQueuedOperation(apiClient, detail.id, operationId);
+      if (result.state === 'rejected') {
+        setFailure(result.message);
+        return;
+      }
 
       router.replace({
         pathname: '/inspections/[inspectionId]',

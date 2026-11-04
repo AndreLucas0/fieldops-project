@@ -270,15 +270,17 @@ Fonte: `arquitetura.md` §11.14.
 
 | Método | URL | Objetivo | Quem escreve | Quem lê |
 |---|---|---|---|---|
-| GET/POST/PUT | `/clients`, `/clients/{id}` | CRUD de cliente | ADMIN | ADMIN, SUPERVISOR |
+| GET/POST/PUT | `/clients`, `/clients/{id}` | CRUD de cliente | ADMIN | ADMIN, SUPERVISOR; TECHNICIAN só `GET /clients/{id}` no escopo¹ |
 | PATCH | `/clients/{id}/status` | Inativar/reativar cliente | ADMIN | — |
 | GET | `/clients/{clientId}/sites` | Locais de um cliente (combo encadeado) | — | ADMIN, SUPERVISOR |
-| GET/POST/PUT | `/sites`, `/sites/{id}` | CRUD de local | ADMIN | ADMIN, SUPERVISOR |
+| GET/POST/PUT | `/sites`, `/sites/{id}` | CRUD de local | ADMIN | ADMIN, SUPERVISOR; TECHNICIAN só `GET /sites/{id}` no escopo¹ |
 | PATCH | `/sites/{id}/status` | Inativar/reativar local | ADMIN | — |
 | GET | `/sites/{siteId}/equipment` | Equipamentos de um local (combo encadeado) | — | ADMIN, SUPERVISOR |
-| GET/POST/PUT | `/equipment`, `/equipment/{id}` | CRUD de equipamento | ADMIN **e** SUPERVISOR | ADMIN, SUPERVISOR |
+| GET/POST/PUT | `/equipment`, `/equipment/{id}` | CRUD de equipamento | ADMIN **e** SUPERVISOR | ADMIN, SUPERVISOR; TECHNICIAN só `GET /equipment/{id}` no escopo¹ |
 | GET | `/equipment/by-qr/{qrCode}` | Buscar equipamento pelo código QR | — | ADMIN, SUPERVISOR, TECHNICIAN |
 | PATCH | `/equipment/{id}/status` | Inativar/reativar/descomissionar | ADMIN **e** SUPERVISOR | — |
+
+¹ **Escopo do técnico (2026-10-20, RN-004):** o técnico lê um cliente, local ou equipamento pelo id somente quando existe inspeção atribuída a ele, em qualquer estado, que referencia aquele registro; caso contrário `403`. As listagens e os combos encadeados continuam exclusivos de ADMIN/SUPERVISOR. Motivo: `aplicativo-mobile.md` exige exibir cliente, local e equipamento na lista e no detalhe, e `InspectionDetail` só traz os ids. Ver `project-state/decisions.md` [2026-10-20].
 
 **Regras aplicadas:** RN-009 (todo local pertence a um cliente) · RN-010 (todo equipamento pertence a um local no MVP) · RN-011 (QR Code único) · RN-012 (equipamento inativo não pode ser usado em nova inspeção) · RN-013 (inativação lógica, não exclusão física) · RN-014 (local compatível com equipamento). **Imutabilidade pós-criação:** `clientId` de um `Site` e `siteId`/`qrCode` de um `Equipment` **não** aparecem nos DTOs de atualização (`openapi.yaml`, decisão de normalização #6) — realocar um local para outro cliente ou um equipamento para outro local não é uma operação suportada no MVP.
 

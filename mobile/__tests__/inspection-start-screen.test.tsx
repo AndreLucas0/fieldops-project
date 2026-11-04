@@ -1,6 +1,7 @@
 import { USER_IDS } from '@fieldops/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import * as Location from 'expo-location';
+import * as Network from 'expo-network';
 
 jest.mock('expo-router', () => require('@/test-utils/expo-router-mock'));
 
@@ -8,6 +9,7 @@ import StartInspectionScreen from '../app/(protected)/inspections/[inspectionId]
 import { resetRouterMock, routerMock, setSearchParams } from '@/test-utils/expo-router-mock';
 import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/test-utils/render';
 import { configureApi, getMockDatabase, resetApiConfig, resetMockDatabase } from '@/services';
+import { getPendingEntries } from '@/services/local-db';
 import type { InspectionStatus } from '@/models';
 
 const TECHNICIAN_ID = USER_IDS.technician;
@@ -164,5 +166,36 @@ describe('FE-M07 — Iniciar inspeção', () => {
 
     await waitFor(() => expect(screen.getByTestId('iniciar-falha')).toBeOnTheScreen());
     expect(routerMock.replace).not.toHaveBeenCalled();
+    // Recusa definitiva do servidor: a operação não fica presa no outbox.
+    expect(await getPendingEntries(id)).toHaveLength(0);
+  });
+
+  it('sem conexão, guarda o início no outbox e segue para o checklist (offline-first)', async () => {
+    const id = inspectionWith('ASSIGNED');
+    await renderStart(id);
+    asMock(Network.getNetworkStateAsync).mockResolvedValue({
+      isConnected: false,
+      isInternetReachable: false,
+    });
+
+    await fireEvent.press(screen.getByTestId('iniciar-sem-localizacao'));
+
+    await waitFor(() =>
+      expect(routerMock.replace).toHaveBeenCalledWith({
+        pathname: '/inspections/[inspectionId]/checklist',
+        params: { inspectionId: id },
+      }),
+    );
+    const pendentes = await getPendingEntries(id);
+    expect(pendentes).toEqual([
+      expect.objectContaining({ entity_type: 'INSPECTION', entity_id: id }),
+    ]);
+    expect(JSON.parse(pendentes[0]?.payload ?? '{}')).toMatchObject({
+      status: 'IN_PROGRESS',
+      startedAtDevice: expect.any(String),
+    });
+    expect(getMockDatabase().inspections.find((entry) => entry.id === id)?.status).toBe(
+      'ASSIGNED',
+    );
   });
 });

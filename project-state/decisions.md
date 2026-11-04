@@ -27,6 +27,187 @@ ACTIVE / SUPERSEDED
 
 ---
 
+### [2026-10-21] — CONFLICT-REBASE: conflito de resposta do checklist — a última edição do técnico vale
+
+Context:
+CONFLICT numa resposta trava a inspeção inteira (o servidor responde DEPENDENCY_FAILED ao resto do lote) e era
+reenviado igual para sempre. A causa observada no banco real foi a conta de versão do app (criar não incrementa).
+
+Decision (escolhida pelo dono em 2026-10-21):
+- Versão: resposta criada nasce em 0; só atualizações somam 1 (app e sobreposição local seguem isso).
+- CONFLICT de INSPECTION_RESPONSE: o app lê a versão atual no servidor, refaz em ordem a base das edições pendentes
+  do item com novo operationId e reenvia **uma vez** na mesma sincronização. Se conflitar de novo, ou se não der
+  para ler a versão, fica CONFLICT para a próxima. RN-076 continua no servidor (inspeção aprovada recusa a edição).
+
+Alternatives considered:
+- CONFLICT com "Descartar" na aba Sincronização (perderia a edição do técnico).
+- Só corrigir a conta de versão (o aparelho com entrada presa precisaria limpar os dados).
+
+Impact:
+Última gravação vence também contra edições de outro aparelho/supervisor no mesmo item — aceito para o MVP.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-10-21] — SYNC-EVIDENCE-LINK: vínculo evidência↔resposta resolvido no mobile; recusa definitiva vira REJECTED
+
+Context:
+OFFLINE-FIRST-FINDINGS-2026-10-20 itens 2, 3 e 5. O sync identifica a resposta pelo snapshotId, mas o upload de
+evidência exige o id da resposta no servidor, que o aparelho só conhece depois do push. Respostas e evidências
+recusadas de vez eram reenviadas a cada sincronização. Encontrado durante a tarefa: o backend exige a evidência no
+servidor para aceitar a conclusão (`InspectionExecutionService`, `MISSING_EVIDENCE_ON_NON_CONFORMING`), e o push
+enviava a conclusão antes do upload das fotos.
+
+Decision (escolhida pelo dono do projeto em 2026-10-21):
+- Vínculo resolvido no mobile, sem mudar a API: o outbox de EVIDENCE guarda `inspectionItemId` (snapshotId) e
+  descarta `responseId` `local-…`; no sync, depois do push, `GET /mobile/inspections/{id}` (uma vez por inspeção)
+  traduz snapshotId → id da resposta. Resposta/NC da foto ainda no outbox → a foto espera (FAILED "Aguardando…");
+  item sem resposta em lugar nenhum → sobe vinculada só à inspeção (comportamento anterior).
+- Novo status `REJECTED` no outbox: push `REJECTED` e upload 4xx (exceto 401/408/429) são definitivos. A entrada sai
+  de `getPendingEntries`/`countPendingEntries`, aparece em `getFailedEntries` e na aba Sincronização com o motivo e
+  o botão "Descartar" (`discardOutboxEntry`, que apaga também a foto). `DEPENDENCY_FAILED` segue transitório (FAILED).
+- Ordem do `syncPending`: push JSON sem conclusões → upload de evidências → push das conclusões (SUBMITTED); a
+  conclusão de inspeção com foto ainda no aparelho fica PENDING para a próxima sincronização.
+- O resumo (FE-M09) soma as fotos do outbox às evidências do servidor (`withPendingEvidences`).
+
+Alternatives considered:
+- Backend aceitar `inspectionItemSnapshotId` no upload — muda o contrato (openapi, controller, ITs).
+- `responseId` gerado no aparelho, como no `openapi.yaml` — mudança mais ampla (PUT, payload de sync, migração).
+- Descartar recusas automaticamente — o técnico perderia fotos sem perceber.
+
+Impact:
+Divergência que permanece registrada: `PUT /inspections/{id}/responses/{snapshotId}` usa snapshotId, não o id gerado
+no dispositivo que `api-rest.md`/`openapi.yaml` descrevem. CONFLICT continua sendo reenviado (sem UI de resolução).
+
+Status:
+ACTIVE — complementa (não substitui) a decisão de 2026-10-20 sobre transições: `settleQueuedOperation` agora lê a
+entrada por id (`getOutboxEntry`) e também trata `REJECTED` como recusa.
+
+---
+
+### [2026-10-20] — Transições de inspeção e NC no outbox: sem baseVersion; recusa definitiva sai do outbox
+
+Context:
+O backend recusa como conflito `baseVersion` diferente da versão atual. Iniciar e concluir offline em sequência
+mudariam a versão da inspeção entre as duas operações; NC criada no aparelho não tem versão conhecida.
+
+Decision:
+- `INSPECTION` e `NON_CONFORMITY` vão no push com `baseVersion: null` (`VERSIONLESS_ENTITY_TYPES`, `sync-service.ts`).
+  Transições já são validadas pela máquina de estados; edição de NC (PEND-06, fora do MVP) fica com a última gravação.
+- Telas de iniciar/concluir/NC gravam no outbox e tentam sincronizar (`settleQueuedOperation`): recusa do servidor
+  (FAILED/CONFLICT com mensagem) remove a operação do outbox e aparece na tela; falha de rede deixa pendente e a tela segue.
+- A mensagem de recusa do push passa a ser gravada em `last_error`.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-10-20] — SYNC-OUTBOX-EVIDENCE: evidência entra no outbox e sobe pelo endpoint multipart existente
+
+Context:
+Contrato §10.8/§11.3 e RN-047: capturar evidência é operação offline e o arquivo fica no aparelho até o upload
+ser confirmado. A pendência dizia "requer backend" (entityType EVIDENCE no sync push).
+
+Decision:
+- Sem mudança no backend: a entrada EVIDENCE do outbox guarda `localUri` + metadados; o sync refaz o
+  `POST /inspections/{id}/evidence` multipart com a mesma `idempotencyKey` (= id da entrada).
+- Foto copiada para `Paths.document/evidence-pending/` (o cache pode ser limpo pelo sistema); apagada só após sucesso.
+- Ordem: push JSON primeiro, evidências depois (vínculo com resposta/NC já existe no servidor).
+- 409 `EVIDENCE_ALREADY_PROCESSED` = sucesso (o backend responde assim a chave repetida, não 200).
+- A prévia não mostra mais rejeição do servidor; ela aparece na aba Sincronização.
+
+Reason:
+Endpoint já idempotente por chave (RN-068); multipart não cabe no push JSON. Menor mudança que cumpre a spec.
+
+Alternatives considered:
+- `entityType: EVIDENCE` no `/mobile/sync/push` com arquivo em base64: payload enorme e mudança de contrato.
+
+Status:
+ACTIVE
+
+---
+
+### [2026-10-20] — TECH-PLACE-READ: técnico lê cliente/local/equipamento por id, só no próprio escopo
+
+Context:
+Contra a API real, o detalhe e a lista de inspeções do mobile mostravam 403 em
+`GET /clients/{id}`, `/sites/{id}` e `/equipment/{id}` para o técnico. Divergência
+documental: `aplicativo-mobile.md` exige exibir cliente, local e equipamento ao técnico,
+mas `contrato-backend-frontend.md` §3.4 restringia a leitura a ADMIN/SUPERVISOR e
+`InspectionDetail` só traz os ids. O mock não checava perfil e escondia o problema.
+
+Decision (escolha do dono do projeto entre duas opções apresentadas):
+- Os três `GET /{id}` aceitam TECHNICIAN; o service devolve 403 (`AccessDeniedException`)
+  se não existir inspeção atribuída ao técnico que referencie aquele registro
+  (`InspectionRepository.existsByTechnicianIdAnd{Client,Site,Equipment}Id`), em qualquer estado.
+- Equipamento: escopo pelo `equipment_id` da inspeção, não pelo local (mais estrito que o
+  `by-qr`, que usa o local e só estados não terminais).
+- Listagens e combos encadeados continuam só ADMIN/SUPERVISOR.
+
+Reason:
+RN-004 (técnico consulta só o que é das inspeções atribuídas a ele). Mudança mínima: o mobile
+já chamava esses endpoints e não precisou mudar.
+
+Alternatives considered:
+- Embutir resumo (nome do cliente, local com endereço, equipamento) em `/mobile/inspections`
+  e `/mobile/inspections/{id}`: uma requisição só e melhor para offline, mas exige mudar
+  contrato, `shared/`, backend e mobile. Não escolhida; continua sendo a evolução natural se
+  o N+1 de requisições pesar.
+
+Impact:
+`contrato-backend-frontend.md` §3.4 e `openapi.yaml` atualizados. O mobile continua fazendo
+uma requisição por cliente/local/equipamento (pendência "nomes buscados um a um" permanece).
+
+Status:
+ACTIVE
+
+---
+
+### [2026-10-20] — CORS-CONFIG: backend aceita só origens de `CORS_ALLOWED_ORIGINS`
+
+Context:
+O preview web do mobile (`expo start --web`, origem `http://localhost:8081`) era
+bloqueado pelo navegador ao chamar a API real (8090): o backend não tinha CORS.
+O proxy do `ng serve` (INT-011) resolvia só o web, e só em dev.
+
+Decision:
+- `SecurityConfig` habilita `.cors()` com um `CorsConfigurationSource` alimentado por
+  `CorsProperties` (`fieldops.security.cors.allowed-origins` ← `CORS_ALLOWED_ORIGINS`,
+  lista separada por vírgula). Padrão de dev: `http://localhost:4200,http://localhost:8081`.
+- Métodos GET/POST/PUT/PATCH/DELETE/OPTIONS; cabeçalhos `Authorization`, `Content-Type`,
+  `Accept`; **sem** `allowCredentials` (autenticação é Bearer, não cookie); `maxAge` 3600 s.
+- Origem fora da lista: preflight recebe 403 e nenhum `Access-Control-Allow-Origin`.
+
+Reason:
+Cumpre `arquitetura.md` §11.10 ("CORS somente para origens autorizadas") e
+`plano-implementacao-backend.md` §5.5, que já previam exatamente essa variável.
+
+Alternatives considered:
+- Proxy no Metro/Expo: não existe mecanismo equivalente ao do `ng serve` sem config extra, e
+  não resolve produção.
+- `allowedOrigins("*")`: viola §11.10.
+
+Impact:
+O proxy do web (INT-011) continua funcionando e não é mais obrigatório. Em produção, defina
+`CORS_ALLOWED_ORIGINS` com a origem publicada do web. App nativo não é afetado (CORS é só do navegador).
+Supersede parcialmente a alternativa descartada "CORS no backend" da decisão INT-011 de 2026-10-05.
+
+Status:
+ACTIVE
+
+Update (2026-10-20, a pedido do dono do projeto — "libere o CORS para qualquer ip"):
+- No perfil `local`, `fieldops.security.cors.allowed-origins` passa a `${CORS_ALLOWED_ORIGINS:*}`
+  (`application-local.yml`): qualquer origem é aceita em desenvolvimento, inclusive IPs da rede.
+- `SecurityConfig` usa `setAllowedOriginPatterns` (aceita `*` e padrões como `http://192.168.*:*`;
+  ecoa a origem em vez de devolver `*`). Sem credenciais, então `*` não expõe cookies.
+- Fora do perfil local continua a lista restrita de `application.yml` (§11.10), coberta por
+  `RestrictedCorsConfigurationIT`. Antes de qualquer deploy, não ative o perfil `local`.
+
+---
+
 ### [2026-10-13] — Mobile em dev usa `.env` com IP da máquina; DB_PORT=5433 (não 5432)
 
 Context:

@@ -11,9 +11,13 @@ import {
 } from '@/components';
 import { Button, Feedback, Panel, Screen, spacing, Text } from '@/design-system';
 import { captureLocation, describeAccuracy } from '@/features/inspections/location';
+import {
+  queueInspectionTransition,
+  settleQueuedOperation,
+} from '@/features/inspections/inspection-outbox';
 import { useInspectionDetail } from '@/features/inspections/use-inspection-detail';
 import { apiClient } from '@/services';
-import { toApiError, type GeoLocation, type Inspection, type StartInspectionRequest } from '@/models';
+import { toApiError, type GeoLocation } from '@/models';
 
 /**
  * FE-M07 — Iniciar inspeção.
@@ -91,12 +95,18 @@ export default function StartInspectionScreen() {
         }
       }
 
-      const body: StartInspectionRequest = {
+      // Offline-first: o início é gravado no aparelho e enviado na sincronização.
+      const operationId = await queueInspectionTransition(detail.id, {
+        status: 'IN_PROGRESS',
         startedAtDevice: new Date().toISOString(),
-        ...(captured ? { location: captured } : {}),
-      };
+        location: captured,
+      });
 
-      await apiClient.post<Inspection>(`/inspections/${detail.id}/start`, body);
+      const outcome = await settleQueuedOperation(apiClient, detail.id, operationId);
+      if (outcome.state === 'rejected') {
+        setFailure(outcome.message);
+        return;
+      }
 
       router.replace({
         pathname: '/inspections/[inspectionId]/checklist',

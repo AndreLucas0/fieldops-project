@@ -56,13 +56,29 @@ cópias isoladas antes da aplicação. Sem npm audit fix, force ou legacy-peer-d
   Native 0.86.2 preservados. 64 alertas → 63, zero críticos; 12 altos restantes.
   Parte das sugestões exige mudança incompatível de SDK; não aplicar downgrade
   para Expo 51 nem migração automática para Expo 58.
-- Última validação local: web 310 testes/38 arquivos e build aprovado; mobile
+- Última validação local: web 314 testes/38 arquivos e build aprovado; mobile
   444 testes/37 arquivos, typecheck e lint sem erros; backend 52 unitários.
 - Avisos mantidos: quatro diretivas eslint históricas sem uso no mobile e
   CSS de detalhe/revisão acima de 4 kB, mas abaixo do limite de erro de 8 kB.
   Budgets não foram aumentados.
-- Integração local bloqueada por Docker ausente; a validação completa usa o
-  runner Linux do PR, com Docker. Resultado final ainda será registrado.
+- Integração local bloqueada por Docker ausente; CI 3 e CI 5 aprovados com
+  Docker: 52 unitários e 304 integrações backend, web e mobile verdes.
+  Execução CI 5: https://github.com/AndreLucas0/fieldops-project/actions/runs/41857115164
+- Retomada: commits 3325579/fa2f7b3/ee30605 preservam precisão integral do
+  timestamp e usam ConfirmDialogService. Cancelar/Escape não decide e devolve
+  foco a Aprovar; confirmação pendente impede duplicação sem desabilitar o
+  acionador. Reproduzido por teste antes da correção e confirmado no navegador.
+- Revisão 320/768/1440 px sem overflow horizontal na revisão; listas em 320 px
+  também verificadas na execução anterior. Fotos mock não são URLs reais;
+  erro é visível. Homologação com fotos reais permanece separada.
+- Exportação Expo web encontrou ausência de suporte WASM no Metro existente.
+  Adicionado suporte de asset e isolamento COOP/COEP no servidor de preview,
+  conforme documentação Expo SQLite, preservando aliases/pastas compartilhadas.
+  Exportações web e Android/Hermes aprovadas; não equivale a APK/IPA assinado.
+  Hospedagem web deve emitir os mesmos headers; nenhum deploy foi realizado.
+- PR #296 é o registro de integração e checks atuais. As evidências de CI acima
+  correspondem aos commits indicados nas execuções, sem presumir validação de
+  alterações futuras. Relatório consolidado externo registra os SHAs finais.
 
 ## Dependências de decisão ou recurso externo
 

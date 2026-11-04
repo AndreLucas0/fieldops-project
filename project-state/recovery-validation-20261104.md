@@ -11,10 +11,15 @@ Esta entrada supera os estados provisórios de `recovery-20261103.md`.
 - PRs #271/#278 e branch-Joao continuam preservados: não substituir contratos
   e migrações atuais pelo conjunto antigo. Regras de escrita relevantes exigem
   decisão específica; não fazer recuperação indiscriminada desse backend.
-- Original em develop `80d4820`, AGENTS.md, bundles e dependências preservados.
+- Estado inicial original: develop `80d4820`; AGENTS.md e bundles preservados.
   A junction antiga foi movida, sem exclusão de seu destino, para
   `outputs/web-node_modules-preserved-link`, fora da worktree. Esta worktree
   agora tem sua própria instalação de dependências.
+- PR #296 integrado em develop `4851892`; promoção #297 integrada em main
+  `8e278c2`, após checks completos aprovados (CI 6 e execução 41858582825).
+  Árvores idênticas verificadas. Original atualizado por fast-forward, sem
+  checkout/reset; main local também avançou sem force. Dependências locais
+  reinstaladas pelos lockfiles e build web no caminho original aprovado.
 
 ## Correções e funcionalidades
 
@@ -56,6 +61,14 @@ cópias isoladas antes da aplicação. Sem npm audit fix, force ou legacy-peer-d
   Native 0.86.2 preservados. 64 alertas → 63, zero críticos; 12 altos restantes.
   Parte das sugestões exige mudança incompatível de SDK; não aplicar downgrade
   para Expo 51 nem migração automática para Expo 58.
+- Avaliação complementar isolada encontrou patches transitivos compatíveis
+  para xmldom, brace-expansion, compression, js-yaml, node-forge e source-map-js.
+  Apenas patches dentro dos intervalos existentes, sem mudar package.json,
+  Expo, Router, React Native ou peers. Resultado: 57 alertas, sendo 6 altos,
+  45 moderados e 6 baixos; zero críticos. Substitui a contagem anterior de 63.
+  Restantes acompanhados na issue #298: CLI/Router/query-string/decode-uri/
+  zod e image-size. Metro 0.84.4 usa image-size ^1.0.2; major corrigida fora
+  desse intervalo não será forçada. Decisão de baseline SDK permanece aberta.
 - Última validação local: web 314 testes/38 arquivos e build aprovado; mobile
   444 testes/37 arquivos, typecheck e lint sem erros; backend 52 unitários.
 - Avisos mantidos: quatro diretivas eslint históricas sem uso no mobile e
@@ -81,6 +94,12 @@ cópias isoladas antes da aplicação. Sem npm audit fix, force ou legacy-peer-d
   alterações futuras. Relatório consolidado externo registra os SHAs finais.
 
 ## Dependências de decisão ou recurso externo
+
+Quadro conciliado: #97, #98, #103–106, #174–175, #213–214, #218 e #285–287
+encerradas e em Done, atribuídas a LucasIanovski, com referências aos merges
+e evidências. Comentários distinguem implementação inicial dos colegas das
+correções/entrega integrada. #281/#282/#284/#289/#290 e #298 permanecem abertas;
+não declarar histórias abrangentes concluídas por encerrar tarefas parciais.
 
 - Figma sem link/chave localizado; Lovable acessível e consultado. Não afirmar
   validação Figma ou homologação em todos os aparelhos físicos.

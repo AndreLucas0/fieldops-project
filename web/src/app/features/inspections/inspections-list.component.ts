@@ -224,8 +224,8 @@ function formatDay(day: string): string {
 
   </section>
   `,
- 
-styles: `
+
+  styles: `
   :host {
     display: block;
     min-width: 0;
@@ -349,6 +349,10 @@ export class InspectionsListComponent {
   /** Escrita em inspeções: ADMIN e SUPERVISOR (`RESOURCE_WRITE_ROLES`). */
   protected readonly canManage = computed(() => canWrite('inspections', this.auth.role()));
 
+  protected readonly isSupervisor = computed(
+    () => this.auth.role() === 'SUPERVISOR',
+  );
+
   protected readonly technicians = signal<User[]>([]);
   protected readonly clientOptions = signal<Client[]>([]);
 
@@ -369,92 +373,107 @@ export class InspectionsListComponent {
     return sort && typeof sort === 'object' && !Array.isArray(sort) ? (sort as Sort) : null;
   });
 
-  
 
-protected readonly columns = computed<readonly TableColumn<Inspection>[]>(() => {
-  const technicianNames = new Map(
-    this.technicians().map((user) => [user.id, user.name])
-  );
 
-  const clientNames = new Map(
-    this.clientOptions().map((client) => [client.id, client.name])
-  );
+  protected readonly columns = computed<readonly TableColumn<Inspection>[]>(() => {
+    const technicianNames = new Map(
+      this.technicians().map((user) => [user.id, user.name])
+    );
 
-  return [
-    {
-      field: 'title',
-      label: 'Inspeção',
-      type: 'link',
-      sortable: true,
-      width: '18rem',
-      emptyText: 'Sem título',
-      link: (row) => ['/inspections', row.id],
-    },
-    {
-      field: 'clientId',
-      label: 'Cliente / local',
-      width: '13rem',
-      format: (value) =>
-        clientNames.get(String(value)) ?? '—',
-    },
-    {
-      field: 'technicianId',
-      label: 'Técnico',
-      width: '12rem',
-      format: (value) =>
-        technicianNames.get(String(value)) ?? '—',
-    },
-    {
-      field: 'priority',
-      label: 'Prioridade',
-      type: 'badge',
-      badgeContext: 'priority',
-      align: 'center',
-      width: '9rem',
-    },
-    {
-      field: 'scheduledFor',
-      label: 'Prevista',
-      type: 'date',
-      sortable: true,
-      width: '12rem',
-    },
-    {
-      field: 'status',
-      label: 'Estado',
-      type: 'badge',
-      badgeContext: 'inspection',
-      align: 'center',
-      width: '12rem',
-    },
-    {
-      field: 'updatedAt',
-      label: 'Atualização',
-      type: 'date',
-      sortable: true,
-      width: '12rem',
-    },
-    {
-      field: 'actions',
-      label: 'Ações',
-      type: 'actions',
-      actionsInline: true,
-      width: '9rem',
-      actions: this.canManage()
-        ? [
-            {
-              id: 'cancel',
-              label: 'Cancelar',
-              icon: 'cancel',
-              danger: true,
-              visible: (row: Inspection) =>
-                !NOT_CANCELABLE.has(row.status),
-            },
-          ]
-        : [],
-    },
-  ];
-});
+    const clientNames = new Map(
+      this.clientOptions().map((client) => [client.id, client.name])
+    );
+
+    return [
+      {
+        field: 'title',
+        label: 'Inspeção',
+        type: 'link',
+        sortable: true,
+        width: '18rem',
+        emptyText: 'Sem título',
+        link: (row) => ['/inspections', row.id],
+      },
+      {
+        field: 'clientId',
+        label: 'Cliente / local',
+        width: '13rem',
+        format: (value) =>
+          clientNames.get(String(value)) ?? '—',
+      },
+      {
+        field: 'technicianId',
+        label: 'Técnico',
+        width: '12rem',
+        format: (value) =>
+          technicianNames.get(String(value)) ?? '—',
+      },
+      {
+        field: 'priority',
+        label: 'Prioridade',
+        type: 'badge',
+        badgeContext: 'priority',
+        align: 'center',
+        width: '9rem',
+      },
+      {
+        field: 'scheduledFor',
+        label: 'Prevista',
+        type: 'date',
+        sortable: true,
+        width: '12rem',
+      },
+      {
+        field: 'status',
+        label: 'Estado',
+        type: 'badge',
+        badgeContext: 'inspection',
+        align: 'center',
+        width: '12rem',
+      },
+      {
+        field: 'updatedAt',
+        label: 'Atualização',
+        type: 'date',
+        sortable: true,
+        width: '12rem',
+      },
+      {
+        field: 'actions',
+        label: 'Ações',
+        type: 'actions',
+        actionsInline: true,
+        width: '12rem',
+        actions: [
+          ...(this.isSupervisor()
+            ? [
+              {
+                id: 'review',
+                label: 'Continuar revisão',
+                icon: 'rate_review',
+                visible: (row: Inspection) =>
+                  row.status === 'SUBMITTED' ||
+                  row.status === 'UNDER_REVIEW',
+              },
+            ]
+            : []),
+
+          ...(this.canManage()
+            ? [
+              {
+                id: 'cancel',
+                label: 'Cancelar',
+                icon: 'cancel',
+                danger: true,
+                visible: (row: Inspection) =>
+                  !NOT_CANCELABLE.has(row.status),
+              },
+            ]
+            : []),
+        ],
+      },
+    ];
+  });
 
 
 
@@ -584,19 +603,37 @@ protected readonly columns = computed<readonly TableColumn<Inspection>[]>(() => 
   }
 
   protected onRowAction(event: RowActionEvent<Inspection>): void {
-    if (!this.canManage() || event.action !== 'cancel') return;
-    this.dialog
-      .open(InspectionCancelDialogComponent, {
-        data: { inspection: event.row },
-        width: '32rem',
-        maxWidth: '95vw',
-        autoFocus: 'first-tabbable',
-        restoreFocus: true,
-      })
-      .afterClosed()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((cancelled: boolean | undefined) => {
-        if (cancelled) this.load();
-      });
+  if (event.action === 'review') {
+    if (
+      !this.isSupervisor() ||
+      !['SUBMITTED', 'UNDER_REVIEW'].includes(event.row.status)
+    ) {
+      return;
+    }
+
+    void this.router.navigate([
+      '/inspections',
+      event.row.id,
+      'review',
+    ]);
+
+    return;
   }
+
+  if (!this.canManage() || event.action !== 'cancel') return;
+
+  this.dialog
+    .open(InspectionCancelDialogComponent, {
+      data: { inspection: event.row },
+      width: '32rem',
+      maxWidth: '95vw',
+      autoFocus: 'first-tabbable',
+      restoreFocus: true,
+    })
+    .afterClosed()
+    .pipe(takeUntilDestroyed(this.destroyRef))
+    .subscribe((cancelled: boolean | undefined) => {
+      if (cancelled) this.load();
+    });
+}
 }

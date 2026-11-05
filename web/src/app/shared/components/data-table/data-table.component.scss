@@ -146,6 +146,15 @@ td a:focus-visible {
   margin-top: 0.75rem;
 }
 
+tr.fo-table__row--clickable {
+  cursor: pointer;
+}
+
+tr.fo-table__row--clickable:focus-visible {
+  outline: 2px solid #ffad0a;
+  outline-offset: -2px;
+}
+
 /* Personalização exclusiva da listagem de inspeções */
 :host-context(.inspection-list-page) {
   .fo-table {
@@ -214,5 +223,25 @@ td a:focus-visible {
 
   .fo-table__inline-actions button:hover {
     background: rgba(255, 100, 120, 0.08);
+  }
+}
+
+:host-context(.template-list-page) {
+  // Destaque ao passar o cursor sobre uma linha clicável.
+  tr.mat-mdc-row {
+    transition: background 150ms ease;
+  }
+
+  tr.mat-mdc-row:hover {
+    background: #202a32;
+  }
+
+  // Divisórias entre as linhas.
+  td {
+    border-bottom: 1px solid #303a43;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
   }
 }

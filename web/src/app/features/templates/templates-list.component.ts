@@ -44,7 +44,7 @@ import {
     PageHeaderComponent,
   ],
   template: `
-    <section class="page">
+    <section class="page template-list-page">
   <app-page-header
     title="Modelos de inspeção"
     subtitle="Checklists configuráveis e versionados."
@@ -90,6 +90,7 @@ import {
     <app-data-table
       [columns]="columns"
       [data]="data()"
+      [rowLink]="templateRowLink"
       [loading]="loading()"
       [error]="error()"
       [activeFilters]="activeFilters()"
@@ -151,8 +152,6 @@ export class TemplatesListComponent {
       field: 'title',
       label: 'Título',
       sortable: true,
-      type: 'link',
-      link: (row) => ['/inspection-templates', row.id, 'edit'],
     },
     { field: 'category', label: 'Categoria', sortable: true },
     {
@@ -169,6 +168,12 @@ export class TemplatesListComponent {
       emptyText: 'Nenhuma publicada',
     },
     { field: 'updatedAt', label: 'Atualizado em', type: 'date', sortable: true },
+  ];
+
+  protected readonly templateRowLink = (row: InspectionTemplate) => [
+    '/inspection-templates',
+    row.id,
+    'edit',
   ];
 
   protected readonly loading = signal(false);

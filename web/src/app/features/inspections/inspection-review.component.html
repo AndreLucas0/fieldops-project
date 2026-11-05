@@ -211,7 +211,7 @@
                   <button
                     type="button"
                     class="action-button reject-button"
-                    [disabled]="actionLoading()"
+                    [disabled]="actionLoading() || !decisionComment().trim()"
                     (click)="reject()"
                   >
                     {{ actionLoading() ? 'Processando...' : 'Reprovar' }}

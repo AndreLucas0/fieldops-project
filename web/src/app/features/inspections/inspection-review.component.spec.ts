@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
-import { Subject, of } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { AuthStore } from '../../core/auth/auth.store';
 import { InspectionsService } from '../../core/services/resources';
 import { InspectionReviewComponent } from './inspection-review.component';
@@ -38,6 +38,34 @@ describe('Revisão — RN-079/080/082', () => {
     return { service, component, fixture, confirm };
   }
   afterEach(() => vi.restoreAllMocks());
+
+  it('recarrega após 409 e não repete decisão sobre estado antigo', () => {
+    const { service, component } = setup('UNDER_REVIEW');
+    service.get.mockReturnValueOnce(of({ id: 'i1', status: 'APPROVED' }));
+    component.approve();
+    service.approve.mock.results[0].value.error({ status: 409 });
+    expect(service.get).toHaveBeenCalledTimes(2);
+    component.approve();
+    expect(service.approve).toHaveBeenCalledTimes(1);
+  });
+
+  it('bloqueia decisão se a atualização após conflito também falhar', () => {
+    const { service, component } = setup('UNDER_REVIEW');
+    service.get.mockReturnValueOnce(throwError(() => ({ status: 503 })));
+    component.approve();
+    service.approve.mock.results[0].value.error({ status: 409 });
+    component.approve();
+    expect(service.approve).toHaveBeenCalledTimes(1);
+  });
+
+  it('desabilita reprovação sem motivo preenchido', () => {
+    const { fixture } = setup('UNDER_REVIEW');
+    fixture.detectChanges();
+    const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
+    expect(buttons.find((button) => button.textContent?.trim() === 'Reprovar')?.disabled).toBe(
+      true,
+    );
+  });
 
   it('mantém o acionador habilitado para restaurar foco e impede confirmações duplicadas', () => {
     const { service, component, fixture, confirm } = setup('UNDER_REVIEW');

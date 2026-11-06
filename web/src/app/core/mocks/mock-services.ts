@@ -21,7 +21,7 @@ import {
   updateEntity,
   withinRange,
   dashboardSummary as summaryOf,
-  inspectionsByStatus as byStatusOf,    
+  inspectionsByStatus as byStatusOf,
   nonConformitiesBySeverity as bySeverityOf,
   type MockStore,
 } from '@fieldops/shared';
@@ -362,6 +362,29 @@ export class MockEquipmentService extends MockBase implements EquipmentService {
 
 @Injectable()
 export class MockTemplatesService extends MockBase implements TemplatesService {
+  create(input: Partial<InspectionTemplate>): Observable<InspectionTemplate> {
+    return this.respond(() => {
+      const timestamp = nowIso();
+
+      const template: InspectionTemplate = {
+        id: nextMockId('5500'),
+        title: input.title ?? 'Novo modelo',
+        description: input.description ?? null,
+        category: input.category ?? 'GERAL',
+        status: 'DRAFT',
+        currentVersion: null,
+        createdBy: '',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        version: 1,
+      };
+
+      insertEntity(this.db.templates, template);
+      this.db.draftSections[template.id] = [];
+
+      return template;
+    });
+  }
   list(query: PageQuery<TemplateFilters> = {}): Observable<Page<InspectionTemplate>> {
     const { category, status } = query;
     const filtered = this.db.templates.filter((template) =>

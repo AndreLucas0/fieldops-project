@@ -12,29 +12,29 @@ const ADMIN_FEATURE_ROUTES: Routes = [
         (module) => module.ClientsListComponent,
       ),
   },
-    {
-  path: 'inspections/new',
-  title: 'Nova inspeção — FieldOps',
-  loadComponent: () =>
-    import('./features/inspections/inspection-create.component').then(
-      (module) => module.InspectionCreateComponent,
-    ),
+  {
+    path: 'inspections/new',
+    title: 'Nova inspeção — FieldOps',
+    loadComponent: () =>
+      import('./features/inspections/inspection-create.component').then(
+        (module) => module.InspectionCreateComponent,
+      ),
   },
   {
-  path: 'inspections/:inspectionId/review',
-  title: 'Revisão da inspeção — FieldOps',
-  loadComponent: () =>
-    import('./features/inspections/inspection-review.component')
-      .then((m) => m.InspectionReviewComponent),
-},
+    path: 'inspections/:inspectionId/review',
+    title: 'Revisão da inspeção — FieldOps',
+    loadComponent: () =>
+      import('./features/inspections/inspection-review.component')
+        .then((m) => m.InspectionReviewComponent),
+  },
   {
-  path: 'inspections/:inspectionId',
-  title: 'Detalhes da inspeção — FieldOps',
-  loadComponent: () =>
-    import('./features/inspections/inspection-detail.component').then(
-      (module) => module.InspectionDetailComponent,
-    ),
-},
+    path: 'inspections/:inspectionId',
+    title: 'Detalhes da inspeção — FieldOps',
+    loadComponent: () =>
+      import('./features/inspections/inspection-detail.component').then(
+        (module) => module.InspectionDetailComponent,
+      ),
+  },
   {
     path: 'inspections',
     title: 'Inspeções — FieldOps',
@@ -94,6 +94,14 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/templates/templates-list.component').then(
             (module) => module.TemplatesListComponent,
+          ),
+      },
+      {
+        path: 'inspection-templates/new',
+        title: 'Novo modelo — FieldOps',
+        loadComponent: () =>
+          import('./features/templates/template-builder.component').then(
+            (module) => module.TemplateBuilderComponent,
           ),
       },
       {

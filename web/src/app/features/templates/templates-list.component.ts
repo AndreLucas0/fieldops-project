@@ -51,10 +51,15 @@ import {
     >
       <div actions class="actions">
         @if (canCreate()) {
-          <a matButton="filled" routerLink="/inspection-templates/new">
-            <mat-icon>add</mat-icon>
-            Novo modelo
-          </a>
+         <button
+  matButton="filled"
+  type="button"
+  [disabled]="loading()"
+  (click)="createNew()"
+>
+  <mat-icon>add</mat-icon>
+  Novo modelo
+</button>
         }
       </div>
     </app-page-header>
@@ -139,8 +144,8 @@ import {
   </section>
 
   `,
- 
-styles: `
+
+  styles: `
   :host {
     display: block;
     min-width: 0;
@@ -397,8 +402,9 @@ export class TemplatesListComponent {
     this.load();
   }
 
-  protected createNew(): void {
-    if (!this.canCreate()) return;
-    void this.router.navigate(['/inspection-templates/new']);
-  }
+ protected createNew(): void {
+  if (!this.canCreate() || this.loading()) return;
+
+  void this.router.navigate(['/inspection-templates/new']);
+}
 }

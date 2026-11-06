@@ -147,6 +147,13 @@ export abstract class TemplatesService {
     itemId: Uuid,
     input: Partial<TemplateItem>,
   ): Observable<TemplateItem>;
+  abstract create(
+    input: Partial<InspectionTemplate>,
+  ): Observable<InspectionTemplate>;
+
+  /*abstract publish(
+    templateId: Uuid,
+  ): Observable<InspectionTemplateVersionDetail>;*/
 }
 
 export abstract class InspectionsService {
@@ -319,6 +326,15 @@ export class HttpTemplatesService extends TemplatesService {
   updateItem(templateId: Uuid, itemId: Uuid, input: Partial<TemplateItem>) {
     return this.api.put<TemplateItem>(`/inspection-templates/${templateId}/items/${itemId}`, input);
   }
+  create(input: Partial<InspectionTemplate>) {
+    return this.api.post<InspectionTemplate>('/inspection-templates', input);
+  }
+
+  publish(templateId: Uuid) {
+    return this.api.post<InspectionTemplateVersionDetail>(
+      `/inspection-templates/${templateId}/publish`,
+    );
+  }
 }
 
 @Injectable()
@@ -329,8 +345,8 @@ export class HttpInspectionsService extends InspectionsService {
     return this.api.getPage<Inspection, InspectionFilters>('/inspections', query);
   }
   get(id: Uuid) {
-  return this.api.get<InspectionDetail>(`/inspections/${id}`);
-}
+    return this.api.get<InspectionDetail>(`/inspections/${id}`);
+  }
   history(id: Uuid, query: PageQuery = {}) {
     return this.api.getPage<AuditEvent>(`/inspections/${id}/history`, query);
   }
@@ -395,3 +411,5 @@ export const HTTP_RESOURCE_PROVIDERS = [
   { provide: NonConformitiesService, useClass: HttpNonConformitiesService },
   { provide: DashboardService, useClass: HttpDashboardService },
 ];
+
+

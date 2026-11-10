@@ -363,73 +363,27 @@ export class MockEquipmentService extends MockBase implements EquipmentService {
 
 @Injectable()
 export class MockTemplatesService extends MockBase implements TemplatesService {
-  private readonly auth = inject(AuthStore);
-
-  create(
-    input: Pick<InspectionTemplate, 'title' | 'category' | 'description'>,
-  ): Observable<InspectionTemplate> {
+  create(input: Partial<InspectionTemplate>): Observable<InspectionTemplate> {
     return this.respond(() => {
-      if (!input.title.trim() || !input.category.trim()) {
-        throw new ApiError({
-          kind: 'BAD_REQUEST',
-          status: 400,
-          code: 'VALIDATION_ERROR',
-          userMessage: 'Informe título e categoria.',
-        });
-      }
-      return insertEntity(this.db.templates, {
-        ...input,
-        id: nextMockId('5400'),
-        status: 'DRAFT',
-        createdBy: this.auth.user()?.id,
-        createdAt: nowIso(),
-        updatedAt: nowIso(),
-        version: 0,
-      });
-    });
-  }
+      const timestamp = nowIso();
 
-  publish(templateId: Uuid): Observable<InspectionTemplateVersionDetail> {
-    return this.respond(() => {
-      const template = this.requireDraftTemplate(templateId);
-      const sections = this.draftSectionsOf(templateId);
-      if (!sections.length || !sections.some((section) => section.items?.length)) {
-        throw new ApiError({
-          kind: 'UNPROCESSABLE',
-          status: 422,
-          code: 'TEMPLATE_HAS_NO_ITEMS',
-          userMessage: 'Adicione pelo menos uma seção com itens antes de publicar.',
-        });
-      }
-      const publisher = this.auth.user()?.id;
-      if (!publisher)
-        throw new ApiError({
-          kind: 'UNAUTHORIZED',
-          status: 401,
-          code: 'AUTH_REQUIRED',
-          userMessage: 'Entre novamente para publicar.',
-        });
-      const version: InspectionTemplateVersionDetail = {
+      const template: InspectionTemplate = {
         id: nextMockId('5500'),
-        templateId,
-        versionNumber: (template.currentVersion ?? 0) + 1,
-        titleSnapshot: template.title,
-        descriptionSnapshot: template.description,
-        publishedBy: publisher,
-        publishedAt: nowIso(),
-        createdAt: nowIso(),
-        activeForNewInspections: true,
-        sections: structuredClone(sections),
+        title: input.title ?? 'Novo modelo',
+        description: input.description ?? null,
+        category: input.category ?? 'GERAL',
+        status: 'DRAFT',
+        currentVersion: null,
+        createdBy: '',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        version: 1,
       };
-      for (const previous of this.db.templateVersions.filter((v) => v.templateId === templateId))
-        previous.activeForNewInspections = false;
-      for (const section of version.sections ?? []) section.templateVersionId = version.id;
-      this.db.templateVersions.push(version);
-      template.status = 'ACTIVE';
-      template.currentVersion = version.versionNumber;
-      template.updatedAt = nowIso();
-      delete this.db.draftSections[templateId];
-      return version;
+
+      insertEntity(this.db.templates, template);
+      this.db.draftSections[template.id] = [];
+
+      return template;
     });
   }
   list(query: PageQuery<TemplateFilters> = {}): Observable<Page<InspectionTemplate>> {

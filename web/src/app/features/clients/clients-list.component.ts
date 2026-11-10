@@ -45,36 +45,89 @@ import { ClientFormDialogComponent } from './client-form-dialog.component';
     PageHeaderComponent,
   ],
   template: `
-    <section class="page">
-      <app-page-header title="Clientes" subtitle="Empresas atendidas e seus locais.">
-        @if (canManage()) {
-          <button actions matButton="filled" type="button" (click)="openForm()">
-            <mat-icon>add</mat-icon>
-            Novo cliente
+    
+  <section class="page">
+    <app-page-header
+      title="Clientes"
+      subtitle="Empresas atendidas e seus locais."
+    >
+      @if (canManage()) {
+        <button
+          actions
+          matButton="filled"
+          type="button"
+          (click)="openForm()"
+        >
+          <mat-icon>add</mat-icon>
+          Novo cliente
+        </button>
+      }
+    </app-page-header>
+
+    <section class="content-panel">
+
+      <!-- Área dos filtros -->
+      <div class="filter-section">
+
+        <div class="filter-heading">
+          <div>
+            <h2>Filtros</h2>
+            <p>Encontre clientes usando os critérios abaixo.</p>
+          </div>
+
+          <button
+            mat-button
+            type="button"
+            class="clear-filters"
+            (click)="clearFilters()"
+          >
+            <mat-icon>filter_alt_off</mat-icon>
+            Limpar filtros
           </button>
-        }
-      </app-page-header>
-      <div class="catalog-card">
+        </div>
+
+        <!-- Campos de pesquisa -->
         <div class="filters" aria-label="Filtros de clientes">
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+
+          <mat-form-field
+            appearance="outline"
+            subscriptSizing="dynamic"
+          >
             <mat-label>Buscar cliente</mat-label>
+
             <input
               matInput
               [ngModel]="name()"
               (ngModelChange)="setName($event)"
               placeholder="Nome da empresa"
             />
-            <mat-icon matSuffix aria-hidden="true">search</mat-icon>
+
+            <mat-icon matSuffix aria-hidden="true">
+              search
+            </mat-icon>
           </mat-form-field>
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+
+          <mat-form-field
+            appearance="outline"
+            subscriptSizing="dynamic"
+          >
             <mat-label>Situação</mat-label>
-            <mat-select [ngModel]="status()" (ngModelChange)="setStatus($event)">
+
+            <mat-select
+              [ngModel]="status()"
+              (ngModelChange)="setStatus($event)"
+            >
               <mat-option [value]="null">Todas</mat-option>
               <mat-option value="ACTIVE">Ativos</mat-option>
               <mat-option value="INACTIVE">Inativos</mat-option>
             </mat-select>
           </mat-form-field>
+
         </div>
+      </div>
+
+      <!-- Listagem -->
+      <div class="table-section">
         <app-data-table
           [columns]="columns()"
           [data]="data()"
@@ -93,29 +146,124 @@ import { ClientFormDialogComponent } from './client-form-dialog.component';
           (retry)="load()"
         />
       </div>
+
     </section>
+  </section>
   `,
-  styles: `
-    :host {
-      display: block;
-      min-width: 0;
-    }
-    .page {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      min-width: 0;
-    }
+ 
+styles: `
+  :host {
+    display: block;
+    min-width: 0;
+  }
+
+  /* Estrutura da página */
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+
+  /* Container principal */
+  .content-panel {
+    min-width: 0;
+    padding: 1.5rem;
+    border: 1px solid var(--mat-sys-outline-variant);
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #1b232b, #161c22);
+  }
+
+  /* Área dos filtros */
+  .filter-section {
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  /* Cabeçalho dos filtros */
+  .filter-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .filter-heading h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--mat-sys-on-surface);
+  }
+
+  .filter-heading p {
+    margin: 0.3rem 0 0;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.85rem;
+  }
+
+  .filter-heading button {
+    flex-shrink: 0;
+    color: #ffad0a;
+    font-weight: 600;
+  }
+
+  /* Campos de filtro */
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .filters mat-form-field {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+  }
+
+  /* Tabela */
+  .table-section {
+    min-width: 0;
+    padding-top: 0.75rem;
+  }
+
+  .table-section app-data-table {
+    display: block;
+    min-width: 0;
+  }
+
+  /* Telas intermediárias */
+  @media (max-width: 1100px) {
     .filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
-    .filters mat-form-field {
-      flex: 1 1 14rem;
-      max-width: 22rem;
+  }
+
+  /* Tablets */
+  @media (max-width: 700px) {
+    .content-panel {
+      padding: 1rem;
     }
-  `,
+
+    .filters {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /* Celulares */
+  @media (max-width: 480px) {
+    .filters {
+      grid-template-columns: 1fr;
+    }
+
+    .filter-heading {
+      align-items: flex-start;
+    }
+  }
+`,
+
 })
 export class ClientsListComponent {
   private readonly clients = inject(ClientsService);
@@ -158,20 +306,20 @@ export class ClientsListComponent {
       actions: [
         ...(this.canManage()
           ? [
-              { id: 'edit', label: 'Editar', icon: 'edit' },
-              {
-                id: 'deactivate',
-                label: 'Inativar',
-                icon: 'block',
-                visible: (row: Client) => row.status === 'ACTIVE',
-              },
-              {
-                id: 'activate',
-                label: 'Ativar',
-                icon: 'check_circle',
-                visible: (row: Client) => row.status === 'INACTIVE',
-              },
-            ]
+            { id: 'edit', label: 'Editar', icon: 'edit' },
+            {
+              id: 'deactivate',
+              label: 'Inativar',
+              icon: 'block',
+              visible: (row: Client) => row.status === 'ACTIVE',
+            },
+            {
+              id: 'activate',
+              label: 'Ativar',
+              icon: 'check_circle',
+              visible: (row: Client) => row.status === 'INACTIVE',
+            },
+          ]
           : []),
       ],
     },
@@ -248,6 +396,19 @@ export class ClientsListComponent {
         this.data.update((page) => ({ ...page }));
       });
   }
+
+  protected clearFilters(): void {
+    this.name.set('');
+    this.status.set(null);
+
+    this.params.update((p) => ({
+      ...p,
+      page: 0,
+    }));
+
+    this.load();
+  }
+
   protected setName(value: string): void {
     this.name.set(value);
     this.params.update((p) => ({ ...p, page: 0 }));

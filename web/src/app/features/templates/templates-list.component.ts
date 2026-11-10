@@ -44,23 +44,50 @@ import {
     PageHeaderComponent,
   ],
   template: `
-    <section class="page">
-      <app-page-header
-        title="Modelos de inspeção"
-        subtitle="Checklists configuráveis e versionados."
-      >
-        <div actions class="actions">
-          @if (canCreate()) {
-            <a matButton="filled" routerLink="/inspection-templates/new">
-              <mat-icon>add</mat-icon>
-              Novo modelo
-            </a>
-          }
-        </div>
-      </app-page-header>
+  <section class="page template-list-page">
+    <app-page-header
+      title="Modelos de inspeção"
+      subtitle="Checklists configuráveis e versionados."
+    >
+      <div actions class="actions">
+        @if (canCreate()) {
+         <button
+  matButton="filled"
+  type="button"
+  [disabled]="loading()"
+  (click)="createNew()"
+>
+  <mat-icon>add</mat-icon>
+  Novo modelo
+</button>
+        }
+      </div>
+    </app-page-header>
 
-      <div class="catalog-card">
+    <section class="content-panel">
+
+      <!-- Filtros -->
+      <div class="filter-section">
+
+        <div class="filter-heading">
+          <div>
+            <h2>Filtros</h2>
+            <p>Encontre modelos usando os critérios abaixo.</p>
+          </div>
+
+          <button
+            mat-button
+            type="button"
+            class="clear-filters"
+            (click)="clearFilters()"
+          >
+            <mat-icon>filter_alt_off</mat-icon>
+            Limpar filtros
+          </button>
+        </div>
+
         <div class="filters" aria-label="Filtros de modelos">
+
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Categoria</mat-label>
             <input
@@ -73,8 +100,12 @@ import {
 
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Situação</mat-label>
-            <mat-select [ngModel]="statusInput()" (ngModelChange)="onStatusChange($event)">
+            <mat-select
+              [ngModel]="statusInput()"
+              (ngModelChange)="onStatusChange($event)"
+            >
               <mat-option [value]="null">Todas</mat-option>
+
               @for (option of statusChoices; track option.value) {
                 <mat-option [value]="option.value">
                   {{ option.label }}
@@ -82,11 +113,16 @@ import {
               }
             </mat-select>
           </mat-form-field>
-        </div>
 
+        </div>
+      </div>
+
+      <!-- Tabela -->
+      <div class="table-section">
         <app-data-table
           [columns]="columns"
           [data]="data()"
+          [rowLink]="templateRowLink"
           [loading]="loading()"
           [error]="error()"
           [activeFilters]="activeFilters()"
@@ -103,38 +139,129 @@ import {
           (retry)="load()"
         />
       </div>
+
     </section>
+  </section>
+
   `,
+
   styles: `
-    :host {
-      display: block;
-      min-width: 0;
-    }
+  :host {
+    display: block;
+    min-width: 0;
+  }
 
-    .page {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      min-width: 0;
-    }
+  /* Estrutura da página */
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-width: 0;
+  }
 
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
+  /* Container externo: igual à tela de inspeções */
+  .content-panel {
+    min-width: 0;
+    padding: 1.5rem;
+    border: 1px solid var(--mat-sys-outline-variant);
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #1b232b, #161c22);
+  }
+
+  /* Área dos filtros */
+  .filter-section {
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  /* Cabeçalho dos filtros */
+  .filter-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .filter-heading h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--mat-sys-on-surface);
+  }
+
+  .filter-heading p {
+    margin: 0.3rem 0 0;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.85rem;
+  }
+
+  .filter-heading button {
+    flex-shrink: 0;
+  }
+
+  /* Filtros */
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .filters mat-form-field {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+  }
+
+  /* Tabela */
+  .table-section {
+    min-width: 0;
+    padding-top: 0.75rem;
+  }
+
+  .table-section app-data-table {
+    display: block;
+    min-width: 0;
+  }
+
+  /* Botão de novo modelo */
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* Telas intermediárias */
+  @media (max-width: 1100px) {
+    .filters {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* Tablets */
+  @media (max-width: 700px) {
+    .content-panel {
+      padding: 1rem;
     }
 
     .filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /* Celulares */
+  @media (max-width: 480px) {
+    .filters {
+      grid-template-columns: 1fr;
     }
 
-    .filters mat-form-field {
-      flex: 1 1 14rem;
-      max-width: 22rem;
+    .filter-heading {
+      align-items: flex-start;
     }
-  `,
+  }
+`,
 })
 export class TemplatesListComponent {
   private readonly templates = inject(TemplatesService);
@@ -148,8 +275,6 @@ export class TemplatesListComponent {
       field: 'title',
       label: 'Título',
       sortable: true,
-      type: 'link',
-      link: (row) => ['/inspection-templates', row.id, 'edit'],
     },
     { field: 'category', label: 'Categoria', sortable: true },
     {
@@ -180,6 +305,12 @@ export class TemplatesListComponent {
       link: (row) => ['/inspection-templates', row.id, 'versions'],
       format: () => 'Ver versões',
     },
+  ];
+
+  protected readonly templateRowLink = (row: InspectionTemplate) => [
+    '/inspection-templates',
+    row.id,
+    'edit',
   ];
 
   protected readonly loading = signal(false);
@@ -243,6 +374,18 @@ export class TemplatesListComponent {
       .subscribe((page) => this.data.set(page));
   }
 
+  protected clearFilters(): void {
+    this.categoryInput.set('');
+    this.statusInput.set(null);
+
+    this.pageParams.update((params) => ({
+      ...params,
+      page: 0,
+    }));
+
+    this.load();
+  }
+
   protected onCategoryChange(value: string): void {
     this.categoryInput.set(value);
     this.pageParams.update((params) => ({ ...params, page: 0 }));
@@ -273,8 +416,9 @@ export class TemplatesListComponent {
     this.load();
   }
 
-  protected createNew(): void {
-    if (!this.canCreate()) return;
-    void this.router.navigate(['/inspection-templates/new']);
-  }
+ protected createNew(): void {
+  if (!this.canCreate() || this.loading()) return;
+
+  void this.router.navigate(['/inspection-templates/new']);
+}
 }

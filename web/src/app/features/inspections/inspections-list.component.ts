@@ -201,7 +201,31 @@ function formatDay(day: string): string {
             (retry)="load()"
           />
         </div>
-      </section>
+      </div>
+
+      <div class="table-section">
+
+        <app-data-table
+          [columns]="columns()"
+          [data]="data()"
+          [loading]="loading()"
+          [rowLink]="inspectionRowLink"
+          [error]="error()"
+          [activeFilters]="activeFilters()"
+          [sort]="sort()"
+          ariaLabel="Inspeções"
+          emptyIcon="assignment"
+          emptyTitle="Nenhuma inspeção encontrada"
+          [emptyMessage]="emptyMessage()"
+          (pageChange)="onPage($event)"
+          (sortChange)="onSort($event)"
+          (filterChange)="onFilter($event)"
+          (rowAction)="onRowAction($event)"
+          (retry)="load()"
+        />
+
+      </div>
+
     </section>
   `,
 
@@ -331,6 +355,11 @@ export class InspectionsListComponent {
 
   protected readonly isSupervisor = computed(() => this.auth.role() === 'SUPERVISOR');
 
+  protected readonly inspectionRowLink = (row: Inspection) => [
+    '/inspections',
+    row.id,
+  ];
+
   protected readonly technicians = signal<User[]>([]);
   protected readonly clientOptions = signal<Client[]>([]);
 
@@ -354,17 +383,19 @@ export class InspectionsListComponent {
   protected readonly columns = computed<readonly TableColumn<Inspection>[]>(() => {
     const technicianNames = new Map(this.technicians().map((user) => [user.id, user.name]));
 
-    const clientNames = new Map(this.clientOptions().map((client) => [client.id, client.name]));
+
+
+    const clientNames = new Map(
+      this.clientOptions().map((client) => [client.id, client.name])
+    );
 
     return [
       {
         field: 'title',
         label: 'Inspeção',
-        type: 'link',
         sortable: true,
         width: '18rem',
         emptyText: 'Sem título',
-        link: (row) => ['/inspections', row.id],
       },
       {
         field: 'clientId',
@@ -575,11 +606,18 @@ export class InspectionsListComponent {
 
   protected onRowAction(event: RowActionEvent<Inspection>): void {
     if (event.action === 'review') {
-      if (!this.isSupervisor() || !['SUBMITTED', 'UNDER_REVIEW'].includes(event.row.status)) {
+      if (
+        !this.isSupervisor() ||
+        !['SUBMITTED', 'UNDER_REVIEW'].includes(event.row.status)
+      ) {
         return;
       }
 
-      void this.router.navigate(['/inspections', event.row.id, 'review']);
+      void this.router.navigate([
+        '/inspections',
+        event.row.id,
+        'review',
+      ]);
 
       return;
     }

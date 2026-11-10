@@ -58,9 +58,17 @@
   letter-spacing: 0.09em;
 }
 
+.sidebar__group {
+  margin-top: 0.75rem;
+}
+
+.sidebar__group:first-of-type {
+  margin-top: 0.5rem;
+}
+
 .sidebar__section-label {
-  padding: 1.5rem 1rem 0.5rem;
-  color: #9aa7b1;
+  padding: 1rem 1rem 0.5rem;
+  color: #8f9ba5;
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -71,6 +79,7 @@
 }
 
 .shell__sidebar a[mat-list-item] {
+  min-height: 2.75rem;
   margin: 0.125rem 0;
   border-radius: 0.625rem;
   color: #c8d0d6;

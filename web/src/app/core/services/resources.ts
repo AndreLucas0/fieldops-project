@@ -151,7 +151,7 @@ export abstract class TemplatesService {
     input: Partial<InspectionTemplate>,
   ): Observable<InspectionTemplate>;
 
-    abstract publish(
+  abstract publish(
     templateId: Uuid,
   ): Observable<InspectionTemplateVersionDetail>;
 }

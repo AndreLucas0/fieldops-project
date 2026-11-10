@@ -786,24 +786,33 @@ export class TemplateBuilderComponent implements OnInit {
     });
   }
 
-  protected moveItem(section: TemplateSectionDetail, item: TemplateItem, direction: -1 | 1): void {
-    const templateId = this.templateId();
-    if (!templateId) return;
-    const items = section.items ?? [];
-    const index = items.findIndex((candidate) => candidate.id === item.id);
-    const neighbor = items[index + direction];
-    if (!neighbor || this.saving()) return;
+  
+protected moveItem(
+  section: TemplateSectionDetail,
+  item: TemplateItem,
+  direction: -1 | 1,
+): void {
+  const templateId = this.templateId();
+  if (!templateId) return;
 
-    this.saving.set(true);
-    forkJoin([
-      this.templates.updateItem(templateId, item.id, {
-        displayOrder: neighbor.displayOrder,
-      }),
-      this.templates.updateItem(templateId, neighbor.id, {
-        displayOrder: item.displayOrder,
-      }),
-    ])
-      .pipe(finalize(() => this.saving.set(false)))
-      .subscribe(() => this.reloadSections());
-  }
+  const items = section.items ?? [];
+  const index = items.findIndex((candidate) => candidate.id === item.id);
+  const neighbor = items[index + direction];
+
+  if (!neighbor || this.saving() || !this.canEditDraft()) return;
+
+  this.saving.set(true);
+
+  forkJoin([
+    this.templates.updateItem(templateId, item.id, {
+      displayOrder: neighbor.displayOrder,
+    }),
+    this.templates.updateItem(templateId, neighbor.id, {
+      displayOrder: item.displayOrder,
+    }),
+  ])
+    .pipe(finalize(() => this.saving.set(false)))
+    .subscribe(() => this.reloadSections());
+}
+
 }

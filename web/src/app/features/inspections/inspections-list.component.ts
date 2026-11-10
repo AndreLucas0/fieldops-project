@@ -94,136 +94,127 @@ function formatDay(day: string): string {
     PageHeaderComponent,
   ],
   template: `
-  <section class="page inspection-list-page">
+<section class="page inspection-list-page">
+  <app-page-header
+    title="Inspeções"
+    subtitle="Acompanhe o planejamento e cancele quando necessário."
+  >
+    <div actions>
+      @if (canManage()) {
+        <button matButton="filled" (click)="createNew()">
+          <mat-icon>add</mat-icon>
+          Nova inspeção
+        </button>
+      }
+    </div>
+  </app-page-header>
 
-    <app-page-header
-      title="Inspeções"
-      subtitle="Acompanhe o planejamento e cancele quando necessário."
-    >
-      <div actions>
-        @if (canManage()) {
-          <button matButton="filled" (click)="createNew()">
-            <mat-icon>add</mat-icon>
-            Nova inspeção
-          </button>
-        }
-      </div>
-    </app-page-header>
-
-    <section class="content-panel">
-
-      <div class="filter-section">
-
-        <div class="filter-heading">
-          <div>
-            <h2>Filtros</h2>
-            <p>Encontre inspeções usando os critérios abaixo.</p>
-          </div>
-
-          <button matButton type="button" (click)="onFilter([])">
-            <mat-icon>filter_alt_off</mat-icon>
-            Limpar filtros
-          </button>
+  <section class="content-panel">
+    <div class="filter-section">
+      <div class="filter-heading">
+        <div>
+          <h2>Filtros</h2>
+          <p>Encontre inspeções usando os critérios abaixo.</p>
         </div>
 
-        <div class="filters" aria-label="Filtros de inspeções">
-
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Estado</mat-label>
-            <mat-select
-              [ngModel]="status()"
-              (ngModelChange)="setStatus($event)"
-            >
-              <mat-option [value]="null">Todos</mat-option>
-              @for (option of statusOptions; track option.value) {
-                <mat-option [value]="option.value">
-                  {{ option.label }}
-                </mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Técnico</mat-label>
-            <mat-select
-              [ngModel]="technicianId()"
-              (ngModelChange)="setTechnician($event)"
-            >
-              <mat-option [value]="null">Todos</mat-option>
-              @for (technician of technicians(); track technician.id) {
-                <mat-option [value]="technician.id">
-                  {{ technician.name }}
-                </mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Cliente</mat-label>
-            <mat-select
-              [ngModel]="clientId()"
-              (ngModelChange)="setClient($event)"
-            >
-              <mat-option [value]="null">Todos</mat-option>
-              @for (client of clientOptions(); track client.id) {
-                <mat-option [value]="client.id">
-                  {{ client.name }}
-                </mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Agendada a partir de</mat-label>
-            <input
-              matInput
-              type="date"
-              [ngModel]="from()"
-              [max]="to() || null"
-              (ngModelChange)="setFrom($event)"
-            />
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-label>Agendada até</mat-label>
-            <input
-              matInput
-              type="date"
-              [ngModel]="to()"
-              [min]="from() || null"
-              (ngModelChange)="setTo($event)"
-            />
-          </mat-form-field>
-
-        </div>
+        <button matButton type="button" (click)="onFilter([])">
+          <mat-icon>filter_alt_off</mat-icon>
+          Limpar filtros
+        </button>
       </div>
 
-      <div class="table-section">
+      <div class="filters" aria-label="Filtros de inspeções">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Estado</mat-label>
+          <mat-select
+            [ngModel]="status()"
+            (ngModelChange)="setStatus($event)"
+          >
+            <mat-option [value]="null">Todos</mat-option>
+            @for (option of statusOptions; track option.value) {
+              <mat-option [value]="option.value">
+                {{ option.label }}
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
 
-        <app-data-table
-          [columns]="columns()"
-          [data]="data()"
-          [loading]="loading()"
-          [rowLink]="inspectionRowLink"
-          [error]="error()"
-          [activeFilters]="activeFilters()"
-          [sort]="sort()"
-          ariaLabel="Inspeções"
-          emptyIcon="assignment"
-          emptyTitle="Nenhuma inspeção encontrada"
-          [emptyMessage]="emptyMessage()"
-          (pageChange)="onPage($event)"
-          (sortChange)="onSort($event)"
-          (filterChange)="onFilter($event)"
-          (rowAction)="onRowAction($event)"
-          (retry)="load()"
-        />
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Técnico</mat-label>
+          <mat-select
+            [ngModel]="technicianId()"
+            (ngModelChange)="setTechnician($event)"
+          >
+            <mat-option [value]="null">Todos</mat-option>
+            @for (technician of technicians(); track technician.id) {
+              <mat-option [value]="technician.id">
+                {{ technician.name }}
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
 
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Cliente</mat-label>
+          <mat-select
+            [ngModel]="clientId()"
+            (ngModelChange)="setClient($event)"
+          >
+            <mat-option [value]="null">Todos</mat-option>
+            @for (client of clientOptions(); track client.id) {
+              <mat-option [value]="client.id">
+                {{ client.name }}
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Agendada a partir de</mat-label>
+          <input
+            matInput
+            type="date"
+            [ngModel]="from()"
+            [max]="to() || null"
+            (ngModelChange)="setFrom($event)"
+          />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Agendada até</mat-label>
+          <input
+            matInput
+            type="date"
+            [ngModel]="to()"
+            [min]="from() || null"
+            (ngModelChange)="setTo($event)"
+          />
+        </mat-form-field>
       </div>
+    </div>
 
-    </section>
-
+    <div class="table-section">
+      <app-data-table
+        [columns]="columns()"
+        [data]="data()"
+        [loading]="loading()"
+        [rowLink]="inspectionRowLink"
+        [error]="error()"
+        [activeFilters]="activeFilters()"
+        [sort]="sort()"
+        ariaLabel="Inspeções"
+        emptyIcon="assignment"
+        emptyTitle="Nenhuma inspeção encontrada"
+        [emptyMessage]="emptyMessage()"
+        (pageChange)="onPage($event)"
+        (sortChange)="onSort($event)"
+        (filterChange)="onFilter($event)"
+        (rowAction)="onRowAction($event)"
+        (retry)="load()"
+      />
+    </div>
   </section>
+</section>
   `,
 
   styles: `

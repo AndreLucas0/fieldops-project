@@ -411,10 +411,10 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
   }
 
 
-publish(templateId: Uuid): Observable<InspectionTemplateVersionDetail> {
-  return this.respond(() => {
-    const template = this.requireDraftTemplate(templateId);
-    const draftSections = this.draftSectionsOf(templateId);
+  publish(templateId: Uuid): Observable<InspectionTemplateVersionDetail> {
+    return this.respond(() => {
+      const template = this.requireDraftTemplate(templateId);
+      const draftSections = this.draftSectionsOf(templateId);
 
     // RN-015: o modelo precisa ter título, categoria,
     // seção e pelo menos um item válido.

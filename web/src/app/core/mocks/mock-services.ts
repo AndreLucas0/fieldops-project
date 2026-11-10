@@ -411,6 +411,100 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
     });
   }
 
+
+  publish(templateId: Uuid): Observable<InspectionTemplateVersionDetail> {
+    return this.respond(() => {
+      const template = this.requireDraftTemplate(templateId);
+      const draftSections = this.draftSectionsOf(templateId);
+
+    // RN-015: o modelo precisa ter título, categoria,
+    // seção e pelo menos um item válido.
+    if (!template.title.trim() || !template.category.trim()) {
+      throw new ApiError({
+        kind: 'UNPROCESSABLE',
+        status: 422,
+        code: 'TEMPLATE_REQUIRED_FIELDS',
+        userMessage: 'Preencha o título e a categoria do modelo.',
+      });
+    }
+
+    const hasValidSection = draftSections.some(
+      (section) =>
+        section.title.trim().length > 0 &&
+        (section.items ?? []).some(
+          (item) =>
+            item.title.trim().length > 0 &&
+            !!item.responseType,
+        ),
+    );
+
+    if (!hasValidSection) {
+      throw new ApiError({
+        kind: 'UNPROCESSABLE',
+        status: 422,
+        code: 'TEMPLATE_WITHOUT_VALID_ITEMS',
+        userMessage:
+          'Adicione pelo menos uma seção com um item válido antes de publicar.',
+      });
+    }
+
+    const timestamp = nowIso();
+    const versionNumber = (template.currentVersion ?? 0) + 1;
+    const versionId = nextMockId('5800');
+
+    // Cria uma cópia independente das seções e dos itens.
+    const sections: TemplateSectionDetail[] = draftSections.map(
+      (section) => {
+        const sectionId = nextMockId('5600');
+
+        const items: TemplateItem[] = (section.items ?? []).map(
+          (item) => ({
+            ...item,
+            id: nextMockId('5700'),
+            sectionId,
+          }),
+        );
+
+        return {
+          ...section,
+          id: sectionId,
+          templateVersionId: versionId,
+          items,
+        };
+      },
+    );
+
+    const publishedVersion: InspectionTemplateVersionDetail = {
+      id: versionId,
+      templateId: template.id,
+      versionNumber,
+      titleSnapshot: template.title,
+      descriptionSnapshot: template.description ?? null,
+      publishedBy: template.createdBy ?? '',
+      publishedAt: timestamp,
+      activeForNewInspections: true,
+      createdAt: timestamp,
+      sections,
+    };
+
+    // Registra a versão publicada.
+    insertEntity(this.db.templateVersions, publishedVersion);
+
+    // Atualiza o modelo para ACTIVE.
+    this.require(
+      updateEntity(this.db.templates, templateId, {
+        status: 'ACTIVE',
+        currentVersion: versionNumber,
+      }),
+      '/inspection-templates',
+      templateId,
+    );
+
+    return publishedVersion;
+  });
+}
+
+
   listVersions(
     templateId: Uuid,
     query: PageQuery = {},

@@ -13,6 +13,9 @@
  * (ou ao mock) e o resultado volta direto para a tela.
  */
 
+import { File } from 'expo-file-system';
+import { Platform } from 'react-native';
+
 import {
   ApiError,
   CLIENT_ERROR_CODES,
@@ -193,8 +196,14 @@ export class ApiClient {
   }
 
   /**
-   * Envio multipart de evidência. O objeto `{ uri, name, type }` é a forma que
-   * o `FormData` do React Native aceita para arquivo local.
+   * Envio multipart de evidência.
+   *
+   * No aparelho, o Expo 57 troca o `fetch` global pelo `expo/fetch`, que só
+   * aceita como parte do multipart texto, `Blob` ou objeto com `bytes()`; o
+   * `{ uri, name, type }` do React Native o faz lançar antes de abrir a conexão
+   * (e o app mostrava "Sem conexão com o servidor"). A parte entrega então o
+   * conteúdo do arquivo, lido na hora do envio. Na prévia web (só
+   * desenvolvimento) a URI é `blob:` e segue como antes.
    */
   upload<T>(
     path: string,
@@ -203,7 +212,11 @@ export class ApiClient {
     options: RequestOptions = {},
   ): Promise<T> {
     const formData = new FormData();
-    formData.append('file', file as unknown as Blob);
+    const part =
+      Platform.OS === 'web'
+        ? file
+        : { name: file.name, type: file.type, bytes: () => new File(file.uri).bytes() };
+    formData.append('file', part as unknown as Blob);
 
     for (const [key, value] of Object.entries(metadata)) {
       if (value === undefined || value === null) continue;

@@ -1,5 +1,13 @@
 # Web — Inventário de Telas e Status de Integração
 
+**Atualização 2026-11-04:** o inventário histórico abaixo é superado pelo
+[registro de recuperação](recovery-validation-20261104.md). Shell e navegação
+estão implementados; FE-W14/16/17 agora têm componentes/rotas; FE-W18/19/20/21
+foram recuperadas/integradas e corrigidas. FE-W20 mantém reatribuição em
+ASSIGNED bloqueada pelo comportamento atual do backend; FE-W21 não inventa
+GPS de execução ausente da consulta. FE-W23 continua bloqueada por F04.
+Figma, F05/F07, decisões de backend e homologação real permanecem pendentes.
+
 **Data da auditoria original:** 2026-10-14 (inventário histórico; os estados das telas abaixo foram atualizados conforme os incrementos de 2026-11-01)
 **Branch atualizada:** `develop` (2026-11-01)
 **Validação atual:** consulte as entradas datadas em `progress.md`; não use o resumo executivo histórico abaixo como estado atual.

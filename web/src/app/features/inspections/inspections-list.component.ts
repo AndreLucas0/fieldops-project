@@ -59,8 +59,6 @@ const NOT_CANCELABLE: ReadonlySet<InspectionStatus> = new Set<InspectionStatus>(
   'CANCELED',
 ]);
 
-
-
 /** `yyyy-MM-dd` do input de data → ISO 8601 no início/fim do dia local. */
 function toIso(day: string, endOfDay: boolean): string | undefined {
   if (!day) return undefined;
@@ -218,115 +216,115 @@ function formatDay(day: string): string {
   `,
 
   styles: `
-  :host {
-    display: block;
-    min-width: 0;
-  }
-
-  /* Estrutura da página */
-  .page {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-    min-width: 0;
-  }
-
-  /* Container único */
-  .content-panel {
-    min-width: 0;
-    padding: 1.5rem;
-    border: 1px solid var(--mat-sys-outline-variant);
-    border-radius: 1rem;
-    background: linear-gradient(135deg, #1b232b, #161c22);
-  }
-
-  /* Área dos filtros */
-  .filter-section {
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-  /* Cabeçalho dos filtros */
-  .filter-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-bottom: 1.25rem;
-  }
-
-  .filter-heading h2 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--mat-sys-on-surface);
-  }
-
-  .filter-heading p {
-    margin: 0.3rem 0 0;
-    color: var(--mat-sys-on-surface-variant);
-    font-size: 0.85rem;
-  }
-
-  .filter-heading button {
-    flex-shrink: 0;
-  }
-
-  /* Cinco filtros em uma única linha */
-  .filters {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.75rem;
-    align-items: center;
-  }
-
-  .filters mat-form-field {
-    width: 100%;
-    min-width: 0;
-    margin: 0;
-  }
-
-  /* Tabela diretamente abaixo dos filtros */
- .table-section {
-  min-width: 0;
-  padding-top: 0.75rem;
-}
-
-  .table-section app-data-table {
-    display: block;
-    min-width: 0;
-  }
-
-  /* Telas intermediárias */
-  @media (max-width: 1100px) {
-    .filters {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+    :host {
+      display: block;
+      min-width: 0;
     }
-  }
 
-  /* Tablets */
-  @media (max-width: 700px) {
+    /* Estrutura da página */
+    .page {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      min-width: 0;
+    }
+
+    /* Container único */
     .content-panel {
-      padding: 1rem;
+      min-width: 0;
+      padding: 1.5rem;
+      border: 1px solid var(--mat-sys-outline-variant);
+      border-radius: 1rem;
+      background: linear-gradient(135deg, #1b232b, #161c22);
     }
 
-    .filters {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  /* Celulares */
-  @media (max-width: 480px) {
-    .filters {
-      grid-template-columns: 1fr;
+    /* Área dos filtros */
+    .filter-section {
+      padding-bottom: 0;
+      border-bottom: none;
     }
 
+    /* Cabeçalho dos filtros */
     .filter-heading {
-      align-items: flex-start;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
     }
-  }
-`,
+
+    .filter-heading h2 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--mat-sys-on-surface);
+    }
+
+    .filter-heading p {
+      margin: 0.3rem 0 0;
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 0.85rem;
+    }
+
+    .filter-heading button {
+      flex-shrink: 0;
+    }
+
+    /* Cinco filtros em uma única linha */
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .filters mat-form-field {
+      width: 100%;
+      min-width: 0;
+      margin: 0;
+    }
+
+    /* Tabela diretamente abaixo dos filtros */
+    .table-section {
+      min-width: 0;
+      padding-top: 0.75rem;
+    }
+
+    .table-section app-data-table {
+      display: block;
+      min-width: 0;
+    }
+
+    /* Telas intermediárias */
+    @media (max-width: 1100px) {
+      .filters {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    /* Tablets */
+    @media (max-width: 700px) {
+      .content-panel {
+        padding: 1rem;
+      }
+
+      .filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    /* Celulares */
+    @media (max-width: 480px) {
+      .filters {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-heading {
+        align-items: flex-start;
+      }
+    }
+  `,
 })
 export class InspectionsListComponent {
   private readonly inspections = inject(InspectionsService);
@@ -341,9 +339,7 @@ export class InspectionsListComponent {
   /** Escrita em inspeções: ADMIN e SUPERVISOR (`RESOURCE_WRITE_ROLES`). */
   protected readonly canManage = computed(() => canWrite('inspections', this.auth.role()));
 
-  protected readonly isSupervisor = computed(
-    () => this.auth.role() === 'SUPERVISOR',
-  );
+  protected readonly isSupervisor = computed(() => this.auth.role() === 'SUPERVISOR');
 
   protected readonly inspectionRowLink = (row: Inspection) => [
     '/inspections',
@@ -370,12 +366,8 @@ export class InspectionsListComponent {
     return sort && typeof sort === 'object' && !Array.isArray(sort) ? (sort as Sort) : null;
   });
 
-
-
   protected readonly columns = computed<readonly TableColumn<Inspection>[]>(() => {
-    const technicianNames = new Map(
-      this.technicians().map((user) => [user.id, user.name])
-    );
+    const technicianNames = new Map(this.technicians().map((user) => [user.id, user.name]));
 
 
 
@@ -395,15 +387,13 @@ export class InspectionsListComponent {
         field: 'clientId',
         label: 'Cliente / local',
         width: '13rem',
-        format: (value) =>
-          clientNames.get(String(value)) ?? '—',
+        format: (value) => clientNames.get(String(value)) ?? '—',
       },
       {
         field: 'technicianId',
         label: 'Técnico',
         width: '12rem',
-        format: (value) =>
-          technicianNames.get(String(value)) ?? '—',
+        format: (value) => technicianNames.get(String(value)) ?? '—',
       },
       {
         field: 'priority',
@@ -415,7 +405,7 @@ export class InspectionsListComponent {
       },
       {
         field: 'scheduledFor',
-        label: 'Prevista',
+        label: 'Agendada para',
         type: 'date',
         sortable: true,
         width: '12rem',
@@ -427,6 +417,11 @@ export class InspectionsListComponent {
         badgeContext: 'inspection',
         align: 'center',
         width: '12rem',
+      },
+      {
+        field: 'overdue',
+        label: 'Prazo',
+        format: (_value, row) => overdueLabel(row, this.now()),
       },
       {
         field: 'updatedAt',
@@ -444,35 +439,31 @@ export class InspectionsListComponent {
         actions: [
           ...(this.isSupervisor()
             ? [
-              {
-                id: 'review',
-                label: 'Continuar revisão',
-                icon: 'rate_review',
-                visible: (row: Inspection) =>
-                  row.status === 'SUBMITTED' ||
-                  row.status === 'UNDER_REVIEW',
-              },
-            ]
+                {
+                  id: 'review',
+                  label: 'Continuar revisão',
+                  icon: 'rate_review',
+                  visible: (row: Inspection) =>
+                    row.status === 'SUBMITTED' || row.status === 'UNDER_REVIEW',
+                },
+              ]
             : []),
 
           ...(this.canManage()
             ? [
-              {
-                id: 'cancel',
-                label: 'Cancelar',
-                icon: 'cancel',
-                danger: true,
-                visible: (row: Inspection) =>
-                  !NOT_CANCELABLE.has(row.status),
-              },
-            ]
+                {
+                  id: 'cancel',
+                  label: 'Cancelar',
+                  icon: 'cancel',
+                  danger: true,
+                  visible: (row: Inspection) => !NOT_CANCELABLE.has(row.status),
+                },
+              ]
             : []),
         ],
       },
     ];
   });
-
-
 
   protected readonly activeFilters = computed<ActiveFilter[]>(() => {
     const filters: ActiveFilter[] = [];

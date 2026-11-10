@@ -1,25 +1,22 @@
+$inspection-card: #191c1f;
+$inspection-line: #2b3035;
+$inspection-text: #f1f3f4;
+$inspection-dim: #929ba3;
+$inspection-sub: #68727b;
+$inspection-accent: #e5a43b;
+
 :host {
   display: block;
   min-width: 0;
 }
 
 .detail-page {
-  --detail-bg: #191c1f;
-  --detail-card: #191c1f;
-  --detail-card-inner: #202428;
-  --detail-border: #2b3035;
-  --detail-text: #f1f3f4;
-  --detail-muted: #929ba3;
-  --detail-subtle: #68727b;
-  --detail-accent: #e5a43b;
-  --detail-accent-soft: rgba(229, 164, 59, 0.12);
-
   display: flex;
   flex-direction: column;
   gap: 1rem;
   width: 100%;
   min-width: 0;
-  color: var(--detail-text);
+  color: $inspection-text;
   box-sizing: border-box;
 }
 
@@ -28,14 +25,12 @@
   align-items: center;
   gap: 9px;
   margin-bottom: 25px;
-  color: var(--detail-muted);
+  color: $inspection-dim;
   font-size: 13px;
-  font-weight: 500;
   text-decoration: none;
-  transition: color 160ms ease;
 
   &:hover {
-    color: var(--detail-text);
+    color: $inspection-text;
   }
 }
 
@@ -61,9 +56,8 @@
   align-items: center;
   gap: 9px;
   margin-bottom: 12px;
-  color: var(--detail-subtle);
+  color: $inspection-sub;
   font-size: 12px;
-  font-weight: 500;
 }
 
 .breadcrumb-separator {
@@ -72,10 +66,8 @@
 
 .detail-header h1 {
   margin: 0;
-  color: var(--detail-text);
+  color: $inspection-text;
   font-size: clamp(23px, 2.2vw, 30px);
-  font-weight: 650;
-  letter-spacing: -0.8px;
   line-height: 1.2;
 }
 
@@ -85,7 +77,7 @@
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 11px;
-  color: var(--detail-muted);
+  color: $inspection-dim;
   font-size: 12px;
 }
 
@@ -104,7 +96,7 @@
 
 .version-tag {
   padding: 3px 7px;
-  border: 1px solid var(--detail-border);
+  border: 1px solid $inspection-line;
   border-radius: 5px;
   color: #b9c1c7;
   font-size: 10px;
@@ -116,14 +108,13 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border: 1px solid var(--detail-border);
+  border: 1px solid $inspection-line;
   border-radius: 7px;
-  background: var(--detail-card);
+  background: $inspection-card;
   color: #d4d9dd;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
 }
 
 .status-dot {
@@ -132,20 +123,13 @@
   border-radius: 50%;
   background: #929ba3;
 
-  &.draft,
-  &.assigned {
-    background: #929ba3;
-  }
-
   &.in-progress {
     background: #4da3e6;
-    box-shadow: 0 0 9px rgba(77, 163, 230, 0.35);
   }
 
   &.submitted,
   &.under-review {
-    background: var(--detail-accent);
-    box-shadow: 0 0 9px rgba(229, 164, 59, 0.3);
+    background: $inspection-accent;
   }
 
   &.approved {
@@ -175,9 +159,9 @@
 .data-card,
 .history-card {
   min-width: 0;
-  border: 1px solid var(--detail-border);
+  border: 1px solid $inspection-line;
   border-radius: 11px;
-  background: var(--detail-card);
+  background: $inspection-card;
 }
 
 .data-card {
@@ -197,19 +181,16 @@
 
   h2 {
     margin: 5px 0 0;
-    color: var(--detail-text);
+    color: $inspection-text;
     font-size: 18px;
-    font-weight: 620;
-    letter-spacing: -0.3px;
   }
 }
 
 .eyebrow {
   display: block;
-  color: var(--detail-subtle);
+  color: $inspection-sub;
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 1.3px;
 }
 
 .card-heading-icon {
@@ -217,9 +198,9 @@
   width: 34px;
   height: 34px;
   place-items: center;
-  border: 1px solid var(--detail-border);
+  border: 1px solid $inspection-line;
   border-radius: 7px;
-  color: var(--detail-muted);
+  color: $inspection-dim;
   font-size: 17px;
 }
 
@@ -235,7 +216,7 @@
   gap: 7px;
   min-width: 0;
   padding: 14px 0;
-  border-bottom: 1px solid var(--detail-border);
+  border-bottom: 1px solid $inspection-line;
 
   &:nth-last-child(-n + 2) {
     border-bottom: 0;
@@ -243,28 +224,25 @@
 }
 
 .field-label {
-  color: var(--detail-muted);
+  color: $inspection-dim;
   font-size: 11px;
-  font-weight: 500;
 }
 
 .field-value {
   overflow-wrap: anywhere;
   color: #e5e9ec;
   font-size: 13px;
-  font-weight: 550;
   line-height: 1.45;
 }
 
 .priority-value {
   text-transform: uppercase;
-  letter-spacing: 0.3px;
 }
 
 .section-divider {
   height: 1px;
   margin: 23px 0;
-  background: var(--detail-border);
+  background: $inspection-line;
 }
 
 .section-title-row {
@@ -276,14 +254,14 @@
 
   h3 {
     margin: 5px 0 0;
-    color: var(--detail-text);
+    color: $inspection-text;
     font-size: 15px;
     font-weight: 600;
   }
 }
 
 .workflow-caption {
-  color: var(--detail-subtle);
+  color: $inspection-sub;
   font-size: 10px;
 }
 
@@ -322,13 +300,12 @@
 
   &.is-current .step-marker {
     border-color: rgba(229, 164, 59, 0.65);
-    background: var(--detail-accent-soft);
-    color: var(--detail-accent);
-    box-shadow: 0 0 0 3px rgba(229, 164, 59, 0.06);
+    background: rgba(229, 164, 59, 0.12);
+    color: $inspection-accent;
   }
 
   &.is-current strong {
-    color: var(--detail-accent);
+    color: $inspection-accent;
   }
 }
 
@@ -341,8 +318,8 @@
   place-items: center;
   border: 1px solid #3a4248;
   border-radius: 50%;
-  background: var(--detail-card);
-  color: var(--detail-muted);
+  background: $inspection-card;
+  color: $inspection-dim;
   font-size: 10px;
   font-weight: 700;
 }
@@ -360,7 +337,7 @@
   }
 
   span {
-    color: var(--detail-subtle);
+    color: $inspection-sub;
     font-size: 10px;
     line-height: 1.4;
     overflow-wrap: anywhere;
@@ -418,9 +395,9 @@
   height: 25px;
   padding: 0 6px;
   place-items: center;
-  border: 1px solid var(--detail-border);
+  border: 1px solid $inspection-line;
   border-radius: 6px;
-  color: var(--detail-muted);
+  color: $inspection-dim;
   font-size: 10px;
   font-weight: 600;
 }
@@ -466,10 +443,9 @@
   width: 9px;
   height: 9px;
   margin-top: 4px;
-  border: 2px solid var(--detail-accent);
+  border: 2px solid $inspection-accent;
   border-radius: 50%;
-  background: var(--detail-card);
-  box-shadow: 0 0 0 3px var(--detail-accent-soft);
+  background: $inspection-card;
 }
 
 .timeline-content {
@@ -485,26 +461,25 @@
 
   time {
     display: block;
-    color: var(--detail-muted);
+    color: $inspection-dim;
     font-size: 10px;
   }
 }
 
 .timeline-time {
   margin-left: 5px;
-  color: var(--detail-subtle);
+  color: $inspection-sub;
 }
 
 .timeline-entity {
   display: inline-block;
   margin-top: 8px;
   padding: 3px 6px;
-  border: 1px solid var(--detail-border);
+  border: 1px solid $inspection-line;
   border-radius: 4px;
-  color: var(--detail-subtle);
+  color: $inspection-sub;
   font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
 }
 
 .empty-history {
@@ -522,7 +497,7 @@
   }
 
   > span:last-child {
-    color: var(--detail-subtle);
+    color: $inspection-sub;
     font-size: 10px;
     line-height: 1.5;
   }
@@ -533,9 +508,9 @@
   width: 38px;
   height: 38px;
   place-items: center;
-  border: 1px solid var(--detail-border);
+  border: 1px solid $inspection-line;
   border-radius: 50%;
-  color: var(--detail-muted);
+  color: $inspection-dim;
   font-size: 19px;
 }
 
@@ -546,10 +521,10 @@
   justify-content: center;
   min-height: 300px;
   padding: 30px;
-  border: 1px solid var(--detail-border);
+  border: 1px solid $inspection-line;
   border-radius: 11px;
-  background: var(--detail-card);
-  color: var(--detail-muted);
+  background: $inspection-card;
+  color: $inspection-dim;
   text-align: center;
 
   p {
@@ -558,7 +533,7 @@
 
   a {
     margin-top: 10px;
-    color: var(--detail-accent);
+    color: $inspection-accent;
     font-size: 12px;
     text-decoration: none;
   }
@@ -575,7 +550,7 @@
   width: 22px;
   height: 22px;
   border: 2px solid #3b4248;
-  border-top-color: var(--detail-accent);
+  border-top-color: $inspection-accent;
   border-radius: 50%;
   animation: detail-spin 0.8s linear infinite;
 }
@@ -584,7 +559,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .review-button {
@@ -606,20 +583,6 @@
   text-decoration: none;
 
   cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.2s ease;
-
-  &:hover {
-    background-color: #ffc247;
-    border-color: #ffc247;
-    color: #111820;
-  }
-
-  &:active {
-    transform: translateY(1px);
-  }
 }
 
 @keyframes detail-spin {
@@ -640,25 +603,14 @@
 }
 
 @media (max-width: 760px) {
+  .detail-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
   .content-grid {
     gap: 16px;
   }
-
-  .page-header {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .header-actions {
-    width: 100%;
-    justify-content: space-between;
-    flex-wrap: wrap;
-  }
-  .header-actions {
-  width: 100%;
-  justify-content: space-between;
-  flex-wrap: wrap;
-}
 }
 
 @media (max-width: 480px) {
@@ -690,7 +642,7 @@
   }
 
   .detail-field:nth-last-child(2) {
-    border-bottom: 1px solid var(--detail-border);
+    border-bottom: 1px solid $inspection-line;
   }
 
   .detail-field:last-child {

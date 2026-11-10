@@ -397,6 +397,10 @@ paths:
       operationId: getClient
       tags: [Clients]
       summary: Consultar cliente por id
+      description: >-
+        ADMIN e SUPERVISOR leem qualquer cliente. TECHNICIAN lê somente quando
+        há inspeção atribuída a ele (em qualquer estado) que referencia este
+        registro (RN-004); caso contrário 403.
       parameters:
         - $ref: '#/components/parameters/IdParam'
       responses:
@@ -408,6 +412,8 @@ paths:
                 $ref: '#/components/schemas/Client'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     put:
@@ -562,6 +568,10 @@ paths:
       operationId: getSite
       tags: [Sites]
       summary: Consultar local por id
+      description: >-
+        ADMIN e SUPERVISOR leem qualquer local. TECHNICIAN lê somente quando
+        há inspeção atribuída a ele (em qualquer estado) que referencia este
+        registro (RN-004); caso contrário 403.
       parameters:
         - $ref: '#/components/parameters/IdParam'
       responses:
@@ -573,6 +583,8 @@ paths:
                 $ref: '#/components/schemas/InspectionSite'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     put:
@@ -728,6 +740,10 @@ paths:
       operationId: getEquipment
       tags: [Equipment]
       summary: Consultar equipamento por id
+      description: >-
+        ADMIN e SUPERVISOR leem qualquer equipamento. TECHNICIAN lê somente quando
+        há inspeção atribuída a ele (em qualquer estado) que referencia este
+        registro (RN-004); caso contrário 403.
       parameters:
         - $ref: '#/components/parameters/IdParam'
       responses:
@@ -739,6 +755,8 @@ paths:
                 $ref: '#/components/schemas/Equipment'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     put:

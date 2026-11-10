@@ -1,5 +1,6 @@
 import * as Network from 'expo-network';
 
+import { ApiError } from '@/models';
 import type { ApiClient } from '@/services/api-client';
 import {
   countPendingEntries,
@@ -106,7 +107,8 @@ describe('BF-007 — sync-service + outbox', () => {
     expect(outboxRow('op-1').synced).toBe(1);
   });
 
-  it.each(['REJECTED', 'CONFLICT', 'DEPENDENCY_FAILED'])(
+  // REJECTED é definitivo e sai da fila — ver sync-evidence-link.test.ts (item 5).
+  it.each(['CONFLICT', 'DEPENDENCY_FAILED'])(
     '%s: a entrada continua pendente e o contador de erro sobe',
     async (status) => {
       await addEntry('op-1');
@@ -132,6 +134,36 @@ describe('BF-007 — sync-service + outbox', () => {
     expect(result).toEqual({ synced: 0, failed: 2 });
     expect(outboxRow('op-1')).toMatchObject({ synced: 0, error_count: 1 });
     expect(outboxRow('op-2')).toMatchObject({ synced: 0, error_count: 1 });
+  });
+
+  it('push recusado pelo servidor (HTTP): guarda status, código e mensagem em last_error', async () => {
+    await addEntry('op-1');
+    const { client } = fakeClient(() => {
+      throw new ApiError({
+        timestamp: '2026-10-21T12:00:00Z',
+        status: 400,
+        code: 'VALIDATION_ERROR',
+        message: 'Request payload failed validation',
+        fieldErrors: [{ field: 'operations[0].entityId', message: 'must not be null' }],
+      });
+    });
+
+    await syncPending(client);
+
+    expect(outboxRow('op-1').last_error).toBe(
+      'Envio recusado (HTTP 400 VALIDATION_ERROR): Request payload failed validation — operations[0].entityId: must not be null',
+    );
+  });
+
+  it('push sem resposta (rede): guarda a mensagem do erro em last_error', async () => {
+    await addEntry('op-1');
+    const { client } = fakeClient(() => {
+      throw new Error('Network request failed');
+    });
+
+    await syncPending(client);
+
+    expect(outboxRow('op-1').last_error).toBe('Falha no envio: Network request failed');
   });
 
   it('envia em lotes de 50 operações', async () => {
@@ -185,7 +217,7 @@ describe('BF-007 — sync-service + outbox', () => {
 
   it('usa o mesmo deviceId em todas as sincronizações', async () => {
     await addEntry('op-1');
-    const { client, post } = fakeClient(allWith('REJECTED'));
+    const { client, post } = fakeClient(allWith('CONFLICT'));
 
     await syncPending(client);
     await syncPending(client);
@@ -307,13 +339,13 @@ describe('BF-007 — sync-service + outbox', () => {
       expect(outboxRow('status-1').status).toBe('COMPLETED');
     });
 
-    it('REJECTED define status FAILED', async () => {
+    it('REJECTED define status REJECTED (recusa definitiva, sai da fila)', async () => {
       await addEntry('status-2');
       const { client } = fakeClient(allWith('REJECTED'));
 
       await syncPending(client);
 
-      expect(outboxRow('status-2').status).toBe('FAILED');
+      expect(outboxRow('status-2').status).toBe('REJECTED');
     });
 
     it('CONFLICT define status CONFLICT', async () => {
@@ -334,6 +366,89 @@ describe('BF-007 — sync-service + outbox', () => {
       await syncPending(client);
 
       expect(outboxRow('status-4').status).toBe('FAILED');
+    });
+  });
+
+  describe('SYNC-OUTBOX-INSPECTION — transições de estado da inspeção', () => {
+    it('operações INSPECTION vão sem baseVersion (o servidor valida pela máquina de estados)', async () => {
+      await upsertOutboxEntry({
+        id: 'transicao-1',
+        inspectionId: INSPECTION_A,
+        entityType: 'INSPECTION',
+        entityId: INSPECTION_A,
+        operationType: 'UPSERT',
+        baseVersion: 0,
+        payload: JSON.stringify({ status: 'IN_PROGRESS', startedAtDevice: '2026-10-20T12:00:00Z' }),
+      });
+      await addEntry('resposta-1', INSPECTION_A, 3);
+      const { client, post } = fakeClient(allWith('APPLIED'));
+
+      await syncPending(client);
+
+      const body = post.mock.calls[0]?.[1] as PushBody;
+      const transicao = body.operations.find((op) => op.operationId === 'transicao-1');
+      const resposta = body.operations.find((op) => op.operationId === 'resposta-1');
+      expect(transicao?.baseVersion).toBeNull();
+      expect(resposta?.baseVersion).toBe(3);
+    });
+
+    it('guarda em last_error a mensagem da recusa do servidor', async () => {
+      await addEntry('recusada-1');
+      const { client } = fakeClient((body) => ({
+        results: body.operations.map((op) => ({
+          operationId: op.operationId,
+          status: 'REJECTED',
+          error: { code: 'INSPECTION_INVALID_STATE', message: 'Inspeção não está em andamento.' },
+        })),
+      }));
+
+      await syncPending(client);
+
+      expect(outboxRow('recusada-1')).toMatchObject({
+        status: 'REJECTED',
+        last_error: 'Inspeção não está em andamento.',
+      });
+    });
+  });
+
+  describe('SYNC-PULL — a sincronização geral também baixa os dados para uso offline', () => {
+    function clientWithPull() {
+      const post = jest.fn(async () => ({ results: [] }));
+      const get = jest.fn(async (path: string) =>
+        path === '/mobile/sync/pull'
+          ? { changes: [], nextCursor: 'cursor-1', serverTime: '2026-10-20T12:00:00Z' }
+          : { content: [] },
+      );
+      return { client: { post, get } as unknown as ApiClient, get };
+    }
+
+    it('sem inspectionId (primeiro plano, reconexão, aba Sincronização), faz o pull', async () => {
+      const { client, get } = clientWithPull();
+
+      await syncPendingIfOnline(client);
+
+      expect(get).toHaveBeenCalledWith('/mobile/sync/pull', expect.anything());
+      expect(await getSyncMetadata('last_pull_cursor')).toBe('cursor-1');
+    });
+
+    it('com inspectionId (cada resposta do checklist), só envia', async () => {
+      const { client, get } = clientWithPull();
+
+      await syncPendingIfOnline(client, INSPECTION_A);
+
+      expect(get).not.toHaveBeenCalled();
+    });
+
+    it('offline, nem envia nem baixa', async () => {
+      jest.mocked(Network.getNetworkStateAsync).mockResolvedValueOnce({
+        isConnected: false,
+        isInternetReachable: false,
+      } as Network.NetworkState);
+      const { client, get } = clientWithPull();
+
+      await syncPendingIfOnline(client);
+
+      expect(get).not.toHaveBeenCalled();
     });
   });
 

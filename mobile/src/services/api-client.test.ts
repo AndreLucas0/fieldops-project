@@ -1,3 +1,7 @@
+// Código real do Expo 57 que roda no aparelho (fetch global = expo/fetch).
+import { convertFormDataAsync } from 'expo/src/winter/fetch/convertFormData';
+import * as FileSystem from 'expo-file-system';
+
 import { ApiError, type AuthSession } from '@/models';
 
 import { ApiClient, buildQueryString } from './api-client';
@@ -103,6 +107,12 @@ describe('buildQueryString', () => {
     expect(buildQueryString({ a: undefined })).toBe('');
     expect(buildQueryString(undefined)).toBe('');
   });
+});
+
+let afterTestRestore: (() => void) | null = null;
+afterEach(() => {
+  afterTestRestore?.();
+  afterTestRestore = null;
 });
 
 describe('ApiClient', () => {
@@ -251,6 +261,45 @@ describe('ApiClient', () => {
     const { client } = buildClient([jsonResponse(204)], storage);
 
     await expect(client.post('/auth/logout')).resolves.toBeNull();
+  });
+
+  it('upload monta a parte do arquivo num formato que o expo/fetch (fetch global do Expo 57) aceita', async () => {
+    // No aparelho o Expo 57 troca o fetch global pelo
+    // expo/fetch, que serializa o multipart com convertFormDataAsync e recusa
+    // a parte `{ uri, name, type }` do React Native ("Unsupported FormDataPart").
+    // FormData mínimo que guarda o valor exatamente como foi anexado — o mesmo
+    // que o FormData do React Native com o patch do Expo entrega ao expo/fetch.
+    class RecordingFormData {
+      readonly parts: [string, unknown][] = [];
+      append(name: string, value: unknown): void {
+        this.parts.push([name, value]);
+      }
+      entries(): IterableIterator<[string, unknown]> {
+        return this.parts[Symbol.iterator]();
+      }
+    }
+    const originalFormData = globalThis.FormData;
+    globalThis.FormData = RecordingFormData as unknown as typeof FormData;
+    afterTestRestore = () => {
+      globalThis.FormData = originalFormData;
+    };
+    const uri = 'file:///data/user/0/host.exp.exponent/files/evidence-pending/foto.jpg';
+    (FileSystem as unknown as { __files: Set<string> }).__files.add(uri);
+    const storage = memoryStorage(buildSession());
+    const { client, calls } = buildClient([jsonResponse(201, { id: 'ev-1' })], storage);
+
+    await client.upload(
+      '/inspections/insp-1/evidence',
+      { uri, name: 'evidencia.jpg', type: 'image/jpeg' },
+      { idempotencyKey: 'chave-1' },
+    );
+
+    const { body } = await convertFormDataAsync(calls[0]?.body as FormData, 'limite');
+    const text = new TextDecoder().decode(body);
+    expect(text).toContain('name="file"; filename="evidencia.jpg"');
+    expect(text).toContain('content-type: image/jpeg');
+    expect(text).toContain(`conteudo:${uri}`);
+    expect(text).toContain('name="idempotencyKey"\r\n\r\nchave-1');
   });
 
   it('monta a URL sem barra duplicada', async () => {

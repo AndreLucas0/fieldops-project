@@ -15,7 +15,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { forkJoin } from 'rxjs';
-import { catchError, finalize, of } from 'rxjs';
+import { catchError, concatMap, finalize, of } from 'rxjs';
 
 import { AuthStore, canWrite, isApiError, type ApiError } from '../../core';
 import type {
@@ -681,6 +681,11 @@ export class TemplateBuilderComponent implements OnInit {
 
     if (!neighbor || this.saving()) return;
 
+    const originalOrder = section.displayOrder;
+    const targetOrder = neighbor.displayOrder;
+    const first = { title: section.title, description: section.description };
+    const second = { title: neighbor.title, description: neighbor.description };
+    const temporaryOrder = Math.max(...ordered.map((entry) => entry.displayOrder)) + 1;
     this.saving.set(true);
 
     forkJoin([

@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -49,6 +50,9 @@ class TemplateVersionControllerIT {
     private UserRepository userRepository;
 
     @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -60,7 +64,9 @@ class TemplateVersionControllerIT {
 
     @BeforeEach
     void setUp() {
-        versionRepository.deleteAll();
+        // Isola os fixtures da base efêmera de Testcontainers, inclusive inspeções
+        // criadas por outras classes que referenciam as versões publicadas.
+        jdbcTemplate.execute("TRUNCATE TABLE inspection_template_versions CASCADE");
         templateRepository.deleteAll();
         userRepository.deleteAll();
 

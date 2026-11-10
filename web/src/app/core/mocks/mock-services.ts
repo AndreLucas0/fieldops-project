@@ -27,6 +27,7 @@ import {
 } from '@fieldops/shared';
 
 import { ApiError } from '../models/api-error.model';
+import { AuthStore } from '../auth/auth.store';
 import type {
   Client,
   ActiveStatus,
@@ -667,15 +668,12 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
 
 @Injectable()
 export class MockInspectionsService extends MockBase implements InspectionsService {
-
   history(id: Uuid, query: PageQuery = {}): Observable<Page<AuditEvent>> {
     return this.page<AuditEvent>([], query);
   }
 
   list(query: PageQuery<InspectionFilters> = {}): Observable<Page<Inspection>> {
     const { scheduledFrom, scheduledTo, overdue, page, size, sort, ...simple } = query;
-
-
 
     const filtered = this.db.inspections.filter((inspection) => {
       if (!matchesFilters(inspection as unknown as Record<string, unknown>, simple)) return false;

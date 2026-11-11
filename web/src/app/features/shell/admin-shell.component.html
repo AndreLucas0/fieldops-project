@@ -10,24 +10,35 @@
   >
     <a class="brand" routerLink="/dashboard" aria-label="FieldOps, início" (click)="closeOnMobile(drawer)">
       <span class="brand__mark" aria-hidden="true"><mat-icon>fact_check</mat-icon></span>
-      <span class="brand__text"><strong>FieldOps</strong><small>CONSOLE ADMINISTRATIVO</small></span>
+      <span class="brand__text"><strong>FieldOps</strong><small>CONSOLE</small></span>
     </a>
 
-    <div class="sidebar__section-label">MENU</div>
-    <mat-nav-list aria-label="Navegação administrativa">
-      @for (item of navigation(); track item.route) {
-        <a
-          mat-list-item
-          [routerLink]="item.route"
-          routerLinkActive="navigation-item--active"
-          [routerLinkActiveOptions]="{ exact: item.route === '/dashboard' || item.route === '/inspection-templates' }"
-          (click)="closeOnMobile(drawer)"
-        >
-          <mat-icon matListItemIcon aria-hidden="true">{{ item.icon }}</mat-icon>
-          <span matListItemTitle>{{ item.label }}</span>
-        </a>
-      }
-    </mat-nav-list>
+    @for (group of navigation(); track group.label) {
+      <div class="sidebar__section-label">{{ group.label }}</div>
+      <mat-nav-list [attr.aria-label]="group.label">
+        @for (item of group.items; track item.route) {
+          <a
+            mat-list-item
+            [routerLink]="item.route"
+            routerLinkActive="navigation-item--active"
+            [routerLinkActiveOptions]="{ exact: item.route === '/dashboard' || item.route === '/inspection-templates' }"
+            (click)="closeOnMobile(drawer)"
+          >
+            <mat-icon matListItemIcon aria-hidden="true">{{ item.icon }}</mat-icon>
+            <span matListItemTitle>{{ item.label }}</span>
+            @if (item.badge === 'pendingReview' && pendingReview()) {
+              <span
+                matListItemMeta
+                class="nav-badge"
+                [attr.aria-label]="pendingReview() + ' aguardando revisão'"
+              >
+                {{ pendingReview() }}
+              </span>
+            }
+          </a>
+        }
+      </mat-nav-list>
+    }
 
     <div class="sidebar__footer">
       <button mat-button class="logout" (click)="logout()">

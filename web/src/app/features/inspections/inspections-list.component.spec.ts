@@ -1,7 +1,7 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { resetMockStore } from '@fieldops/shared';
@@ -92,6 +92,26 @@ describe('InspectionsListComponent', () => {
     );
     expect(format(undefined, { status: 'ASSIGNED', scheduledFor: future } as Inspection)).toBe('—');
     expect(format(undefined, { status: 'APPROVED', scheduledFor: past } as Inspection)).toBe('—');
+  });
+
+  it('começa filtrada pelo estado recebido na URL', async () => {
+    TestBed.overrideProvider(ActivatedRoute, {
+      useValue: { snapshot: { queryParamMap: convertToParamMap({ status: 'SUBMITTED' }) } },
+    });
+
+    const { component } = await render();
+
+    expect(component.activeFilters().map((filter) => filter.value)).toEqual(['Enviada']);
+  });
+
+  it('ignora na URL um estado que não existe', async () => {
+    TestBed.overrideProvider(ActivatedRoute, {
+      useValue: { snapshot: { queryParamMap: convertToParamMap({ status: 'NAO_EXISTE' }) } },
+    });
+
+    const { component } = await render();
+
+    expect(component.activeFilters()).toEqual([]);
   });
 
   it('envia o estado ao serviço e volta para a primeira página', async () => {

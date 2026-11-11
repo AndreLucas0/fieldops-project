@@ -9,6 +9,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatDialog } from '@angular/material/dialog';
+import { ActivatedRoute } from '@angular/router';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -61,6 +62,11 @@ function toIso(day: string, endOfDay: boolean): string | undefined {
   if (!day) return undefined;
   const date = new Date(`${day}T${endOfDay ? '23:59:59' : '00:00:00'}`);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+/** Estado vindo da URL; valor desconhecido é ignorado. */
+function statusFromQuery(value: string | null): InspectionStatus | null {
+  return STATUS_OPTIONS.find((option) => option.value === value)?.value ?? null;
 }
 
 function formatDay(day: string): string {
@@ -190,6 +196,7 @@ export class InspectionsListComponent {
   private readonly clients = inject(ClientsService);
   private readonly auth = inject(AuthStore);
   private readonly dialog = inject(MatDialog);
+  private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly statusOptions = STATUS_OPTIONS;
@@ -202,7 +209,10 @@ export class InspectionsListComponent {
   protected readonly data = signal<Page<Inspection>>(emptyPage());
   protected readonly loading = signal(false);
   protected readonly error = signal<ApiError | null>(null);
-  protected readonly status = signal<InspectionStatus | null>(null);
+  /** Aceita `?status=` na URL: é por ele que o painel leva à fila de revisão. */
+  protected readonly status = signal<InspectionStatus | null>(
+    statusFromQuery(this.route.snapshot.queryParamMap.get('status')),
+  );
   protected readonly technicianId = signal<string | null>(null);
   protected readonly clientId = signal<string | null>(null);
   protected readonly from = signal('');

@@ -20,17 +20,61 @@ interface NavigationItem {
   label: string;
   route: string;
   icon: string;
+  group: 'OPERAÇÃO' | 'CADASTROS';
 }
 
 const NAVIGATION: readonly NavigationItem[] = [
-  { label: 'Painel', route: '/dashboard', icon: 'space_dashboard' },
-  { label: 'Inspeções', route: '/inspections', icon: 'assignment' },
-  { label: 'Modelos', route: '/inspection-templates', icon: 'fact_check' },
-  { label: 'Clientes', route: '/clients', icon: 'business' },
-  { label: 'Locais', route: '/sites', icon: 'location_on' },
-  { label: 'Equipamentos', route: '/equipment', icon: 'precision_manufacturing' },
-  { label: 'Usuários', route: '/users', icon: 'group' },
-  { label: 'Não conformidades', route: '/non-conformities', icon: 'report_problem' },
+  // Operação
+  {
+    label: 'Painel',
+    route: '/dashboard',
+    icon: 'space_dashboard',
+    group: 'OPERAÇÃO',
+  },
+  {
+    label: 'Inspeções',
+    route: '/inspections',
+    icon: 'assignment',
+    group: 'OPERAÇÃO',
+  },
+  {
+    label: 'Não conformidades',
+    route: '/non-conformities',
+    icon: 'report_problem',
+    group: 'OPERAÇÃO',
+  },
+
+  // Cadastros
+  {
+    label: 'Modelos',
+    route: '/inspection-templates',
+    icon: 'fact_check',
+    group: 'CADASTROS',
+  },
+  {
+    label: 'Clientes',
+    route: '/clients',
+    icon: 'business',
+    group: 'CADASTROS',
+  },
+  {
+    label: 'Locais',
+    route: '/sites',
+    icon: 'location_on',
+    group: 'CADASTROS',
+  },
+  {
+    label: 'Equipamentos',
+    route: '/equipment',
+    icon: 'precision_manufacturing',
+    group: 'CADASTROS',
+  },
+  {
+    label: 'Usuários',
+    route: '/users',
+    icon: 'group',
+    group: 'CADASTROS',
+  },
 ];
 
 /** Casca compartilhada das rotas administrativas autenticadas. */
@@ -67,6 +111,22 @@ export class AdminShellComponent {
   readonly roleLabel = computed(() => roleLabel(this.authStore.role()));
   readonly navigation = computed(() =>
     NAVIGATION.filter((item) => canAccessRoute(item.route, this.authStore.role())),
+  );
+  readonly navigationGroups = computed(() => {
+    const items = this.navigation();
+
+    return (['OPERAÇÃO', 'CADASTROS'] as const)
+      .map((label) => ({
+        label,
+        items: items.filter((item) => item.group === label),
+      }))
+      .filter((group) => group.items.length > 0);
+  });
+
+  readonly brandSubtitle = computed(() =>
+    this.authStore.role() === 'SUPERVISOR'
+      ? 'CONSOLE DE OPERAÇÕES'
+      : 'CONSOLE ADMINISTRATIVO',
   );
 
   constructor() {

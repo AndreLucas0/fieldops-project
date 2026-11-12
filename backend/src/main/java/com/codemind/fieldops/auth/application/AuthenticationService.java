@@ -84,7 +84,7 @@ public class AuthenticationService {
 
 	@Transactional
 	public void logout(UUID userId) {
-		userRepository.findById(userId).ifPresent(User::invalidateSessions);
+		userRepository.findById(userId).ifPresent(user -> user.invalidateSessions());
 	}
 
 	public User getCurrentUser(UUID userId) {

@@ -103,7 +103,7 @@ public class InspectionExecutionService {
 
         if (!requiredSnapshots.isEmpty()) {
             List<UUID> requiredSnapshotIds = requiredSnapshots.stream()
-                .map(ItemSnapshot::getId)
+                .map(snapshot -> snapshot.getId())
                 .toList();
             long answeredCount = responseRepository.countByInspectionIdAndSnapshotIdIn(inspectionId, requiredSnapshotIds);
             if (answeredCount < requiredSnapshotIds.size()) {

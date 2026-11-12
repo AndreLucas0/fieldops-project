@@ -1,6 +1,6 @@
-# 23 - Dependências Spring Initializr e Estratégia de Testes (Spring Boot 4.1.0 / Java 25)
+# 23 - Dependências Spring Initializr e Estratégia de Testes (Spring Boot 4.1.2 / Java 25)
 
-> **Atualização de runtime:** o backend agora compila e executa com Java 25 (LTS). As consultas e o `pom.xml` reproduzidos neste documento registram a validação original do Spring Initializr com Java 21; essa evidência histórica foi mantida, mas Java 25 é o runtime vigente.
+> **Atualização de versões:** o backend usa Spring Boot 4.1.2 e Java 25 (LTS). As consultas e o `pom.xml` reproduzidos neste documento registram a validação original do Spring Initializr com Spring Boot 4.1.0 e Java 21; essa evidência histórica foi mantida.
 
 > **Status:** documento normativo, produzido a partir de (1) leitura completa de `./docs` (01–19) e dos documentos 20–22 já produzidos neste projeto (`contrato-backend-frontend.md`, `telas-frontend.md`, `plano-implementacao-backend.md`), e (2) pesquisa ativa na documentação oficial do Spring e no próprio Spring Initializr, com **validação empírica** — não apenas leitura de blog — contra `start.spring.io` para `bootVersion=4.1.0` / `javaVersion=21`.
 > **Escopo:** (A) quais dependências selecionar no Spring Initializr para gerar o backend; (B) atualização da estratégia de testes já existente em `test-plan.md` — **não** uma documentação de testes paralela (ver seção 8).
@@ -19,7 +19,7 @@ O `pom.xml` final usado como base para as seções 4 e 9 foi gerado com exatamen
 # 1. Contexto tecnológico atual
 
 ```text
-Spring Boot: 4.1.0
+Spring Boot: 4.1.2
 Java: 25 (LTS)
 Build tool: Maven
 ```

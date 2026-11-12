@@ -24,12 +24,12 @@ Este projeto **já chegou com uma quantidade incomum de artefatos prontos** para
 
 ## 1. Stack tecnológica e ferramental
 
-> **Atualização de runtime:** este plano fixou originalmente Spring Boot 4.1.0 e Java 21; o backend agora usa Java 25 (LTS), mantendo o Spring Boot 4.1.0. O documento `docs/dependencias-spring-initializr.md` preserva o registro histórico da seleção de dependências.
+> **Atualização de runtime:** este plano fixou originalmente Spring Boot 4.1.0 e Java 21; o backend agora usa Java 25 (LTS) e Spring Boot 4.1.2. O documento `docs/dependencias-spring-initializr.md` preserva o registro histórico da seleção de dependências.
 
 | Camada | Escolha | Fonte / status |
 |---|---|---|
 | Linguagem/runtime | **Java 25 (LTS)** | Runtime atual do backend; substitui o Java 21 adotado originalmente |
-| Framework | **Spring Boot 4.1.0** | Idem — substitui a suposição original de Spring Boot 3.3.x |
+| Framework | **Spring Boot 4.1.2** | Versão atual do backend; substitui a versão inicial 4.1.0 |
 | Build | Maven (`pom.xml`) | Confirmado — nenhum documento de `./docs` fixa Maven vs. Gradle, mas `README.MD` já pressupõe Maven (`./mvnw spring-boot:run`); ver `docs/dependencias-spring-initializr.md` §1 |
 | Persistência | Spring Data JPA + Hibernate sobre PostgreSQL 16 | `arquitetura.md` §11.7, imagem `postgres:16-alpine` em `docker-compose.yml` |
 | Migrações | **Flyway** | `db/schema.sql` já está escrito num formato diretamente portável para scripts `V{n}__descricao.sql` (comentário no próprio arquivo instrui exatamente isso); Flyway é o padrão de fato em Spring Boot e citado por nome em `test-plan.md` §5.1 (`FlywayMigrationIT.java`) |

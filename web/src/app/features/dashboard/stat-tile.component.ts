@@ -2,18 +2,19 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
 import { MatIconModule } from '@angular/material/icon';
 
 /**
- * Tom do ícone do cartão. `neutral` é o padrão — cor só entra quando o número
- * tem significado de estado, senão os cartões competem entre si e nenhum se
- * destaca.
+ * Tom do cartão. `neutral` é o padrão — cor só entra quando o número tem
+ * significado de estado, senão sete cartões coloridos competem entre si e
+ * nenhum se destaca.
  */
 export type StatTone = 'neutral' | 'good' | 'warning' | 'serious' | 'critical';
 
 /**
  * Cartão numérico do painel.
  *
- * Contrato: rótulo em caixa alta à esquerda, ícone no canto direito e valor em
- * destaque. A cor fica só no ícone; o rótulo continua legível sem ela, que é o
- * que impede a informação de depender só da cor.
+ * Contrato: rótulo em caixa de sentença, valor em destaque e ícone. O ícone e o
+ * rótulo acompanham sempre a cor — `warning` e `serious` ficam abaixo de 3:1
+ * sobre o fundo claro por definição da paleta de estado, e é esse par que
+ * garante que a informação nunca dependa só da cor.
  *
  * O valor usa os algarismos proporcionais da fonte: `tabular-nums` deixa um
  * número como `121` frouxo em corpo grande, e serve para coluna, não para
@@ -26,8 +27,8 @@ export type StatTone = 'neutral' | 'good' | 'warning' | 'serious' | 'critical';
   template: `
     <div class="tile" [class]="'tone-' + tone()">
       <div class="tile__head">
-        <span class="tile__label">{{ label() }}</span>
         <mat-icon class="tile__icon" aria-hidden="true">{{ icon() }}</mat-icon>
+        <span class="tile__label">{{ label() }}</span>
       </div>
 
       <p class="tile__value">
@@ -43,56 +44,56 @@ export type StatTone = 'neutral' | 'good' | 'warning' | 'serious' | 'critical';
       display: block;
     }
 
-    .tile {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      min-width: 0;
-      padding: 1.25rem;
-      border: 1px solid #303842;
-      border-radius: 1rem;
-      background: #1a2027;
-      --fo-tone: var(--mat-sys-on-surface-variant);
-    }
+   .tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 1.25rem;
+  border: 1px solid #303842;
+  border-radius: 1rem;
+  background: #1a2027;
+  --fo-tone: var(--mat-sys-on-surface-variant);
+}
 
     .tone-good {
-      --fo-tone: #3fb950;
+      --fo-tone: #0ca30c;
     }
     .tone-warning {
-      --fo-tone: #f3ad16;
+      /* Abaixo de 3:1 sobre o branco por definição — sempre com ícone e rótulo. */
+      --fo-tone: #b57b00;
     }
     .tone-serious {
-      --fo-tone: #e07a3f;
+      --fo-tone: #b4501f;
     }
     .tone-critical {
-      --fo-tone: #f0545a;
+      --fo-tone: #d03b3b;
     }
 
     .tile__head {
       display: flex;
+      /* Reserva a altura de duas linhas de rótulo, para o cartão com nome longo
+         não destoar dos vizinhos. */
+      min-height: 2.25rem;
       align-items: flex-start;
-      justify-content: space-between;
-      gap: 0.5rem;
+      gap: 0.375rem;
+      color: var(--fo-tone);
       min-width: 0;
-    }
-
-    .tile__label {
-      color: var(--mat-sys-on-surface-variant);
-      font-size: 0.6875rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      line-height: 1.25;
-      text-transform: uppercase;
-      overflow-wrap: anywhere;
     }
 
     .tile__icon {
       flex: none;
       width: 1.125rem;
       height: 1.125rem;
-      color: var(--fo-tone);
       font-size: 1.125rem;
       line-height: 1.125rem;
+    }
+
+    .tile__label {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
     }
 
     .tile__value {
@@ -105,7 +106,7 @@ export type StatTone = 'neutral' | 'good' | 'warning' | 'serious' | 'critical';
 
     .tile__number {
       font-size: 2rem;
-      font-weight: 700;
+      font-weight: 600;
       line-height: 1.1;
       letter-spacing: -0.02em;
     }

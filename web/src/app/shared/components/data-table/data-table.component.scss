@@ -18,6 +18,7 @@
   background: transparent;
 }
 
+
 .fo-table__filters {
   display: flex;
   align-items: center;
@@ -143,4 +144,104 @@ td a:focus-visible {
 
 .fo-table__error button {
   margin-top: 0.75rem;
+}
+
+tr.fo-table__row--clickable {
+  cursor: pointer;
+}
+
+tr.fo-table__row--clickable:focus-visible {
+  outline: 2px solid #ffad0a;
+  outline-offset: -2px;
+}
+
+/* Personalização exclusiva da listagem de inspeções */
+:host-context(.inspection-list-page) {
+  .fo-table {
+    border: 1px solid #303a43;
+    border-radius: 0.75rem;
+    background: #171e24;
+  }
+
+  tr.fo-table__row--clickable {
+    cursor: pointer;
+  }
+
+  tr.fo-table__row--clickable:focus-visible {
+    outline: 2px solid #ffad0a;
+    outline-offset: -2px;
+  }
+
+  .fo-table__viewport {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    background: transparent;
+  }
+
+  th {
+    height: 3.25rem;
+    padding: 0 1rem;
+    color: #929ba5;
+    font-size: 0.82rem;
+    font-weight: 500;
+    border-bottom: 1px solid #303a43;
+    white-space: nowrap;
+  }
+
+  td {
+    height: 4.1rem;
+    padding: 0 1rem;
+    color: #e0e5e9;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #303a43;
+    white-space: nowrap;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  tr.mat-mdc-row {
+    transition: background 150ms ease;
+  }
+
+  tr.mat-mdc-row:hover {
+    background: #202a32;
+  }
+
+  td:first-child {
+    min-width: 16rem;
+    font-weight: 600;
+  }
+
+  .fo-table__inline-actions button {
+    color: #ff9ca5;
+  }
+
+  .fo-table__inline-actions button:hover {
+    background: rgba(255, 100, 120, 0.08);
+  }
+}
+
+:host-context(.template-list-page) {
+  // Destaque ao passar o cursor sobre uma linha clicável.
+  tr.mat-mdc-row {
+    transition: background 150ms ease;
+  }
+
+  tr.mat-mdc-row:hover {
+    background: #202a32;
+  }
+
+  // Divisórias entre as linhas.
+  td {
+    border-bottom: 1px solid #303a43;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
 }

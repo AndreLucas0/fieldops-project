@@ -78,6 +78,7 @@ user_stories:
         iteration: "Sprint 1"
       - id: TS-01-06
         title: "Criar template de pull request e regras de proteção de branch"
+        description: "Além do template, o PR deve citar a issue com `Closes #N`. Em 2026-10-30, nenhum dos 25 PRs mergeados consultados fechava issue, e por isso o quadro ficou defasado."
         priority: "High"
         story_points: 1
         iteration: "Sprint 1"
@@ -268,7 +269,7 @@ user_stories:
         story_points: 1
         iteration: "Sprint 2"
       - id: TS-05-02
-        title: "Criar migration V2 para tabela users"
+        title: "Criar migration V1 para tabela users"
         priority: "High"
         story_points: 1
         iteration: "Sprint 2"
@@ -324,7 +325,7 @@ user_stories:
     iteration: "Sprint 2"
     tasks:
       - id: TS-06-01
-        title: "Criar serviço HTTP base com instância axios e configuração de base URL por ambiente"
+        title: "Criar serviço HTTP base (ApiClient) com configuração de base URL por ambiente"
         priority: "High"
         story_points: 1
         iteration: "Sprint 2"
@@ -354,7 +355,7 @@ user_stories:
         story_points: 1
         iteration: "Sprint 2"
       - id: TS-06-07
-        title: "Implementar interceptador Axios para refresh automático de token expirado"
+        title: "Implementar renovação automática de token expirado no ApiClient"
         priority: "High"
         story_points: 1
         iteration: "Sprint 2"
@@ -477,7 +478,7 @@ user_stories:
     iteration: "Sprint 2"
     tasks:
       - id: TS-09-01
-        title: "Criar migrations para tabelas clients, locations e equipments"
+        title: "Criar migrations para tabelas clients, inspection_sites e equipment"
         priority: "High"
         story_points: 1
         iteration: "Sprint 2"
@@ -733,7 +734,7 @@ user_stories:
         story_points: 1
         iteration: "Sprint 3"
       - id: TS-13-04
-        title: "Implementar endpoint PATCH /inspections/:id/cancel com justificativa obrigatória"
+        title: "Implementar endpoint POST /inspections/:id/cancel com justificativa obrigatória"
         priority: "High"
         story_points: 1
         iteration: "Sprint 3"
@@ -761,7 +762,7 @@ user_stories:
     iteration: "Sprint 4"
     tasks:
       - id: TS-14-01
-        title: "Implementar endpoint GET /me/inspections retornando somente inspeções do técnico autenticado"
+        title: "Implementar endpoint GET /mobile/inspections retornando somente inspeções do técnico autenticado"
         priority: "High"
         story_points: 1
         iteration: "Sprint 4"
@@ -822,7 +823,7 @@ user_stories:
         story_points: 1
         iteration: "Sprint 4"
       - id: TS-15-05
-        title: "Implementar endpoint PATCH /inspections/:id/start com validação de autorização"
+        title: "Implementar endpoint POST /inspections/:id/start com validação de autorização"
         priority: "High"
         story_points: 1
         iteration: "Sprint 4"
@@ -843,7 +844,7 @@ user_stories:
     iteration: "Sprint 4"
     tasks:
       - id: TS-16-01
-        title: "Criar tabela inspection_responses no SQLite local"
+        title: "Persistir respostas do checklist no SQLite local (outbox e read_cache)"
         priority: "High"
         story_points: 1
         iteration: "Sprint 4"
@@ -949,7 +950,7 @@ user_stories:
         story_points: 1
         iteration: "Sprint 4"
       - id: TS-17-08
-        title: "Implementar endpoint PATCH /inspections/:id/complete com validação na API"
+        title: "Implementar endpoint POST /inspections/:id/submit com validação na API"
         priority: "High"
         story_points: 1
         iteration: "Sprint 4"
@@ -972,7 +973,7 @@ user_stories:
     iteration: "Sprint 5"
     tasks:
       - id: TS-18-01
-        title: "Instalar e configurar biblioteca de scanner de QR Code (expo-barcode-scanner ou expo-camera)"
+        title: "Configurar scanner de QR Code com expo-camera"
         priority: "High"
         story_points: 1
         iteration: "Sprint 5"
@@ -1043,7 +1044,7 @@ user_stories:
         story_points: 1
         iteration: "Sprint 5"
       - id: TS-19-07
-        title: "Implementar endpoint POST /evidences com upload multipart (API)"
+        title: "Implementar endpoint POST /inspections/:id/evidence com upload multipart (API)"
         priority: "High"
         story_points: 1
         iteration: "Sprint 5"
@@ -1110,7 +1111,7 @@ user_stories:
     iteration: "Sprint 5"
     tasks:
       - id: TS-21-01
-        title: "Criar tabela non_conformities no SQLite local"
+        title: "Persistir não conformidades no SQLite local via outbox"
         priority: "High"
         story_points: 1
         iteration: "Sprint 5"
@@ -1184,7 +1185,7 @@ user_stories:
     iteration: "Sprint 6"
     tasks:
       - id: TS-23-01
-        title: "Criar schema SQLite completo: inspections, snapshots, responses, evidences, non_conformities"
+        title: "Criar schema SQLite offline: outbox, sync_metadata e read_cache"
         priority: "High"
         story_points: 1
         iteration: "Sprint 6"
@@ -1276,7 +1277,7 @@ user_stories:
     iteration: "Sprint 6"
     tasks:
       - id: TS-25-01
-        title: "Implementar endpoint GET /sync/pull?after=cursor na API retornando eventos desde o cursor"
+        title: "Implementar endpoint GET /mobile/sync/pull?cursor= na API retornando eventos desde o cursor"
         priority: "High"
         story_points: 1
         iteration: "Sprint 6"
@@ -1375,7 +1376,7 @@ user_stories:
         story_points: 1
         iteration: "Sprint 7"
       - id: TS-27-05
-        title: "Implementar endpoint POST /inspections/:id/start-review (API)"
+        title: "Implementar endpoint POST /inspections/:id/begin-review (API)"
         priority: "High"
         story_points: 1
         iteration: "Sprint 7"
@@ -1483,7 +1484,7 @@ user_stories:
     iteration: "Sprint 7"
     tasks:
       - id: TS-30-01
-        title: "Criar tabela audit_log com campos: evento, entidade_id, usuario_id, estado_anterior, estado_novo, timestamp"
+        title: "Criar tabela audit_events para o histórico de mudanças de estado"
         priority: "High"
         story_points: 1
         iteration: "Sprint 7"
@@ -1683,3 +1684,67 @@ user_stories:
         priority: "High"
         story_points: 1
         iteration: "Sprint 8"
+
+  # ── Conciliação do quadro (2026-10-30) ──────────────────────
+
+  - id: US-35
+    title: "Resolver pendências sem card identificadas na conciliação do quadro"
+    story: |
+      **Como** equipe de desenvolvimento,
+      **quero** que as pendências registradas em project-state tenham cards no quadro,
+      **para** acompanhar todo o trabalho restante em um só lugar.
+    acceptance_criteria:
+      - "Toda pendência listada tem card próprio e referência ao registro de origem"
+    priority: "High"
+    story_points: 17
+    tasks:
+      - id: TS-35-01
+        title: "Implementar shell web: logout, usuário logado e toasts"
+        description: "Complementa TS-03-03 (sidebar e header). Origem: WEB-SHELL em project-state/pending-features.md."
+        priority: "High"
+        story_points: 3
+      - id: TS-35-02
+        title: "Implementar escopo de supervisor (RN-005)"
+        description: "SUPERVISOR vê hoje os mesmos dados que ADMIN. Requer decisão de produto. Origem: SUPERVISOR-SCOPE."
+        priority: "High"
+        story_points: 3
+      - id: TS-35-03
+        title: "Definir trava de estado em PUT /inspections/:id"
+        description: "Inspeções em IN_PROGRESS, SUBMITTED ou APPROVED aceitam edição de metadados. Origem: D7."
+        priority: "Medium"
+        story_points: 1
+      - id: TS-35-04
+        title: "Corrigir accessUrl de evidência inacessível no celular"
+        description: "A URL assinada aponta para localhost. Origem: EVIDENCE-ACCESS-URL-HOST."
+        priority: "High"
+        story_points: 2
+      - id: TS-35-05
+        title: "Decidir orientação para conta inativa no login"
+        description: "Decisão de produto entre UX e não revelar a existência do e-mail. Origem: D22."
+        priority: "Low"
+        story_points: 1
+      - id: TS-35-06
+        title: "Corrigir typecheck, lint e testes instáveis do mobile"
+        description: "Origem: MOBILE-PREEXISTING-CHECKS."
+        priority: "Medium"
+        story_points: 2
+      - id: TS-35-07
+        title: "Criar tela de novo modelo de inspeção (FE-W14)"
+        description: "Rota documentada: /inspection-templates/new. Origem: project-state/pending-web.md."
+        priority: "High"
+        story_points: 1
+      - id: TS-35-08
+        title: "Criar tela de versões do modelo (FE-W17)"
+        description: "Rota documentada: /inspection-templates/:templateId/versions. Origem: project-state/pending-web.md."
+        priority: "Medium"
+        story_points: 1
+      - id: TS-35-09
+        title: "Criar tela de lista de não conformidades (FE-W22)"
+        description: "Rota documentada: /non-conformities. Origem: project-state/pending-web.md."
+        priority: "High"
+        story_points: 2
+      - id: TS-35-10
+        title: "Criar tela de auditoria (FE-W23)"
+        description: "Rota documentada: /audit. Sem endpoint de backend definido (PEND-08). Origem: project-state/pending-web.md."
+        priority: "Low"
+        story_points: 1

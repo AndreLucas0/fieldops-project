@@ -1,6 +1,13 @@
 # FieldOps — Current Progress
 
-Last updated: 2026-10-20 (SEED-STALE-FIX — integração validada ponta a ponta contra Postgres real)
+Last updated: 2026-11-04 — recuperação integrada, PR #296.
+
+Estado mais recente: [recovery-validation-20261104.md](recovery-validation-20261104.md).
+Preservação inicial: [recovery-20261103.md](recovery-20261103.md).
+As entradas históricas abaixo não substituem essa revalidação. Web: 310 testes
+e build aprovados; mobile: 444 testes, tipos e lint sem erros; backend: 52
+unitários. CI completa e merge ainda em validação; não registrar conclusão
+global nem encerrar pendências de produto por associação com este PR.
 
 ## Current State
 
@@ -8,6 +15,203 @@ Backend audit (2026-09-22): superseded — ver re-auditoria 2026-10-13 em `proje
 Frontend ↔ Backend contract + screen audit completed (2026-10-02, see `docs/auditoria-frontend-backend.md`).
 Auditoria completa do código 2026-10-13 concluída; inventários de telas criados em `project-state/pending-web.md` e `project-state/pending-mobile.md`.
 Integração incremental Frontend ↔ Backend com TDD em andamento.
+
+### KANBAN-RECONCILE-2026-10-30 — quadro do GitHub Project 16 alinhado ao código
+
+Data: 2026-10-30. Branch: `task/kanban-reconcile`. Tipo: gestão do backlog (sem mudança de código do produto).
+
+**Feito:** 6 issues reabertas por falta de entrega (#1, #6, #7, #8, #23, #78); 125 issues movidas para Done, com a evidência em comentário; 16 títulos corrigidos no quadro e em `github-kanban/backlog.yaml`; #7 passou a citar `Closes #N`; 11 cards novos (US-35, #280–#290) para as pendências sem card; #20 voltou para In Progress.
+
+**Não feito de propósito:** #26 segue aberta porque #28 (perfil de produção) está pendente; #111 segue aberta porque `CancelInspectionRequest.reason` não é obrigatório; #3 e #4 seguem em Done apesar da entrega parcial; #116, #141, #143, #170, #199 e #223 não foram movidas por falta de comprovação; os cards novos ficaram sem iteração porque as 8 do projeto estão concluídas.
+
+**Validação:** consulta ao GitHub depois da execução: 263 itens, status coerente com o estado da issue, títulos iguais aos do YAML, 0 falhas no script. Testes do produto não executados (sem mudança de código). `sync_backlog.py` não foi executado: Python indisponível neste ambiente.
+
+### EVIDENCE-EXPO-FETCH-2026-10-21 — foto nunca saía do aparelho ("Sem conexão com o servidor")
+
+Data: 2026-10-21. Branch: `task/sync-evidence-response-link`. Tipo: bugfix (TDD).
+Relato do dono: todas as entradas pendentes eram EVIDENCE, FAILED, ~30 tentativas, "Sem conexão com o servidor".
+
+**Diagnóstico:** monitor da porta 8090 mostrou o celular (`10.109.3.47`) conectando, mas nenhuma evidência nem
+operação de sync gravada. Causa no código do Expo 57: `expo/src/winter/runtime.native.ts` troca o `fetch` global
+pelo `expo/fetch` (salvo `EXPO_PUBLIC_USE_RN_FETCH`), cujo `convertFormDataAsync` só aceita parte string, `Blob` ou
+objeto com `bytes()`. O `{ uri, name, type }` do React Native lança `Unsupported FormDataPart implementation` antes
+de abrir a conexão, e o `ApiClient` traduz como `NETWORK_UNAVAILABLE`. Por isso o upload de foto **nunca** funcionou
+no aparelho — EVIDENCE-URI-EXPO-GO e SYNC-OUTBOX-EVIDENCE não tinham sido testados no celular.
+
+**Implementado:** `ApiClient.upload` (nativo) anexa `{ name, type, bytes: () => new File(uri).bytes() }`
+(`expo-file-system` 57); web inalterado. Também: falha do push grava o motivo em `last_error` (commit `e9020e4`).
+
+**Testes:** novo em `src/services/api-client.test.ts` usando o `convertFormDataAsync` real do Expo — RED com a mesma
+mensagem do aparelho, GREEN após a correção. Mock de `expo-file-system` ganhou `bytes()`. `npx jest` **444/444**;
+typecheck/lint só com os pré-existentes. `inspection-detail-screen` › "ASSIGNED oferece iniciar…" falhou 1 vez na
+suíte completa e passou isolado 2× (mesma instabilidade de MOBILE-PREEXISTING-CHECKS).
+
+**Não executado:** confirmação no aparelho (precisa recarregar o app).
+
+### CONFLICT-REBASE-2026-10-21 — toda alteração e evidência presas em FAILED/CONFLICT
+
+Data: 2026-10-21. Branch: `task/sync-evidence-response-link`. Tipo: bugfix (TDD).
+Relato do dono: "todas as alterações estão retornando failed/conflict e todas as evidencias estão retornando failed".
+
+**Diagnóstico (banco real, `sync_operations`, somente leitura):** só 3 operações chegaram ao servidor — START
+APPLIED, 1ª resposta do item `46182fe2…` APPLIED (versão 0) e, 0,5 s depois, a 2ª edição do mesmo item CONFLICT
+(app mandou base 1). Causa: criar a resposta **não** incrementa a versão no servidor, mas o app somava 1. Efeito em
+cascata: `SynchronizationService.push` devolve `DEPENDENCY_FAILED` (não gravado) para o resto da inspeção depois de
+um CONFLICT, e a entrada em conflito é a mais antiga → todo envio seguinte da inspeção falha; as evidências esperam
+as respostas ("Aguardando…") e ficam FAILED.
+
+**Implementado (mobile):**
+- `use-checklist.ts`: item sem resposta segue 0, 0, 1, 2… (antes 0, 1, 2…); `pending-overlay.ts`: resposta nova
+  pendente nasce na versão 0.
+- `sync-service.ts` + `rebaseOutboxEntry` (`local-db.ts`): CONFLICT de INSPECTION_RESPONSE → lê a versão atual
+  (`GET /mobile/inspections/{id}`), refaz em ordem a base de todas as edições pendentes do item (novo operationId,
+  mesmo `created_at`) e reenvia uma vez na mesma sincronização. Destrava sozinho o que já está preso no aparelho.
+
+**Testes:** `__tests__/sync-conflict-rebase.test.ts` novo (6, servidor fictício com as regras do backend), +1 em
+`pending-overlay`; ajustadas 3 expectativas que codificavam a premissa errada (2ª edição de item novo com base 1;
+resposta nova pendente com versão 1). RED visto antes da implementação. `npx jest` **441/441, 37 suítes**;
+typecheck/lint só com os pré-existentes. Mock do SQLite passou a ordenar por `created_at` e a suportar o rebase.
+
+**Não executado:** confirmação no aparelho/backend real de que a entrada presa se recupera (próxima sincronização
+com o app atualizado). Nenhum dado do banco foi alterado no diagnóstico.
+
+### SYNC-EVIDENCE-LINK-2026-10-21 — vínculo da evidência, recusas definitivas e ordem da conclusão
+
+Data: 2026-10-21. Branch: `task/sync-evidence-response-link` (a partir de `task/sync-outbox-nc`). Tipo: bugfix (TDD).
+Pedido: "continue a implementação da feature de offline first". Decisões do dono: vínculo resolvido no mobile;
+recusa definitiva vira REJECTED com descarte manual (ver `decisions.md` 2026-10-21).
+
+**Implementado (só mobile, API inalterada):**
+- Achado 2: `queueEvidence` guarda `inspectionItemId` e ignora `responseId` `local-…`; `syncEvidenceEntries` resolve
+  o id da resposta via `GET /mobile/inspections/{id}` depois do push e espera resposta/NC ainda no outbox.
+  `preview.tsx` passa `inspectionItemId`.
+- Achado 3: `useEvidences` expõe as fotos do outbox (`pending`); o resumo usa `withPendingEvidences`
+  (`pending-overlay.ts`) na avaliação de conclusão.
+- Achado 5: status `REJECTED` (`local-db.ts`); push REJECTED e upload 4xx definitivo param de ser reenviados; aba
+  Sincronização lista cada recusa com motivo e "Descartar" (`discardOutboxEntry`, apaga a foto).
+- Encontrado na tarefa: o backend exige a evidência para concluir; `syncPending` agora envia conclusões (SUBMITTED)
+  depois do upload das fotos, e segura a conclusão se ainda houver foto da inspeção no aparelho.
+- `settleQueuedOperation` lê a entrada por id (`getOutboxEntry`) para enxergar REJECTED.
+
+**Testes:** `__tests__/sync-evidence-link.test.ts` novo (21 casos) + 1 em `summary-nc-screens` + 1 em `sync-screen`,
+todos vistos falhando antes da implementação. 4 testes existentes ajustados porque descreviam o comportamento
+antigo que o dono mandou mudar (REJECTED → FAILED/continuava na fila). `npx jest`: **434/434, 36 suítes**.
+`npm run typecheck` e `npm run lint`: só os erros pré-existentes (MOBILE-PREEXISTING-CHECKS); o erro de lint de
+`sync.tsx` mudou de linha (40 → 52) por causa dos imports novos, mesma causa.
+
+**Não executado:** teste ponta a ponta no aparelho com backend real (offline → reconectar → foto vinculada →
+conclusão aceita). Backend não alterado, então `./mvnw verify` não foi rodado.
+
+**Não implementado (fora do escopo):** UI de resolução de CONFLICT; achado 1 (textos desatualizados em
+`CLAUDE.md`/`ESTADO-DO-PROJETO.md`), achados 4 e 6.
+
+### CORS-ANY-ORIGIN-LOCAL-2026-10-20 — perfil local aceita qualquer origem
+
+Data: 2026-10-20. Branch: `task/technician-read-place-data`. Pedido: "libere o CORS para qualquer ip".
+
+**Implementado:** `application-local.yml` com `allowed-origins: ${CORS_ALLOWED_ORIGINS:*}`;
+`SecurityConfig` passa a `setAllowedOriginPatterns`. Lista restrita de `application.yml` segue fora do perfil local.
+
+**Testes:** `CorsConfigurationIT` reescrito (4; novo caso de IP da rede — RED 403 → GREEN) e
+`RestrictedCorsConfigurationIT` novo (2, lista explícita). `./mvnw verify`: **50 unit + 304 IT, BUILD SUCCESS**.
+Não executado: teste pelo navegador (requer reiniciar o backend do usuário).
+
+### OFFLINE-FIRST-REST-2026-10-20 — iniciar/concluir, NC e leitura offline (interrompido para documentação)
+
+Data: 2026-10-20. Tipo: feature (TDD). Interrompido a pedido do dono: "documente as inconsistências encontradas apenas, não implemente mais nada".
+
+**Commitado:**
+- `e9fa3b7` (`task/sync-outbox-inspection`) — SYNC-OUTBOX-INSPECTION: iniciar/concluir via outbox + `settleQueuedOperation`; jest 386/386.
+- `711f32d` (`task/sync-outbox-nc`) — SYNC-OUTBOX-NC: criar/editar NC via outbox com id do aparelho; jest 388/388.
+
+**Implementado e NÃO commitado** (working tree de `task/sync-outbox-nc`): cache de leitura (`read_cache`, `cachedGet`),
+sobreposição das pendências em lista/detalhe, aviso de pendência no detalhe, SYNC-PULL na sincronização geral.
+`npx jest` 412/412 (35 suítes) no momento da interrupção.
+
+**Inconsistências encontradas (só documentadas):** `pending-features.md` → OFFLINE-FIRST-FINDINGS-2026-10-20
+(pendências "requer backend" desatualizadas; vínculo evidência↔resposta não sincronizada; evidência pendente fora do
+resumo; 409 em idempotencyKey repetida; recusas retentadas para sempre; mock de sync parcial; código não commitado).
+
+**Não executado:** teste em aparelho; regressão do backend (sem mudança no backend).
+
+### SYNC-OUTBOX-EVIDENCE-2026-10-20 — evidência offline-first (outbox SQLite)
+
+Data: 2026-10-20. Branch: `task/sync-outbox-evidence` (a partir de `task/fix-evidence-uri-expo-go`). Tipo: feature (TDD). Escopo escolhido pelo dono: só evidências.
+
+**Implementado:** `evidence-outbox.ts` (`queueEvidence`, `syncEvidenceEntries`); `sync-service.ts` envia JSON e depois
+evidências; `preview.tsx` grava local e tenta sincronizar; `evidence-upload.ts` importa `@/services/api-client` direto
+(evita ciclo com o índice); mock de `expo-file-system` em `jest.setup.js`. Sem mudança no backend.
+
+**Mudança de comportamento:** rejeição do servidor (ex.: inspeção aprovada) não aparece mais na prévia; a evidência
+fica com status FAILED e aparece na aba Sincronização/detalhes. Teste "mostra a falha do servidor sem sair da tela"
+substituído por "sem conexão, guarda no outbox e volta" e "falha ao guardar a foto mostra erro".
+
+**Não implementado:** miniatura de evidência pendente no checklist (só aparece após sincronizar); descarte de
+rejeições permanentes (4xx ≠ 409) — são retentadas a cada sync; INSPECTION/NC no outbox (fora do escopo).
+
+**Testes:** `evidence-outbox.test.ts` (6, RED → GREEN, incl. 409 já processada); 3 testes de prévia novos/ajustados.
+`npx jest`: **382/382, 32 suítes**. Lint dos tocados limpo; typecheck só com erros pré-existentes. Não executado: aparelho.
+
+### EVIDENCE-URI-EXPO-GO-2026-10-20 — envio de evidência falhava em todo aparelho com Expo Go
+
+Data: 2026-10-20. Branch: `task/fix-evidence-uri-expo-go` (a partir de `task/technician-read-place-data`). Tipo: correção (TDD).
+
+**Sintoma:** no celular, confirmar a evidência (câmera ou galeria) dava "Sem conexão com o servidor" e
+nenhuma requisição aparecia no tráfego; o resto do app funcionava contra a API.
+
+**Causa:** a captura passava a URI do arquivo para a prévia como parâmetro de rota. O `useLocalSearchParams`
+do expo-router 57 aplica `decodeURIComponent` a todo valor (`node_modules/expo-router/build/hooks/useLocalSearchParams.js:36`)
+e no Expo Go o cache fica em `.../ExperienceData/%2540anonymous%252F...`; decodificada, a URI aponta para um
+arquivo inexistente e o `fetch` multipart falha antes de enviar. No navegador a URI é `blob:` e não é afetada.
+
+**Implementado:** `src/features/evidence/pending-capture.ts` (URI em memória; rota leva só `captureId`);
+`capture.tsx` e `preview.tsx` passam a usá-lo. O mock de `expo-router` dos testes agora decodifica os parâmetros
+como o real — sem isso o defeito era invisível nos testes.
+
+**Testes:** 2 novos em `scanner-evidence-screens.test.tsx` (falham sem a correção, verificado com stash) + 5 ajustados.
+`npx jest`: **375/375, 31 suítes**. Lint dos arquivos tocados: limpo. Typecheck/lint globais têm erros
+pré-existentes em arquivos não tocados (MOBILE-PREEXISTING-CHECKS). Não executado: teste no aparelho.
+
+### TECH-PLACE-READ-2026-10-20 — técnico lê cliente/local/equipamento da própria inspeção
+
+Data: 2026-10-20. Branch: `task/technician-read-place-data` (a partir de `task/cors-config`). Tipo: permissão (TDD).
+
+**Motivo:** mobile contra a API real recebia 403 ao buscar nomes de cliente, local e
+equipamento no detalhe/lista de inspeções com perfil técnico.
+
+**Implementado:** `GET /clients/{id}`, `/sites/{id}`, `/equipment/{id}` aceitam TECHNICIAN
+com checagem de escopo (inspeção atribuída a ele, qualquer estado) nos services; 3 consultas
+`exists` novas em `InspectionRepository`; `openapi.yaml` (descrição + 403) e
+`contrato-backend-frontend.md` §3.4 atualizados. Decisão em `decisions.md`.
+
+**Não implementado:** resumo embutido em `/mobile/inspections` (alternativa registrada);
+nenhuma mudança no mobile.
+
+**Testes:**
+- `TechnicianPlaceReadScopeIT` — 6 testes; RED confirmado (2 falhas: 403 em vez de 200 no próprio escopo) → GREEN.
+- `./mvnw verify` — **50 unit + 302 IT, 0 falhas, BUILD SUCCESS**.
+- HTTP real (instância temporária na 8091, banco com seed): `tecnico` e `tecnico2` → 200 em
+  cliente/local/equipamento das próprias inspeções; `tecnico2` lendo cliente só do `tecnico` → 403.
+- Não executado: fluxo no app (requer reiniciar o backend do usuário nesta branch).
+
+### CORS-CONFIG-2026-10-20 — CORS restrito a origens autorizadas
+
+Data: 2026-10-20. Branch: `task/cors-config`. Tipo: configuração de segurança (TDD).
+
+**Motivo:** o preview web do mobile (`localhost:8081`) recebia erro de CORS contra a API real.
+
+**Implementado:** `CorsProperties` + `.cors()` em `SecurityConfig`, origens de
+`CORS_ALLOWED_ORIGINS` (padrão dev `http://localhost:4200,http://localhost:8081`),
+sem credenciais, cabeçalhos `Authorization`/`Content-Type`/`Accept`. `.env.example` atualizado.
+
+**Não implementado:** valor de produção de `CORS_ALLOWED_ORIGINS` (depende do deploy);
+nenhuma mudança no mobile ou no web.
+
+**Testes:**
+- `CorsConfigurationIT` — 4 testes, RED confirmado (4 falhas pelo motivo esperado) → GREEN.
+- `./mvnw verify` — **50 unit + 296 IT (292 + 4 novos), 0 falhas, BUILD SUCCESS**.
+- Não executado: verificação HTTP real pelo navegador com o preview web do mobile
+  (requer reiniciar o backend em execução do usuário).
 
 ### SEED-STALE-FIX-2026-10-20 — seed.sql alinhado ao schema V14 + integração validada ponta a ponta
 

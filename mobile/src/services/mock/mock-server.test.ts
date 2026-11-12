@@ -15,6 +15,7 @@ async function loginAsTechnician(): Promise<string> {
     path: '/auth/login',
     query: {},
     body: { email: TECHNICIAN_EMAIL, password: MOCK_PASSWORD },
+    accessToken: null,
     formData: null,
   });
   const body = response.body as { accessToken: string };
@@ -82,6 +83,7 @@ describe('POST /mobile/sync/push', () => {
     const response = await handleMockRequest({
       method: 'POST',
       path: '/mobile/sync/push',
+      accessToken: null,
       query: {},
       body: {
         deviceId: 'device-test-001',

@@ -6,10 +6,12 @@ import java.util.UUID;
 
 public record TemplateVersionResponse(
     UUID id,
+    UUID templateId,
     int versionNumber,
     String titleSnapshot,
     String descriptionSnapshot,
     UUID publishedById,
+    UUID publishedBy,
     Instant publishedAt,
     boolean activeForNewInspections,
     Instant createdAt,

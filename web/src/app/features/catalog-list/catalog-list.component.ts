@@ -107,161 +107,331 @@ const PAGE_CONFIG: Record<
     PageHeaderComponent,
   ],
   template: `
-    <section class="page">
-      <app-page-header [title]="config().title" [subtitle]="config().subtitle">
-        @if (kind() === 'sites' && canWrite('sites')) {
-          <button actions matButton="filled" type="button" (click)="openSiteForm()">
-            <mat-icon>add</mat-icon>
-            Novo local
-          </button>
-        }
-        @if (kind() === 'users' && canWrite('users')) {
-          <button actions matButton="filled" type="button" (click)="openUserForm()">
-            <mat-icon>add</mat-icon>
-            Novo usuário
-          </button>
-        }
-        @if (kind() === 'equipment' && canWrite('equipment')) {
-          <button actions matButton="filled" type="button" (click)="openEquipmentForm()">
-            <mat-icon>add</mat-icon>
-            Novo equipamento
-          </button>
-        }
-      </app-page-header>
-      <div class="catalog-card">
-        <div class="filters" [attr.aria-label]="'Filtros de ' + config().title.toLowerCase()">
-          @if (kind() !== 'non-conformities') {
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>{{ kind() === 'users' ? 'Nome' : 'Buscar' }}</mat-label>
-              <input
-                matInput
-                [ngModel]="name()"
-                (ngModelChange)="setName($event)"
-                placeholder="Digite para buscar"
-              />
-            </mat-form-field>
-          }
-          @if (kind() === 'users') {
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>E-mail</mat-label>
-              <input
-                matInput
-                type="email"
-                [ngModel]="email()"
-                (ngModelChange)="setEmail($event)"
-                placeholder="nome@empresa.com"
-              />
-            </mat-form-field>
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Perfil</mat-label>
-              <mat-select [ngModel]="role()" (ngModelChange)="setRole($event)">
-                <mat-option [value]="null">Todos</mat-option>
-                <mat-option value="ADMIN">Administrador</mat-option>
-                <mat-option value="SUPERVISOR">Supervisor</mat-option>
-                <mat-option value="TECHNICIAN">Técnico</mat-option>
-                <mat-option value="CLIENT_VIEWER">Cliente</mat-option>
-              </mat-select>
-            </mat-form-field>
-          }
-          @if (kind() === 'users' || kind() === 'equipment') {
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Situação</mat-label>
-              <mat-select [ngModel]="status()" (ngModelChange)="setStatus($event)">
-                <mat-option [value]="null">Todas</mat-option>
-                @for (option of statusChoices(); track option.value) {
-                  <mat-option [value]="option.value">{{ option.label }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-          }
-          @if (kind() === 'non-conformities') {
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Criticidade</mat-label>
-              <mat-select [ngModel]="severity()" (ngModelChange)="setSeverity($event)">
-                <mat-option [value]="null">Todas</mat-option>
-                @for (option of severityChoices; track option.value) {
-                  <mat-option [value]="option.value">{{ option.label }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Inspeção</mat-label>
-              <mat-select [ngModel]="inspectionId()" (ngModelChange)="setInspectionId($event)">
-                <mat-option [value]="null">Todas as inspeções</mat-option>
-                @for (inspection of inspectionChoices(); track inspection.id) {
-                  <mat-option [value]="inspection.id">
-                    {{ inspection.title || 'Inspeção ' + inspection.id.slice(0, 8) }}
-                  </mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-          }
-          @if (kind() === 'equipment') {
-            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="qr-search">
-              <mat-label>Buscar por QR</mat-label>
-              <input
-                matInput
-                [ngModel]="qrCode()"
-                (ngModelChange)="qrCode.set($event)"
-                (keydown.enter)="$event.preventDefault(); lookupQr()"
-                placeholder="Leia ou digite o código"
-              />
-              <button
-                matSuffix
-                mat-icon-button
-                type="button"
-                aria-label="Buscar equipamento pelo QR Code"
-                (click)="lookupQr()"
-              >
-                <mat-icon>qr_code_scanner</mat-icon>
-              </button>
-            </mat-form-field>
-          }
+   
+
+
+<section class="page">
+  <app-page-header [title]="config().title" [subtitle]="config().subtitle">
+    @if (kind() === 'sites' && canWrite('sites')) {
+      <button actions matButton="filled" type="button" (click)="openSiteForm()">
+        <mat-icon>add</mat-icon>
+        Novo local
+      </button>
+    }
+
+    @if (kind() === 'users' && canWrite('users')) {
+      <button actions matButton="filled" type="button" (click)="openUserForm()">
+        <mat-icon>add</mat-icon>
+        Novo usuário
+      </button>
+    }
+
+    @if (kind() === 'equipment' && canWrite('equipment')) {
+      <button actions matButton="filled" type="button" (click)="openEquipmentForm()">
+        <mat-icon>add</mat-icon>
+        Novo equipamento
+      </button>
+    }
+  </app-page-header>
+
+  <!-- Container principal: mesmo padrão das inspeções -->
+  <section class="content-panel">
+
+    <!-- Área dos filtros -->
+    <div class="filter-section">
+
+      <!-- Cabeçalho dos filtros -->
+      <div class="filter-heading">
+        <div>
+          <h2>Filtros</h2>
+          <p>Encontre registros usando os critérios abaixo.</p>
         </div>
-        <app-data-table
-          [columns]="columns()"
-          [data]="data()"
-          [loading]="loading()"
-          [error]="error()"
-          [activeFilters]="activeFilters()"
-          [sort]="sort()"
-          [ariaLabel]="config().title"
-          [emptyIcon]="config().icon"
-          [emptyTitle]="'Nenhum registro encontrado'"
-          [emptyMessage]="emptyMessage()"
-          (pageChange)="onPage($event)"
-          (sortChange)="onSort($event)"
-          (filterChange)="onFilter($event)"
-          (rowAction)="onRowAction($event)"
-          (retry)="retry()"
-        />
+
+        <button
+          mat-button
+          type="button"
+          class="clear-filters"
+          (click)="clearFilters()"
+        >
+          <mat-icon>filter_alt_off</mat-icon>
+          Limpar filtros
+        </button>
       </div>
-    </section>
+
+      <!-- Campos de filtros -->
+      <div
+        class="filters"
+        [attr.aria-label]="'Filtros de ' + config().title.toLowerCase()"
+      >
+
+        @if (kind() !== 'non-conformities') {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>{{ kind() === 'users' ? 'Nome' : 'Buscar' }}</mat-label>
+            <input
+              matInput
+              [ngModel]="name()"
+              (ngModelChange)="setName($event)"
+              placeholder="Digite para buscar"
+            />
+          </mat-form-field>
+        }
+
+        @if (kind() === 'users') {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>E-mail</mat-label>
+            <input
+              matInput
+              type="email"
+              [ngModel]="email()"
+              (ngModelChange)="setEmail($event)"
+              placeholder="nome@empresa.com"
+            />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Perfil</mat-label>
+            <mat-select
+              [ngModel]="role()"
+              (ngModelChange)="setRole($event)"
+            >
+              <mat-option [value]="null">Todos</mat-option>
+              <mat-option value="ADMIN">Administrador</mat-option>
+              <mat-option value="SUPERVISOR">Supervisor</mat-option>
+              <mat-option value="TECHNICIAN">Técnico</mat-option>
+              <mat-option value="CLIENT_VIEWER">Cliente</mat-option>
+            </mat-select>
+          </mat-form-field>
+        }
+
+        @if (kind() === 'users' || kind() === 'equipment') {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Situação</mat-label>
+            <mat-select
+              [ngModel]="status()"
+              (ngModelChange)="setStatus($event)"
+            >
+              <mat-option [value]="null">Todas</mat-option>
+
+              @for (option of statusChoices(); track option.value) {
+                <mat-option [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+
+        @if (kind() === 'non-conformities') {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Criticidade</mat-label>
+            <mat-select
+              [ngModel]="severity()"
+              (ngModelChange)="setSeverity($event)"
+            >
+              <mat-option [value]="null">Todas</mat-option>
+
+              @for (option of severityChoices; track option.value) {
+                <mat-option [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Inspeção</mat-label>
+            <mat-select
+              [ngModel]="inspectionId()"
+              (ngModelChange)="setInspectionId($event)"
+            >
+              <mat-option [value]="null">Todas as inspeções</mat-option>
+
+              @for (inspection of inspectionChoices(); track inspection.id) {
+                <mat-option [value]="inspection.id">
+                  {{ inspection.title || 'Inspeção ' + inspection.id.slice(0, 8) }}
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+
+        @if (kind() === 'equipment') {
+          <mat-form-field
+            appearance="outline"
+            subscriptSizing="dynamic"
+            class="qr-search"
+          >
+            <mat-label>Buscar por QR</mat-label>
+            <input
+              matInput
+              [ngModel]="qrCode()"
+              (ngModelChange)="qrCode.set($event)"
+              (keydown.enter)="$event.preventDefault(); lookupQr()"
+              placeholder="Leia ou digite o código"
+            />
+
+            <button
+              matSuffix
+              mat-icon-button
+              type="button"
+              aria-label="Buscar equipamento pelo QR Code"
+              (click)="lookupQr()"
+            >
+              <mat-icon>qr_code_scanner</mat-icon>
+            </button>
+          </mat-form-field>
+        }
+
+      </div>
+    </div>
+
+    <!-- Tabela: mesmo posicionamento da tela de inspeções -->
+    <div class="table-section">
+      <app-data-table
+        [columns]="columns()"
+        [data]="data()"
+        [loading]="loading()"
+        [error]="error()"
+        [activeFilters]="activeFilters()"
+        [sort]="sort()"
+        [ariaLabel]="config().title"
+        [emptyIcon]="config().icon"
+        [emptyTitle]="'Nenhum registro encontrado'"
+        [emptyMessage]="emptyMessage()"
+        (pageChange)="onPage($event)"
+        (sortChange)="onSort($event)"
+        (filterChange)="onFilter($event)"
+        (rowAction)="onRowAction($event)"
+        (retry)="retry()"
+      />
+    </div>
+
+  </section>
+</section>
+
+
   `,
-  styles: `
-    :host {
-      display: block;
-      min-width: 0;
-    }
-    .page {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      min-width: 0;
-    }
+  
+styles: `
+  :host {
+    display: block;
+    min-width: 0;
+  }
+
+  /* Estrutura da página */
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+
+  /* Container único: igual ao das inspeções */
+  .content-panel {
+    min-width: 0;
+    padding: 1.5rem;
+    border: 1px solid var(--mat-sys-outline-variant);
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #1b232b, #161c22);
+  }
+
+  /* Área dos filtros: sem linha divisória */
+  .filter-section {
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  /* Cabeçalho dos filtros */
+  .filter-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .filter-heading h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--mat-sys-on-surface);
+  }
+
+  .filter-heading p {
+    margin: 0.3rem 0 0;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.85rem;
+  }
+
+  .filter-heading button {
+    flex-shrink: 0;
+    color: #ffad0a;
+    font-weight: 600;
+  }
+
+  /* Cinco colunas: mesmo padrão das inspeções */
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .filters mat-form-field {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .qr-search {
+    grid-column: span 2;
+  }
+
+  /* Tabela diretamente abaixo dos filtros */
+  .table-section {
+    min-width: 0;
+    padding-top: 0.75rem;
+  }
+
+  .table-section app-data-table {
+    display: block;
+    min-width: 0;
+  }
+
+  /* Telas intermediárias */
+  @media (max-width: 1100px) {
     .filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
-    .filters mat-form-field {
-      flex: 1 1 14rem;
-      max-width: 22rem;
+  }
+
+  /* Tablets */
+  @media (max-width: 700px) {
+    .content-panel {
+      padding: 1rem;
     }
+
+    .filters {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .qr-search {
-      flex-basis: 18rem !important;
+      grid-column: auto;
     }
-  `,
+  }
+
+  /* Celulares */
+  @media (max-width: 480px) {
+    .filters {
+      grid-template-columns: 1fr;
+    }
+
+    .filter-heading {
+      align-items: flex-start;
+    }
+  }
+`,
 })
 export class CatalogListComponent {
   private readonly route = inject(ActivatedRoute);
@@ -304,6 +474,20 @@ export class CatalogListComponent {
   protected readonly statusChoices = computed(() =>
     statusOptions(this.kind() === 'users' ? 'user' : 'equipment'),
   );
+
+  protected clearFilters(): void {
+    this.name.set('');
+    this.email.set('');
+    this.role.set(null);
+    this.status.set(null);
+    this.severity.set(null);
+    this.inspectionId.set(null);
+    this.qrCode.set('');
+    this.qrSearchActive.set(false);
+
+    this.refreshFirstPage();
+  }
+
   protected readonly severityChoices = statusOptions('severity');
   protected readonly data = signal<Page<CatalogRow>>(emptyPage());
   private readonly clientNames = signal<Record<string, string>>({});
@@ -655,39 +839,39 @@ export class CatalogListComponent {
     const request = (
       key === 'users'
         ? this.users.list({
-            ...paging,
-            name: this.name().trim() || undefined,
-            email: this.email().trim() || undefined,
-            role: this.role() ?? undefined,
-            status: this.status() as UserFilters['status'] | undefined,
-          } satisfies PageParams & UserFilters)
+          ...paging,
+          name: this.name().trim() || undefined,
+          email: this.email().trim() || undefined,
+          role: this.role() ?? undefined,
+          status: this.status() as UserFilters['status'] | undefined,
+        } satisfies PageParams & UserFilters)
         : key === 'sites'
           ? this.contextId()
             ? this.sites.listByClient(this.contextId()!, {
-                ...paging,
-                name: this.name().trim() || undefined,
-              })
+              ...paging,
+              name: this.name().trim() || undefined,
+            })
             : this.sites.list({
-                ...paging,
-                name: this.name().trim() || undefined,
-              } satisfies PageParams & SiteFilters)
+              ...paging,
+              name: this.name().trim() || undefined,
+            } satisfies PageParams & SiteFilters)
           : key === 'equipment'
             ? this.contextId()
               ? this.equipment.listBySite(this.contextId()!, {
-                  ...paging,
-                  name: this.name().trim() || undefined,
-                  status: this.status() as EquipmentFilters['status'] | undefined,
-                })
-              : this.equipment.list({
-                  ...paging,
-                  name: this.name().trim() || undefined,
-                  status: this.status() as EquipmentFilters['status'] | undefined,
-                } satisfies PageParams & EquipmentFilters)
-            : this.nonConformities.list({
                 ...paging,
-                severity: this.severity() ?? undefined,
-                inspectionId: this.inspectionId() ?? undefined,
-              } satisfies PageParams & NonConformityFilters)
+                name: this.name().trim() || undefined,
+                status: this.status() as EquipmentFilters['status'] | undefined,
+              })
+              : this.equipment.list({
+                ...paging,
+                name: this.name().trim() || undefined,
+                status: this.status() as EquipmentFilters['status'] | undefined,
+              } satisfies PageParams & EquipmentFilters)
+            : this.nonConformities.list({
+              ...paging,
+              severity: this.severity() ?? undefined,
+              inspectionId: this.inspectionId() ?? undefined,
+            } satisfies PageParams & NonConformityFilters)
     ) as Observable<Page<CatalogRow>>;
     request
       .pipe(

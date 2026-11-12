@@ -18,6 +18,8 @@ public interface TemplateMapper {
     TemplateResponse toResponse(InspectionTemplate template);
 
     @Mapping(source = "publishedBy.id", target = "publishedById")
+    @Mapping(source = "publishedBy.id", target = "publishedBy")
+    @Mapping(source = "template.id", target = "templateId")
     TemplateVersionResponse toVersionResponse(TemplateVersion version);
 
     @Mapping(source = "templateVersion.id", target = "templateVersionId")

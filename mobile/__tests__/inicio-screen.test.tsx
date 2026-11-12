@@ -12,9 +12,18 @@ import { getMockDatabase, resetMockDatabase } from '@/services';
 const TECHNICIAN_ID = USER_IDS.technician;
 
 beforeEach(() => {
+  // O cenário compara "90 minutos atrás" com "hoje". Fixar o relógio evita
+  // que a mudança de dia transforme o fixture em uma inspeção de ontem.
+  jest.useFakeTimers({ now: new Date('2026-11-04T12:00:00-03:00'), doNotFake: [
+    'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'setImmediate', 'clearImmediate',
+    'nextTick', 'queueMicrotask', 'performance', 'hrtime', 'requestAnimationFrame', 'cancelAnimationFrame',
+    'requestIdleCallback', 'cancelIdleCallback',
+  ] });
   resetRouterMock();
   resetMockDatabase();
 });
+
+afterEach(() => jest.useRealTimers());
 
 /**
  * A sessão gravada precisa de um token que o backend fictício aceite, senão a

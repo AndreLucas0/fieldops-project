@@ -792,6 +792,7 @@ export class TemplateBuilderComponent implements OnInit {
   }
 
   
+
 protected moveItem(
   section: TemplateSectionDetail,
   item: TemplateItem,
@@ -806,18 +807,47 @@ protected moveItem(
 
   if (!neighbor || this.saving() || !this.canEditDraft()) return;
 
+  const temporaryOrder =
+    Math.max(...items.map((entry) => entry.displayOrder)) + 1;
+
+  const payload = (target: TemplateItem, displayOrder: number) => ({
+    title: target.title,
+    description: target.description,
+    responseType: target.responseType,
+    required: target.required,
+    observationRequiredOnFailure: target.observationRequiredOnFailure,
+    evidenceRequiredOnFailure: target.evidenceRequiredOnFailure,
+    optionsJson: target.optionsJson,
+    displayOrder,
+  });
+
   this.saving.set(true);
 
-  forkJoin([
-    this.templates.updateItem(templateId, item.id, {
-      displayOrder: neighbor.displayOrder,
-    }),
-    this.templates.updateItem(templateId, neighbor.id, {
-      displayOrder: item.displayOrder,
-    }),
-  ])
-    .pipe(finalize(() => this.saving.set(false)))
-    .subscribe(() => this.reloadSections());
+  this.templates
+    .updateItem(templateId, item.id, payload(item, temporaryOrder))
+    .pipe(
+      concatMap(() =>
+        this.templates.updateItem(
+          templateId,
+          neighbor.id,
+          payload(neighbor, item.displayOrder),
+        ),
+      ),
+      concatMap(() =>
+        this.templates.updateItem(
+          templateId,
+          item.id,
+          payload(item, neighbor.displayOrder),
+        ),
+      ),
+      finalize(() => this.saving.set(false)),
+    )
+    .subscribe({
+      next: () => this.reloadSections(),
+      error: () => {
+        this.notifications.error('Não foi possível reordenar os itens.');
+      },
+    });
 }
 
 }

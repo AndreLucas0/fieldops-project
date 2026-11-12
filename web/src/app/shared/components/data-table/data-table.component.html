@@ -6,8 +6,7 @@
       <mat-chip (removed)="removeFilter(filter)">
         <span class="fo-table__filter-label">{{ filter.label }}:</span> {{
         filter.value }}
-        <button matChipRemove
-          [attr.aria-label]="'Remover filtro ' + filter.label">
+        <button matChipRemove [attr.aria-label]="'Remover filtro ' + filter.label">
           <mat-icon>cancel</mat-icon>
         </button>
       </mat-chip>
@@ -21,8 +20,7 @@
 
   @if (showError()) {
   <div class="fo-table__error" role="alert">
-    <mat-icon class="fo-table__error-icon"
-      aria-hidden="true">error_outline</mat-icon>
+    <mat-icon class="fo-table__error-icon" aria-hidden="true">error_outline</mat-icon>
     <p class="fo-table__error-message">{{ errorMessage() }}</p>
 
     @if (errorRequestId(); as requestId) {
@@ -38,55 +36,31 @@
   }
 
   @if (showLoading()) {
-  <app-loading-state
-    variant="table"
-    [rows]="skeletonRows()"
-    [columns]="displayedColumns().length"
+  <app-loading-state variant="table" [rows]="skeletonRows()" [columns]="displayedColumns().length"
     label="Carregando a listagem…" />
   }
 
   @if (showEmpty()) {
-  <app-empty-state
-    [icon]="emptyIcon()"
-    [title]="emptyTitle()"
-    [message]="emptyMessage()"
-    [actionLabel]="emptyActionLabel()"
-    actionIcon="add"
-    (action)="emptyAction.emit()" />
+  <app-empty-state [icon]="emptyIcon()" [title]="emptyTitle()" [message]="emptyMessage()"
+    [actionLabel]="emptyActionLabel()" actionIcon="add" (action)="emptyAction.emit()" />
   }
 
   @if (showTable()) {
   <div class="fo-table__viewport">
-    <table
-      mat-table
-      [dataSource]="rows()"
-      matSort
-      [matSortActive]="sortField()"
-      [matSortDirection]="sortDirection()"
-      (matSortChange)="onSort($event)"
-      [attr.aria-label]="ariaLabel()">
+    <table mat-table [dataSource]="rows()" matSort [matSortActive]="sortField()" [matSortDirection]="sortDirection()"
+      (matSortChange)="onSort($event)" [attr.aria-label]="ariaLabel()">
       @for (column of columns(); track column.field) {
       <ng-container [matColumnDef]="column.field">
-        <th
-          mat-header-cell
-          *matHeaderCellDef
-          mat-sort-header
-          [disabled]="!column.sortable"
-          [style.width]="column.width"
+        <th mat-header-cell *matHeaderCellDef mat-sort-header [disabled]="!column.sortable" [style.width]="column.width"
           [class]="'align-' + (column.align ?? 'start')">
           {{ column.label }}
         </th>
 
-        <td
-          mat-cell
-          *matCellDef="let row"
-          [class]="'align-' + (column.align ?? 'start')"
+        <td mat-cell *matCellDef="let row" [class]="'align-' + (column.align ?? 'start')"
           [class.fo-table__mono]="column.monospace">
           @switch (columnType(column)) {
           @case ('badge') {
-          <app-status-badge
-            [value]="badgeValue(column, row)"
-            [context]="badgeContext(column)" />
+          <app-status-badge [value]="badgeValue(column, row)" [context]="badgeContext(column)" />
           }
 
           @case ('date') {
@@ -105,12 +79,8 @@
           @if (column.actionsInline) {
           <div class="fo-table__inline-actions">
             @for (action of visibleActions(column, row); track action.id) {
-            <button
-              matButton
-              type="button"
-              [disabled]="isActionDisabled(action, row)"
-              [class.fo-action--danger]="action.danger"
-              [attr.aria-label]="action.label"
+            <button matButton type="button" [disabled]="isActionDisabled(action, row)"
+              [class.fo-action--danger]="action.danger" [attr.aria-label]="action.label"
               (click)="rowAction.emit({ action: action.id, row })">
               @if (action.icon) {
               <mat-icon>{{ action.icon }}</mat-icon>
@@ -120,22 +90,14 @@
             }
           </div>
           } @else if (visibleActions(column, row).length > 0) {
-          <button
-            matIconButton
-            type="button"
-            [matMenuTriggerFor]="rowMenu"
-            [attr.aria-label]="'Ações da linha'">
+          <button matIconButton type="button" [matMenuTriggerFor]="rowMenu" [attr.aria-label]="'Ações da linha'">
             <mat-icon>more_vert</mat-icon>
           </button>
 
           <mat-menu #rowMenu="matMenu">
             @for (action of visibleActions(column, row); track action.id) {
-            <button
-              mat-menu-item
-              type="button"
-              [disabled]="isActionDisabled(action, row)"
-              [class.fo-action--danger]="action.danger"
-              (click)="rowAction.emit({ action: action.id, row })">
+            <button mat-menu-item type="button" [disabled]="isActionDisabled(action, row)"
+              [class.fo-action--danger]="action.danger" (click)="rowAction.emit({ action: action.id, row })">
               @if (action.icon) {
               <mat-icon>{{ action.icon }}</mat-icon>
               }
@@ -160,24 +122,18 @@
       </ng-container>
       }
 
-      <tr mat-row
-        *matRowDef="let row; columns: displayedColumns()"
-        [class.fo-table__row--clickable]="!!rowLink()"
-        [attr.tabindex]="rowLink() ? 0 : null"
-        [attr.aria-label]="rowLink() ? 'Abrir detalhamento: ' + row.title : null"
-        (click)="onRowClick(row, $event)"
-        (keydown.enter)="onRowKeydown(row, $event)">
+      <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
+
+      <tr mat-row *matRowDef="let row; columns: displayedColumns()" [class.fo-table__row--clickable]="!!rowLink()"
+        [attr.tabindex]="rowLink() ? 0 : null" [attr.aria-label]="rowLink() ? 'Abrir detalhamento: ' + row.title : null"
+        (click)="onRowClick(row, $event)" (keydown.enter)="onRowKeydown(row, $event)">
       </tr>
     </table>
   </div>
   }
 
   @if (showPaginator()) {
-  <mat-paginator
-    [length]="total()"
-    [pageIndex]="pageIndex()"
-    [pageSize]="pageSize()"
-    [pageSizeOptions]="pageSizes()"
+  <mat-paginator [length]="total()" [pageIndex]="pageIndex()" [pageSize]="pageSize()" [pageSizeOptions]="pageSizes()"
     (page)="onPage($event)" />
   }
 </section>

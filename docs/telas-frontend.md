@@ -661,7 +661,7 @@ Formulário detalhado (combos encadeados): seção 9.6.
 
 **Objetivo:** revisar, aprovar ou reprovar (UC-16, UC-17, AC-REVIEW). **Usuários autorizados:** SUPERVISOR (RN-079). **Rota:** `/inspections/:inspectionId/review`. **Pré-condições:** `status ∈ {SUBMITTED, UNDER_REVIEW}`.
 
-**Dados exibidos:** cabeçalho da inspeção, técnico e horários (`startedAtServer`/`submittedAtServer`), localização registrada (`GeoLocation` do `start`/`submit`), progresso, seções do checklist com resposta por item, observações, fotografias (`Evidence.accessUrl`), não conformidades, histórico de revisões anteriores (`GET .../reviews`).
+**Dados exibidos:** cabeçalho da inspeção, técnico e horários (`startedAtServer`/`submittedAtServer`), localização registrada (`GeoLocation` do `start`/`submit`), progresso, seções do checklist com resposta por item, observações, fotografias (`Evidence.accessUrl`), não conformidades, histórico de revisões anteriores (`GET .../reviews`) e trilha cronológica de auditoria (`GET /inspections/{id}/history`, paginada).
 
 **Ações disponíveis:**
 

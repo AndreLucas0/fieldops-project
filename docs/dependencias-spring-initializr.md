@@ -1,4 +1,6 @@
-# 23 - Dependências Spring Initializr e Estratégia de Testes (Spring Boot 4.1.0 / Java 21)
+# 23 - Dependências Spring Initializr e Estratégia de Testes (Spring Boot 4.1.0 / Java 25)
+
+> **Atualização de runtime:** o backend agora compila e executa com Java 25 (LTS). As consultas e o `pom.xml` reproduzidos neste documento registram a validação original do Spring Initializr com Java 21; essa evidência histórica foi mantida, mas Java 25 é o runtime vigente.
 
 > **Status:** documento normativo, produzido a partir de (1) leitura completa de `./docs` (01–19) e dos documentos 20–22 já produzidos neste projeto (`contrato-backend-frontend.md`, `telas-frontend.md`, `plano-implementacao-backend.md`), e (2) pesquisa ativa na documentação oficial do Spring e no próprio Spring Initializr, com **validação empírica** — não apenas leitura de blog — contra `start.spring.io` para `bootVersion=4.1.0` / `javaVersion=21`.
 > **Escopo:** (A) quais dependências selecionar no Spring Initializr para gerar o backend; (B) atualização da estratégia de testes já existente em `test-plan.md` — **não** uma documentação de testes paralela (ver seção 8).
@@ -14,11 +16,11 @@ O `pom.xml` final usado como base para as seções 4 e 9 foi gerado com exatamen
 
 ---
 
-# 1. Contexto tecnológico obrigatório
+# 1. Contexto tecnológico atual
 
 ```text
 Spring Boot: 4.1.0
-Java: 21
+Java: 25 (LTS)
 Build tool: Maven
 ```
 
@@ -26,7 +28,7 @@ Build tool: Maven
 
 ## Correção de versão em relação ao plano de implementação anterior
 
-`docs/plano-implementacao-backend.md` §1 (documento 22, produzido antes desta tarefa) havia assumido "Spring Boot 3.3.x / Java 17" como **placeholder explicitamente marcado** ("versão exata não fixada em nenhum documento — decisão deste plano"), porque nenhum documento de `./docs` fixava uma versão exata naquele momento. Esta tarefa fixa obrigatoriamente Spring Boot 4.1.0 e Java 21 — isso **substitui** aquele placeholder, não o contradiz enquanto decisão de produto (nenhuma regra de negócio dependia da versão exata do framework). O documento 22 já foi atualizado (seção 1, tabela de stack) para refletir esta correção.
+O histórico da decisão de dependências fixou Spring Boot 4.1.0 e Java 21 em um momento anterior; o backend agora foi atualizado para Java 25 (LTS). As referências à geração e validação do Initializr com Java 21 neste documento descrevem aquele processo histórico e não o runtime atual.
 
 ---
 
@@ -70,7 +72,7 @@ Extraído de `arquitetura.md` (§11.6–§11.10), `api-rest.md`, `modelo-de-dado
 
 ---
 
-# 3. Resultado da pesquisa sobre testes (Spring Boot 4.1 / Spring Framework 7 / Java 21)
+# 3. Resultado da pesquisa sobre testes (Spring Boot 4.1 / Spring Framework 7)
 
 Resumo das descobertas que fundamentam a atualização de `test-plan.md` (a atualização em si já foi aplicada diretamente naquele arquivo — ver `test-plan.md` §3.1–3.1.4 e §8 "Atualizações realizadas"; esta seção documenta a pesquisa que a embasou, para quem quiser auditar a fonte).
 
@@ -263,7 +265,7 @@ Group: com.fieldops
 Artifact: [A DEFINIR]
 ```
 
-**Packaging = Jar** não é arbitrário: `docs/plano-implementacao-backend.md` §1/§15 já planeja um `Dockerfile` multi-stage produzindo uma imagem `eclipse-temurin:21-jre-alpine` executando um artefato via `java -jar`, e nenhum documento menciona implantação em servlet container externo (Tomcat/JBoss standalone) — WAR não se aplica a esse desenho. **Group = com.fieldops** vem diretamente da estrutura de pacotes já fixada em `arquitetura.md` §11.6 (`com.fieldops.<feature>`) e usada em todo o `test-plan.md`. **Artifact** não tem um nome literal fixado em nenhum documento (o `README.MD` usa a pasta `backend/` como nome de diretório do repositório, o que não é necessariamente o `artifactId` do Maven) — marcado como `[A DEFINIR]`, decisão de time.
+**Packaging = Jar** não é arbitrário: `docs/plano-implementacao-backend.md` §1/§15 já planeja um `Dockerfile` multi-stage produzindo uma imagem `eclipse-temurin:25-jre-alpine` executando um artefato via `java -jar`, e nenhum documento menciona implantação em servlet container externo (Tomcat/JBoss standalone) — WAR não se aplica a esse desenho. **Group = com.fieldops** vem diretamente da estrutura de pacotes já fixada em `arquitetura.md` §11.6 (`com.fieldops.<feature>`) e usada em todo o `test-plan.md`. **Artifact** não tem um nome literal fixado em nenhum documento (o `README.MD` usa a pasta `backend/` como nome de diretório do repositório, o que não é necessariamente o `artifactId` do Maven) — marcado como `[A DEFINIR]`, decisão de time.
 
 Dependências a selecionar: **Spring Web, Spring Data JPA, PostgreSQL Driver, Validation, Spring Security, Flyway Migration, Testcontainers, Docker Compose Support** (seção 4).
 

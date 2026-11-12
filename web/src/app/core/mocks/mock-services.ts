@@ -29,6 +29,7 @@ import {
 import { ApiError } from '../models/api-error.model';
 import type {
   Client,
+  AuditEvent,
   DashboardSummary,
   Equipment,
   EquipmentStatus,
@@ -549,6 +550,17 @@ export class MockInspectionsService extends MockBase implements InspectionsServi
     });
   }
 
+  listHistory(id: Uuid, query: PageQuery = {}): Observable<Page<AuditEvent>> {
+    return this.respond(() => {
+      this.require(findById(this.db.inspections, id), '/inspections', id);
+      const events = this.db.auditEvents
+        .filter((event) => event.inspectionId === id)
+        .sort((left, right) => Date.parse(left.occurredAt) - Date.parse(right.occurredAt));
+      const sort = serializeSort(query.sort);
+      return paginate(events, { page: query.page, size: query.size, sort });
+    });
+  }
+
   listEvidence(id: Uuid): Observable<Evidence[]> {
     return this.respond(() => this.db.evidence[id] ?? []);
   }
@@ -567,11 +579,28 @@ export class MockInspectionsService extends MockBase implements InspectionsServi
         });
       }
 
-      return this.require(
+      const updated = this.require(
         updateEntity(this.db.inspections, id, { status: to }),
         '/inspections',
         id,
       );
+
+      if (to === 'UNDER_REVIEW') {
+        const occurredAt = nowIso();
+        this.db.auditEvents.push({
+          id: nextMockId('8100'),
+          inspectionId: id,
+          actorId: this.db.users.find((user) => user.role === 'SUPERVISOR')?.id ?? null,
+          action: 'REVIEW_STARTED',
+          entityType: 'INSPECTION',
+          entityId: id,
+          occurredAt,
+          previousValueJson: { status: from },
+          newValueJson: { status: to },
+        });
+      }
+
+      return updated;
     });
   }
 
@@ -602,6 +631,24 @@ export class MockInspectionsService extends MockBase implements InspectionsServi
       reviewCycle: cycle,
       createdAt: nowIso(),
       ...(itemsToCorrect?.length ? { itemsToCorrect } : {}),
+    });
+
+    const action = decision === 'APPROVED' ? 'INSPECTION_APPROVED' : 'INSPECTION_REJECTED';
+    const occurredAt = nowIso();
+    this.db.auditEvents.push({
+      id: nextMockId('8100'),
+      inspectionId,
+      actorId: this.db.users.find((user) => user.role === 'SUPERVISOR')?.id ?? null,
+      action,
+      entityType: 'INSPECTION',
+      entityId: inspectionId,
+      occurredAt,
+      previousValueJson: { status: 'UNDER_REVIEW' },
+      newValueJson: { status: decision },
+      metadataJson: {
+        ...(reason ? { reason } : {}),
+        ...(comments ? { comments } : {}),
+      },
     });
 
     return inspection;

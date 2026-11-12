@@ -24,11 +24,11 @@ Este projeto **já chegou com uma quantidade incomum de artefatos prontos** para
 
 ## 1. Stack tecnológica e ferramental
 
-> **Correção de versão (posterior a este documento):** a tarefa "Dependências Spring Initializr e atualização da documentação de testes" fixou obrigatoriamente **Spring Boot 4.1.0** e **Java 21**, substituindo o par Spring Boot 3.3.x/Java 17 assumido abaixo como placeholder ("versão exata não fixada em nenhum documento"). A tabela foi atualizada para refletir esse mandato explícito. Detalhamento completo de dependências, compatibilidade validada empiricamente contra o Spring Initializr e mudanças de teste decorrentes: `docs/dependencias-spring-initializr.md` (documento 23).
+> **Atualização de runtime:** este plano fixou originalmente Spring Boot 4.1.0 e Java 21; o backend agora usa Java 25 (LTS), mantendo o Spring Boot 4.1.0. O documento `docs/dependencias-spring-initializr.md` preserva o registro histórico da seleção de dependências.
 
 | Camada | Escolha | Fonte / status |
 |---|---|---|
-| Linguagem/runtime | **Java 21 (LTS)** | Mandato explícito da tarefa que produziu `docs/dependencias-spring-initializr.md` — substitui o "Java 17+" de `README.MD`, que deve ser atualizado pela equipe |
+| Linguagem/runtime | **Java 25 (LTS)** | Runtime atual do backend; substitui o Java 21 adotado originalmente |
 | Framework | **Spring Boot 4.1.0** | Idem — substitui a suposição original de Spring Boot 3.3.x |
 | Build | Maven (`pom.xml`) | Confirmado — nenhum documento de `./docs` fixa Maven vs. Gradle, mas `README.MD` já pressupõe Maven (`./mvnw spring-boot:run`); ver `docs/dependencias-spring-initializr.md` §1 |
 | Persistência | Spring Data JPA + Hibernate sobre PostgreSQL 16 | `arquitetura.md` §11.7, imagem `postgres:16-alpine` em `docker-compose.yml` |
@@ -43,7 +43,7 @@ Este projeto **já chegou com uma quantidade incomum de artefatos prontos** para
 | Testes de integração | Spring Boot Test + **Testcontainers** (`org.testcontainers:testcontainers-postgresql`, módulo renomeado no Testcontainers 2.0) + `MockMvcTester` | `test-plan.md` §3.1 (atualizado) |
 | Conformidade de contrato | `swagger-request-validator` validando respostas contra `openapi.yaml` | `test-plan.md` §3.1 |
 | Lint/análise estática | Checkstyle ou Spotless (não especificado; **decisão deste plano** — qualquer um satisfaz RNF-009) | `arquitetura.md` §11.14 (RNF-009) |
-| Contêiner | Dockerfile multi-stage (build Maven → imagem `eclipse-temurin:21-jre-alpine`) | `arquitetura.md` §11.13 ("criação de imagem de contêiner") |
+| Contêiner | Dockerfile multi-stage (build Maven → imagem `eclipse-temurin:25-jre-alpine`) | `arquitetura.md` §11.13 ("criação de imagem de contêiner") |
 
 ---
 

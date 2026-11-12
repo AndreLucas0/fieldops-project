@@ -1,6 +1,6 @@
 # Plano de Testes — FieldOps
 
-> **Atualizado para Spring Boot 4.1.0 / Java 21 / Spring Framework 7** (baseline
+> **Atualizado para Spring Boot 4.1.0 / Java 25 / Spring Framework 7** (baseline
 > obrigatório fixado junto com `docs/dependencias-spring-initializr.md`). As
 > seções relativas à API (3.1, e as adições 3.1.1–3.1.4 abaixo) foram revisadas
 > contra a documentação oficial dessas versões; o restante do documento
@@ -60,7 +60,7 @@ seção seguindo a mesma convenção. UC-18 e UC-19 aparecem na seção 5.8 como
 
 ## 3. Estratégia de testes por aplicação
 
-### 3.1 API (Java / Spring Boot 4.1.0, Spring Framework 7, Java 21)
+### 3.1 API (Java / Spring Boot 4.1.0, Spring Framework 7, Java 25)
 
 | Camada | Ferramenta | Convenção de nome | Contexto Spring? | Quando roda |
 |---|---|---|---|---|
@@ -487,7 +487,7 @@ não deve divergir da fonte da verdade normativa (`docs/regras-de-negocio.md`,
 
 ---
 
-## 8. Atualizações realizadas (revisão Spring Boot 4.1.0 / Java 21)
+## 8. Atualizações realizadas (revisão Spring Boot 4.1.0 / Java 25)
 
 Resumo da revisão feita a partir da pesquisa documentada em
 `docs/dependencias-spring-initializr.md`. Não é um changelog linha a linha —
@@ -508,7 +508,7 @@ Testcontainers de PostgreSQL foi corrigida de `postgresql` para
 Spring Boot 4.1). A tabela também ganhou uma coluna "Contexto Spring?".
 `docs/plano-implementacao-backend.md` §1 foi corrigida na mesma revisão (Java
 17/Spring Boot 3.3.x eram um placeholder explicitamente marcado como decisão
-provisória; agora refletem o mandato de Java 21/Spring Boot 4.1.0).
+provisória; agora refletem o mandato de Java 25/Spring Boot 4.1.0).
 
 **Adicionado:** 3.1.1 (dependências de teste modulares do Spring Boot 4.1 e
 como isso elimina a necessidade de adicionar manualmente um "starter de

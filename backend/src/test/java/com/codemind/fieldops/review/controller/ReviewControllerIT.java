@@ -329,6 +329,55 @@ class ReviewControllerIT {
     }
 
     @Test
+    void inspectionHistoryIsPagedAndOrderedChronologically() {
+        Inspection inspection = inspectionWithStatus(InspectionStatus.SUBMITTED);
+
+        mvc.post().uri("/inspections/" + inspection.getId() + "/begin-review")
+            .header("Authorization", bearer(supervisorToken)).exchange();
+        mvc.post().uri("/inspections/" + inspection.getId() + "/approve")
+            .header("Authorization", bearer(supervisorToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{}")
+            .exchange();
+
+        assertThat(mvc.get().uri("/inspections/" + inspection.getId() + "/history?page=0&size=1")
+            .header("Authorization", bearer(supervisorToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.totalElements").asNumber().isEqualTo(2);
+
+        assertThat(mvc.get().uri("/inspections/" + inspection.getId() + "/history?page=0&size=1")
+            .header("Authorization", bearer(supervisorToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content[*].action").asInstanceOf(InstanceOfAssertFactories.LIST)
+            .containsExactly("REVIEW_STARTED");
+
+        assertThat(mvc.get().uri("/inspections/" + inspection.getId() + "/history?page=1&size=1")
+            .header("Authorization", bearer(supervisorToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content[*].action").asInstanceOf(InstanceOfAssertFactories.LIST)
+            .containsExactly("INSPECTION_APPROVED");
+    }
+
+    @Test
+    void inspectionHistoryRequiresAnExistingInspection() {
+        assertThat(mvc.get().uri("/inspections/00000000-0000-0000-0000-000000000001/history")
+            .header("Authorization", bearer(supervisorToken)))
+            .hasStatus(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void technicianCannotReadInspectionHistory() {
+        Inspection inspection = inspectionWithStatus(InspectionStatus.SUBMITTED);
+
+        assertThat(mvc.get().uri("/inspections/" + inspection.getId() + "/history")
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatus(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
     void anonymousCannotAccessReviewEndpoints() {
         Inspection inspection = inspectionWithStatus(InspectionStatus.SUBMITTED);
 

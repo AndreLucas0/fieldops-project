@@ -3,7 +3,7 @@
     "**/node_modules/**",
     "**/.metadata/**",
     "**/archetype-resources/**",
-    "**/META-INF/maven/**",
-    "**/backend/target/**"
-  ]
+    "**/META-INF/maven/**"
+  ],
+  "java.compile.nullAnalysis.mode": "automatic"
 }

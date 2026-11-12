@@ -27,6 +27,15 @@ export const routes: Routes = [
         (m) => m.TemplatesListComponent,
       ),
   },
+  {
+    path: 'inspections/:inspectionId/review',
+    canActivate: [authGuard],
+    title: 'Revisão da inspeção — FieldOps',
+    loadComponent: () =>
+      import('./features/inspections/inspection-review.component').then(
+        (m) => m.InspectionReviewComponent,
+      ),
+  },
   // As demais telas entram aqui conforme forem implementadas. Enquanto isso,
   // um destino desconhecido volta para o painel em vez de deixar a tela vazia.
   { path: '**', redirectTo: 'dashboard' },

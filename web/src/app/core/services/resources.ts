@@ -15,6 +15,7 @@ import type { Observable } from 'rxjs';
 import { ApiService } from '../http/api.service';
 import type {
   Client,
+  AuditEvent,
   DashboardSummary,
   Equipment,
   EquipmentStatus,
@@ -120,6 +121,7 @@ export abstract class InspectionsService {
   abstract beginReview(id: Uuid): Observable<Inspection>;
   abstract approve(id: Uuid, comments?: string): Observable<Inspection>;
   abstract reject(id: Uuid, reason: string, itemsToCorrect?: Uuid[]): Observable<Inspection>;
+  abstract listHistory(id: Uuid, query?: PageQuery): Observable<Page<AuditEvent>>;
   abstract listEvidence(id: Uuid): Observable<Evidence[]>;
 }
 
@@ -278,6 +280,9 @@ export class HttpInspectionsService extends InspectionsService {
   }
   reject(id: Uuid, reason: string, itemsToCorrect: Uuid[] = []) {
     return this.api.post<Inspection>(`/inspections/${id}/reject`, { reason, itemsToCorrect });
+  }
+  listHistory(id: Uuid, query: PageQuery = {}) {
+    return this.api.getPage<AuditEvent>(`/inspections/${id}/history`, query);
   }
   listEvidence(id: Uuid) {
     return this.api.get<Evidence[]>(`/inspections/${id}/evidence`);

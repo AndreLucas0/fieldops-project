@@ -53,7 +53,7 @@ FieldOps/
 
 ### Pré-requisitos
 
-* Java 17+
+* Java 25 (LTS)
 * Node.js 18+
 * PostgreSQL
 * Expo

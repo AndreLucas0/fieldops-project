@@ -13,6 +13,7 @@
 
 import type {
   Client,
+  AuditEvent,
   Equipment,
   Evidence,
   Inspection,
@@ -86,6 +87,7 @@ export interface MockDataset {
   evidence: Record<Uuid, Evidence[]>;
   nonConformities: NonConformity[];
   reviews: MockInspectionReview[];
+  auditEvents: AuditEvent[];
 }
 
 // ---------------------------------------------------------------- usuários
@@ -994,6 +996,38 @@ export function createMockDataset(now: number = Date.now()): MockDataset {
     },
   ];
 
+  const auditEvents: AuditEvent[] = reviews.flatMap((review, index) => {
+    const startedAt = new Date(Date.parse(review.reviewedAt) - 1_000).toISOString();
+    return [
+      {
+        id: childId('8100', index + 1, 1),
+        inspectionId: review.inspectionId,
+        actorId: review.reviewerId,
+        action: 'REVIEW_STARTED',
+        entityType: 'INSPECTION',
+        entityId: review.inspectionId,
+        occurredAt: startedAt,
+        previousValueJson: { status: 'SUBMITTED' },
+        newValueJson: { status: 'UNDER_REVIEW' },
+      },
+      {
+        id: childId('8100', index + 1, 2),
+        inspectionId: review.inspectionId,
+        actorId: review.reviewerId,
+        action: review.decision === 'APPROVED' ? 'INSPECTION_APPROVED' : 'INSPECTION_REJECTED',
+        entityType: 'INSPECTION',
+        entityId: review.inspectionId,
+        occurredAt: review.reviewedAt,
+        previousValueJson: { status: 'UNDER_REVIEW' },
+        newValueJson: { status: review.decision },
+        metadataJson: {
+          ...(review.reason ? { reason: review.reason } : {}),
+          ...(review.comments ? { comments: review.comments } : {}),
+        },
+      },
+    ];
+  });
+
   return {
     users: buildUsers(now),
     clients: buildClients(now),
@@ -1008,6 +1042,7 @@ export function createMockDataset(now: number = Date.now()): MockDataset {
     evidence,
     nonConformities,
     reviews,
+    auditEvents,
   };
 }
 

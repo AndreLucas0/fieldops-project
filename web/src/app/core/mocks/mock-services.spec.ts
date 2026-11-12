@@ -278,6 +278,15 @@ describe('serviços fictícios da web', () => {
       expect((erro as ApiError).status).toBe(409);
     });
 
+    it('registra início de revisão no histórico de auditoria', async () => {
+      const service = TestBed.inject(InspectionsService);
+
+      await firstValueFrom(service.beginReview(INSPECTION_IDS.submitted));
+
+      const history = await firstValueFrom(service.listHistory(INSPECTION_IDS.submitted));
+      expect(history.content.map((event) => event.action)).toContain('REVIEW_STARTED');
+    });
+
     it('aprovar registra a revisão e a data', async () => {
       const service = TestBed.inject(InspectionsService);
       const aprovada = await firstValueFrom(

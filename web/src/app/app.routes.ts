@@ -26,6 +26,15 @@ export const routes: Routes = [
       import('./features/templates/templates-list.component').then((m) => m.TemplatesListComponent),
   },
   {
+    path: 'inspection-templates/new',
+    canActivate: [authGuard],
+    title: 'Novo modelo — FieldOps',
+    loadComponent: () =>
+      import('./features/templates/template-create.component').then(
+        (m) => m.TemplateCreateComponent,
+      ),
+  },
+  {
     path: 'inspection-templates/:templateId/edit',
     canActivate: [authGuard],
     title: 'Construtor de modelo — FieldOps',

@@ -273,9 +273,13 @@ export class TemplatesListComponent {
     {
       field: 'title',
       label: 'Título',
-      sortable: true,
       type: 'link',
-      link: (row) => ['/inspection-templates', row.id, 'edit'],
+      link: (row) => [
+        '/inspection-templates',
+        row.id,
+        'edit',
+      ],
+      sortable: true,
     },
     { field: 'category', label: 'Categoria', sortable: true },
     {

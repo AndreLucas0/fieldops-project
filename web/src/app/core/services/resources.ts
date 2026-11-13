@@ -145,44 +145,68 @@ function normalizeVersion(
   };
 }
 
+
 export abstract class TemplatesService {
   abstract create(
     input: Pick<InspectionTemplate, 'title' | 'category' | 'description'>,
   ): Observable<InspectionTemplate>;
-  abstract publish(templateId: Uuid): Observable<InspectionTemplateVersionDetail>;
-  abstract list(query?: PageQuery<TemplateFilters>): Observable<Page<InspectionTemplate>>;
+
+  abstract publish(
+    templateId: Uuid,
+  ): Observable<InspectionTemplateVersionDetail>;
+
+  abstract list(
+    query?: PageQuery<TemplateFilters>,
+  ): Observable<Page<InspectionTemplate>>;
+
   abstract get(id: Uuid): Observable<InspectionTemplate>;
-  /** Dados gerais (título, descrição, categoria) — só vale para modelos DRAFT (RN-018). */
-  abstract update(id: Uuid, input: Partial<InspectionTemplate>): Observable<InspectionTemplate>;
+
+  /** Dados gerais — só vale para modelos DRAFT (RN-018). */
+  abstract update(
+    id: Uuid,
+    input: Partial<InspectionTemplate>,
+  ): Observable<InspectionTemplate>;
+
   abstract listVersions(
     templateId: Uuid,
     query?: PageQuery,
   ): Observable<Page<InspectionTemplateVersionDetail>>;
-  abstract getVersion(versionId: Uuid): Observable<InspectionTemplateVersionDetail>;
+
+  abstract getVersion(
+    versionId: Uuid,
+  ): Observable<InspectionTemplateVersionDetail>;
+
   /** Seções do rascunho, editadas pelo construtor (FE-W15). */
-  abstract listDraftSections(templateId: Uuid): Observable<TemplateSectionDetail[]>;
+  abstract listDraftSections(
+    templateId: Uuid,
+  ): Observable<TemplateSectionDetail[]>;
+
   /** 409 se o modelo não tiver uma versão rascunho editável (RN-019). */
   abstract createSection(
     templateId: Uuid,
     input: Partial<TemplateSection>,
   ): Observable<TemplateSectionDetail>;
+
   abstract updateSection(
     templateId: Uuid,
     sectionId: Uuid,
     input: Partial<TemplateSection>,
   ): Observable<TemplateSectionDetail>;
-  /** `responseType` restrito aos 7 valores do MVP (RN-023). */
+
+  /** responseType restrito aos 7 valores do MVP (RN-023). */
   abstract createItem(
     templateId: Uuid,
     sectionId: Uuid,
     input: Partial<TemplateItem>,
   ): Observable<TemplateItem>;
+
   abstract updateItem(
     templateId: Uuid,
     itemId: Uuid,
     input: Partial<TemplateItem>,
   ): Observable<TemplateItem>;
 }
+
 
 export abstract class InspectionsService {
   abstract list(query?: PageQuery<InspectionFilters>): Observable<Page<Inspection>>;
@@ -443,3 +467,5 @@ export const HTTP_RESOURCE_PROVIDERS = [
   { provide: NonConformitiesService, useClass: HttpNonConformitiesService },
   { provide: DashboardService, useClass: HttpDashboardService },
 ];
+
+

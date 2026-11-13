@@ -47,6 +47,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test -- --runInBand
+      - run: npx expo export --platform web --output-dir "${{ runner.temp }}/fieldops-mobile-web"
+      - run: npx expo export --platform android --output-dir "${{ runner.temp }}/fieldops-mobile-android"
 
   backend:
     runs-on: ubuntu-24.04

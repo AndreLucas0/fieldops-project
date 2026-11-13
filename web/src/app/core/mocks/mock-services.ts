@@ -363,73 +363,27 @@ export class MockEquipmentService extends MockBase implements EquipmentService {
 
 @Injectable()
 export class MockTemplatesService extends MockBase implements TemplatesService {
-  private readonly auth = inject(AuthStore);
-
-  create(
-    input: Pick<InspectionTemplate, 'title' | 'category' | 'description'>,
-  ): Observable<InspectionTemplate> {
+  create(input: Partial<InspectionTemplate>): Observable<InspectionTemplate> {
     return this.respond(() => {
-      if (!input.title.trim() || !input.category.trim()) {
-        throw new ApiError({
-          kind: 'BAD_REQUEST',
-          status: 400,
-          code: 'VALIDATION_ERROR',
-          userMessage: 'Informe título e categoria.',
-        });
-      }
-      return insertEntity(this.db.templates, {
-        ...input,
-        id: nextMockId('5400'),
-        status: 'DRAFT',
-        createdBy: this.auth.user()?.id,
-        createdAt: nowIso(),
-        updatedAt: nowIso(),
-        version: 0,
-      });
-    });
-  }
+      const timestamp = nowIso();
 
-  publish(templateId: Uuid): Observable<InspectionTemplateVersionDetail> {
-    return this.respond(() => {
-      const template = this.requireDraftTemplate(templateId);
-      const sections = this.draftSectionsOf(templateId);
-      if (!sections.length || !sections.some((section) => section.items?.length)) {
-        throw new ApiError({
-          kind: 'UNPROCESSABLE',
-          status: 422,
-          code: 'TEMPLATE_HAS_NO_ITEMS',
-          userMessage: 'Adicione pelo menos uma seção com itens antes de publicar.',
-        });
-      }
-      const publisher = this.auth.user()?.id;
-      if (!publisher)
-        throw new ApiError({
-          kind: 'UNAUTHORIZED',
-          status: 401,
-          code: 'AUTH_REQUIRED',
-          userMessage: 'Entre novamente para publicar.',
-        });
-      const version: InspectionTemplateVersionDetail = {
+      const template: InspectionTemplate = {
         id: nextMockId('5500'),
-        templateId,
-        versionNumber: (template.currentVersion ?? 0) + 1,
-        titleSnapshot: template.title,
-        descriptionSnapshot: template.description,
-        publishedBy: publisher,
-        publishedAt: nowIso(),
-        createdAt: nowIso(),
-        activeForNewInspections: true,
-        sections: structuredClone(sections),
+        title: input.title ?? 'Novo modelo',
+        description: input.description ?? null,
+        category: input.category ?? 'GERAL',
+        status: 'DRAFT',
+        currentVersion: null,
+        createdBy: '',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        version: 1,
       };
-      for (const previous of this.db.templateVersions.filter((v) => v.templateId === templateId))
-        previous.activeForNewInspections = false;
-      for (const section of version.sections ?? []) section.templateVersionId = version.id;
-      this.db.templateVersions.push(version);
-      template.status = 'ACTIVE';
-      template.currentVersion = version.versionNumber;
-      template.updatedAt = nowIso();
-      delete this.db.draftSections[templateId];
-      return version;
+
+      insertEntity(this.db.templates, template);
+      this.db.draftSections[template.id] = [];
+
+      return template;
     });
   }
   list(query: PageQuery<TemplateFilters> = {}): Observable<Page<InspectionTemplate>> {
@@ -456,6 +410,100 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
       );
     });
   }
+
+
+  publish(templateId: Uuid): Observable<InspectionTemplateVersionDetail> {
+    return this.respond(() => {
+      const template = this.requireDraftTemplate(templateId);
+      const draftSections = this.draftSectionsOf(templateId);
+
+    // RN-015: o modelo precisa ter título, categoria,
+    // seção e pelo menos um item válido.
+    if (!template.title.trim() || !template.category.trim()) {
+      throw new ApiError({
+        kind: 'UNPROCESSABLE',
+        status: 422,
+        code: 'TEMPLATE_REQUIRED_FIELDS',
+        userMessage: 'Preencha o título e a categoria do modelo.',
+      });
+    }
+
+    const hasValidSection = draftSections.some(
+      (section) =>
+        section.title.trim().length > 0 &&
+        (section.items ?? []).some(
+          (item) =>
+            item.title.trim().length > 0 &&
+            !!item.responseType,
+        ),
+    );
+
+    if (!hasValidSection) {
+      throw new ApiError({
+        kind: 'UNPROCESSABLE',
+        status: 422,
+        code: 'TEMPLATE_WITHOUT_VALID_ITEMS',
+        userMessage:
+          'Adicione pelo menos uma seção com um item válido antes de publicar.',
+      });
+    }
+
+    const timestamp = nowIso();
+    const versionNumber = (template.currentVersion ?? 0) + 1;
+    const versionId = nextMockId('5800');
+
+    // Cria uma cópia independente das seções e dos itens.
+    const sections: TemplateSectionDetail[] = draftSections.map(
+      (section) => {
+        const sectionId = nextMockId('5600');
+
+        const items: TemplateItem[] = (section.items ?? []).map(
+          (item) => ({
+            ...item,
+            id: nextMockId('5700'),
+            sectionId,
+          }),
+        );
+
+        return {
+          ...section,
+          id: sectionId,
+          templateVersionId: versionId,
+          items,
+        };
+      },
+    );
+
+    const publishedVersion: InspectionTemplateVersionDetail = {
+      id: versionId,
+      templateId: template.id,
+      versionNumber,
+      titleSnapshot: template.title,
+      descriptionSnapshot: template.description ?? null,
+      publishedBy: template.createdBy ?? '',
+      publishedAt: timestamp,
+      activeForNewInspections: true,
+      createdAt: timestamp,
+      sections,
+    };
+
+    // Registra a versão publicada.
+    insertEntity(this.db.templateVersions, publishedVersion);
+
+    // Atualiza o modelo para ACTIVE.
+    this.require(
+      updateEntity(this.db.templates, templateId, {
+        status: 'ACTIVE',
+        currentVersion: versionNumber,
+      }),
+      '/inspection-templates',
+      templateId,
+    );
+
+    return publishedVersion;
+  });
+}
+
 
   listVersions(
     templateId: Uuid,

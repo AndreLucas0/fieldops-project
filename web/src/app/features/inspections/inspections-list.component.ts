@@ -92,117 +92,127 @@ function formatDay(day: string): string {
     PageHeaderComponent,
   ],
   template: `
-    <section class="page inspection-list-page">
-      <app-page-header
-        title="Inspeções"
-        subtitle="Acompanhe o planejamento e cancele quando necessário."
-      >
-        <div actions>
-          @if (canManage()) {
-            <button matButton="filled" (click)="createNew()">
-              <mat-icon>add</mat-icon>
-              Nova inspeção
-            </button>
-          }
-        </div>
-      </app-page-header>
+<section class="page inspection-list-page">
+  <app-page-header
+    title="Inspeções"
+    subtitle="Acompanhe o planejamento e cancele quando necessário."
+  >
+    <div actions>
+      @if (canManage()) {
+        <button matButton="filled" (click)="createNew()">
+          <mat-icon>add</mat-icon>
+          Nova inspeção
+        </button>
+      }
+    </div>
+  </app-page-header>
 
-      <section class="content-panel">
-        <div class="filter-section">
-          <div class="filter-heading">
-            <div>
-              <h2>Filtros</h2>
-              <p>Encontre inspeções usando os critérios abaixo.</p>
-            </div>
-
-            <button matButton type="button" (click)="onFilter([])">
-              <mat-icon>filter_alt_off</mat-icon>
-              Limpar filtros
-            </button>
-          </div>
-
-          <div class="filters" aria-label="Filtros de inspeções">
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Estado</mat-label>
-              <mat-select [ngModel]="status()" (ngModelChange)="setStatus($event)">
-                <mat-option [value]="null">Todos</mat-option>
-                @for (option of statusOptions; track option.value) {
-                  <mat-option [value]="option.value">
-                    {{ option.label }}
-                  </mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Técnico</mat-label>
-              <mat-select [ngModel]="technicianId()" (ngModelChange)="setTechnician($event)">
-                <mat-option [value]="null">Todos</mat-option>
-                @for (technician of technicians(); track technician.id) {
-                  <mat-option [value]="technician.id">
-                    {{ technician.name }}
-                  </mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Cliente</mat-label>
-              <mat-select [ngModel]="clientId()" (ngModelChange)="setClient($event)">
-                <mat-option [value]="null">Todos</mat-option>
-                @for (client of clientOptions(); track client.id) {
-                  <mat-option [value]="client.id">
-                    {{ client.name }}
-                  </mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Agendada a partir de</mat-label>
-              <input
-                matInput
-                type="date"
-                [ngModel]="from()"
-                [max]="to() || null"
-                (ngModelChange)="setFrom($event)"
-              />
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Agendada até</mat-label>
-              <input
-                matInput
-                type="date"
-                [ngModel]="to()"
-                [min]="from() || null"
-                (ngModelChange)="setTo($event)"
-              />
-            </mat-form-field>
-          </div>
+  <section class="content-panel">
+    <div class="filter-section">
+      <div class="filter-heading">
+        <div>
+          <h2>Filtros</h2>
+          <p>Encontre inspeções usando os critérios abaixo.</p>
         </div>
 
-        <div class="table-section">
-          <app-data-table
-            [columns]="columns()"
-            [data]="data()"
-            [loading]="loading()"
-            [error]="error()"
-            [activeFilters]="activeFilters()"
-            [sort]="sort()"
-            ariaLabel="Inspeções"
-            emptyIcon="assignment"
-            emptyTitle="Nenhuma inspeção encontrada"
-            [emptyMessage]="emptyMessage()"
-            (pageChange)="onPage($event)"
-            (sortChange)="onSort($event)"
-            (filterChange)="onFilter($event)"
-            (rowAction)="onRowAction($event)"
-            (retry)="load()"
+        <button matButton type="button" (click)="onFilter([])">
+          <mat-icon>filter_alt_off</mat-icon>
+          Limpar filtros
+        </button>
+      </div>
+
+      <div class="filters" aria-label="Filtros de inspeções">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Estado</mat-label>
+          <mat-select
+            [ngModel]="status()"
+            (ngModelChange)="setStatus($event)"
+          >
+            <mat-option [value]="null">Todos</mat-option>
+            @for (option of statusOptions; track option.value) {
+              <mat-option [value]="option.value">
+                {{ option.label }}
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Técnico</mat-label>
+          <mat-select
+            [ngModel]="technicianId()"
+            (ngModelChange)="setTechnician($event)"
+          >
+            <mat-option [value]="null">Todos</mat-option>
+            @for (technician of technicians(); track technician.id) {
+              <mat-option [value]="technician.id">
+                {{ technician.name }}
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Cliente</mat-label>
+          <mat-select
+            [ngModel]="clientId()"
+            (ngModelChange)="setClient($event)"
+          >
+            <mat-option [value]="null">Todos</mat-option>
+            @for (client of clientOptions(); track client.id) {
+              <mat-option [value]="client.id">
+                {{ client.name }}
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Agendada a partir de</mat-label>
+          <input
+            matInput
+            type="date"
+            [ngModel]="from()"
+            [max]="to() || null"
+            (ngModelChange)="setFrom($event)"
           />
-        </div>
-      </section>
-    </section>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Agendada até</mat-label>
+          <input
+            matInput
+            type="date"
+            [ngModel]="to()"
+            [min]="from() || null"
+            (ngModelChange)="setTo($event)"
+          />
+        </mat-form-field>
+      </div>
+    </div>
+
+    <div class="table-section">
+      <app-data-table
+        [columns]="columns()"
+        [data]="data()"
+        [loading]="loading()"
+        [rowLink]="inspectionRowLink"
+        [error]="error()"
+        [activeFilters]="activeFilters()"
+        [sort]="sort()"
+        ariaLabel="Inspeções"
+        emptyIcon="assignment"
+        emptyTitle="Nenhuma inspeção encontrada"
+        [emptyMessage]="emptyMessage()"
+        (pageChange)="onPage($event)"
+        (sortChange)="onSort($event)"
+        (filterChange)="onFilter($event)"
+        (rowAction)="onRowAction($event)"
+        (retry)="load()"
+      />
+    </div>
+  </section>
+</section>
   `,
 
   styles: `
@@ -331,6 +341,11 @@ export class InspectionsListComponent {
 
   protected readonly isSupervisor = computed(() => this.auth.role() === 'SUPERVISOR');
 
+  protected readonly inspectionRowLink = (row: Inspection) => [
+    '/inspections',
+    row.id,
+  ];
+
   protected readonly technicians = signal<User[]>([]);
   protected readonly clientOptions = signal<Client[]>([]);
 
@@ -354,17 +369,19 @@ export class InspectionsListComponent {
   protected readonly columns = computed<readonly TableColumn<Inspection>[]>(() => {
     const technicianNames = new Map(this.technicians().map((user) => [user.id, user.name]));
 
-    const clientNames = new Map(this.clientOptions().map((client) => [client.id, client.name]));
+
+
+    const clientNames = new Map(
+      this.clientOptions().map((client) => [client.id, client.name])
+    );
 
     return [
       {
         field: 'title',
         label: 'Inspeção',
-        type: 'link',
         sortable: true,
         width: '18rem',
         emptyText: 'Sem título',
-        link: (row) => ['/inspections', row.id],
       },
       {
         field: 'clientId',
@@ -575,11 +592,18 @@ export class InspectionsListComponent {
 
   protected onRowAction(event: RowActionEvent<Inspection>): void {
     if (event.action === 'review') {
-      if (!this.isSupervisor() || !['SUBMITTED', 'UNDER_REVIEW'].includes(event.row.status)) {
+      if (
+        !this.isSupervisor() ||
+        !['SUBMITTED', 'UNDER_REVIEW'].includes(event.row.status)
+      ) {
         return;
       }
 
-      void this.router.navigate(['/inspections', event.row.id, 'review']);
+      void this.router.navigate([
+        '/inspections',
+        event.row.id,
+        'review',
+      ]);
 
       return;
     }

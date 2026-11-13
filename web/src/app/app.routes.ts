@@ -23,9 +23,8 @@ const ADMIN_FEATURE_ROUTES: Routes = [
     path: 'inspections/:inspectionId/review',
     title: 'Revisão da inspeção — FieldOps',
     loadComponent: () =>
-      import('./features/inspections/inspection-review.component').then(
-        (m) => m.InspectionReviewComponent,
-      ),
+      import('./features/inspections/inspection-review.component')
+        .then((m) => m.InspectionReviewComponent),
   },
   {
     path: 'inspections/:inspectionId',
@@ -101,24 +100,8 @@ export const routes: Routes = [
         path: 'inspection-templates/new',
         title: 'Novo modelo — FieldOps',
         loadComponent: () =>
-          import('./features/templates/template-create.component').then(
-            (m) => m.TemplateCreateComponent,
-          ),
-      },
-      {
-        path: 'inspection-templates/:templateId/preview',
-        title: 'Prévia do modelo — FieldOps',
-        loadComponent: () =>
-          import('./features/templates/template-preview.component').then(
-            (m) => m.TemplatePreviewComponent,
-          ),
-      },
-      {
-        path: 'inspection-templates/:templateId/versions',
-        title: 'Versões do modelo — FieldOps',
-        loadComponent: () =>
-          import('./features/templates/template-versions.component').then(
-            (m) => m.TemplateVersionsComponent,
+          import('./features/templates/template-builder.component').then(
+            (module) => module.TemplateBuilderComponent,
           ),
       },
       {

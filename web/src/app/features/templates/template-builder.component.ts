@@ -66,226 +66,248 @@ import { TemplateSectionFormDialogService } from './template-section-form-dialog
     StatusBadgeComponent,
   ],
   template: `
-    <div class="page">
-      <app-page-header
-        [title]="pageTitle()"
-        subtitle="Monte as seções e os itens do checklist."
-        [breadcrumbs]="[
-          { label: 'Modelos de inspeção', link: '/inspection-templates' },
-          { label: pageTitle() },
-        ]"
-      >
-        <a actions matButton [routerLink]="['/inspection-templates', templateId(), 'preview']">
-          <mat-icon>visibility</mat-icon>
-          Ver prévia
-        </a>
-      </app-page-header>
+    
+<div class="page">
+ 
+<app-page-header
+  [title]="pageTitle()"
+  subtitle="Monte as seções e os itens do checklist."
+  [breadcrumbs]="[
+    { label: 'Modelos de inspeção', link: '/inspection-templates' },
+    { label: pageTitle() },
+  ]"
+>
+  @if (!isCreating()) {
+    <a
+      actions
+      matButton
+      [routerLink]="['/inspection-templates', templateId(), 'preview']"
+    >
+      <mat-icon>visibility</mat-icon>
+      Ver prévia
+    </a>
+  }
+</app-page-header>
 
-      @if (loading()) {
-        <app-loading-state variant="form" [rows]="4" label="Carregando modelo…" />
-      } @else if (error(); as apiError) {
-        <div class="error" role="alert">
-          <mat-icon aria-hidden="true">error_outline</mat-icon>
-          <p>{{ apiError.userMessage }}</p>
-          <button matButton="filled" type="button" (click)="load()">
-            <mat-icon>refresh</mat-icon>
-            Tentar novamente
-          </button>
-        </div>
-      } @else if (template(); as tpl) {
-        <app-status-badge class="status" [value]="tpl.status" context="template" />
 
-        @if (!canEditDraft()) {
-          <div class="notice" role="status">
-            <mat-icon aria-hidden="true">info</mat-icon>
-            <p>
-              Este modelo não está em rascunho — modelos
-              {{ tpl.status === 'ACTIVE' ? 'ativos' : 'inativos' }}
-              não podem ser editados aqui (RN-018). Consulte o histórico de versões para ver o
-              conteúdo publicado.
-            </p>
-          </div>
-        }
-
-        <mat-card class="general">
-          <mat-card-content class="general__fields">
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Título</mat-label>
-              <input
-                matInput
-                [disabled]="!canEditDraft()"
-                [ngModel]="generalTitle()"
-                (ngModelChange)="generalTitle.set($event)"
-              />
-            </mat-form-field>
-
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-label>Categoria</mat-label>
-              <input
-                matInput
-                [disabled]="!canEditDraft()"
-                [ngModel]="generalCategory()"
-                (ngModelChange)="generalCategory.set($event)"
-              />
-            </mat-form-field>
-
-            <mat-form-field
-              appearance="outline"
-              subscriptSizing="dynamic"
-              class="general__description"
-            >
-              <mat-label>Descrição</mat-label>
-              <textarea
-                matInput
-                rows="2"
-                [disabled]="!canEditDraft()"
-                [ngModel]="generalDescription()"
-                (ngModelChange)="generalDescription.set($event)"
-              ></textarea>
-            </mat-form-field>
-          </mat-card-content>
-
-          @if (canEditDraft()) {
-            <mat-card-actions align="end">
-              <button
-                matButton
-                type="button"
-                [disabled]="saving() || !generalChanged()"
-                (click)="saveGeneral()"
-              >
-                Salvar dados gerais
-              </button>
-            </mat-card-actions>
-          }
-        </mat-card>
-
-        @if (sections().length === 0) {
-          <app-empty-state
-            icon="view_list"
-            title="Nenhuma seção ainda"
-            message="Organize as perguntas em seções — por exemplo, por área ou etapa da inspeção."
-            [actionLabel]="canEditDraft() ? 'Nova seção' : null"
-            (action)="addSection()"
-          />
-        } @else {
-          <div class="sections">
-            @for (section of sections(); track section.id; let first = $first; let last = $last) {
-              <mat-card class="section">
-                <mat-card-header class="section__header">
-                  <mat-card-title>{{ section.title }}</mat-card-title>
-                  @if (section.description) {
-                    <mat-card-subtitle>{{ section.description }}</mat-card-subtitle>
-                  }
-
-                  @if (canEditDraft()) {
-                    <div class="section__actions">
-                      <button
-                        matIconButton
-                        type="button"
-                        aria-label="Mover seção para cima"
-                        [disabled]="first || saving()"
-                        (click)="moveSection(section, -1)"
-                      >
-                        <mat-icon>arrow_upward</mat-icon>
-                      </button>
-                      <button
-                        matIconButton
-                        type="button"
-                        aria-label="Mover seção para baixo"
-                        [disabled]="last || saving()"
-                        (click)="moveSection(section, 1)"
-                      >
-                        <mat-icon>arrow_downward</mat-icon>
-                      </button>
-                      <button
-                        matIconButton
-                        type="button"
-                        aria-label="Editar seção"
-                        (click)="editSection(section)"
-                      >
-                        <mat-icon>edit</mat-icon>
-                      </button>
-                    </div>
-                  }
-                </mat-card-header>
-
-                <mat-card-content>
-                  @if ((section.items ?? []).length === 0) {
-                    <p class="section__empty">Nenhum item nesta seção ainda.</p>
-                  } @else {
-                    <ul class="items">
-                      @for (
-                        item of section.items ?? [];
-                        track item.id;
-                        let firstItem = $first;
-                        let lastItem = $last
-                      ) {
-                        <li class="item">
-                          <div class="item__text">
-                            <span class="item__title">{{ item.title }}</span>
-                            <span class="item__meta">
-                              {{ responseTypeLabel(item) }}
-                              @if (item.required) {
-                                · Obrigatório
-                              }
-                            </span>
-                          </div>
-
-                          @if (canEditDraft()) {
-                            <div class="item__actions">
-                              <button
-                                matIconButton
-                                type="button"
-                                aria-label="Mover item para cima"
-                                [disabled]="firstItem || saving()"
-                                (click)="moveItem(section, item, -1)"
-                              >
-                                <mat-icon>arrow_upward</mat-icon>
-                              </button>
-                              <button
-                                matIconButton
-                                type="button"
-                                aria-label="Mover item para baixo"
-                                [disabled]="lastItem || saving()"
-                                (click)="moveItem(section, item, 1)"
-                              >
-                                <mat-icon>arrow_downward</mat-icon>
-                              </button>
-                              <button
-                                matIconButton
-                                type="button"
-                                aria-label="Editar item"
-                                (click)="editItem(section, item)"
-                              >
-                                <mat-icon>edit</mat-icon>
-                              </button>
-                            </div>
-                          }
-                        </li>
-                      }
-                    </ul>
-                  }
-
-                  @if (canEditDraft()) {
-                    <button matButton type="button" (click)="addItem(section)">
-                      <mat-icon>add</mat-icon>
-                      Novo item
-                    </button>
-                  }
-                </mat-card-content>
-              </mat-card>
-            }
-          </div>
-
-          @if (canEditDraft()) {
-            <button matButton="outlined" type="button" class="add-section" (click)="addSection()">
-              <mat-icon>add</mat-icon>
-              Nova seção
-            </button>
-          }
-        }
-      }
+  @if (loading()) {
+    <app-loading-state variant="form" [rows]="4" label="Carregando modelo…" />
+  } @else if (error(); as apiError) {
+    <div class="error" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <p>{{ apiError.userMessage }}</p>
+      <button matButton="filled" type="button" (click)="load()">
+        <mat-icon>refresh</mat-icon>
+        Tentar novamente
+      </button>
     </div>
+  } @else if (template(); as tpl) {
+    <app-status-badge class="status" [value]="tpl.status" context="template" />
+
+    @if (!canEditDraft()) {
+      <div class="notice" role="status">
+        <mat-icon aria-hidden="true">info</mat-icon>
+        <p>
+          Este modelo não está em rascunho — modelos
+          {{ tpl.status === 'ACTIVE' ? 'ativos' : 'inativos' }}
+          não podem ser editados aqui (RN-018). Consulte o histórico de versões para ver o
+          conteúdo publicado.
+        </p>
+      </div>
+    }
+
+    <mat-card class="general">
+      <mat-card-content class="general__fields">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Título</mat-label>
+          <input
+            matInput
+            [disabled]="!canEditDraft()"
+            [ngModel]="generalTitle()"
+            (ngModelChange)="generalTitle.set($event)"
+          />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Categoria</mat-label>
+          <input
+            matInput
+            [disabled]="!canEditDraft()"
+            [ngModel]="generalCategory()"
+            (ngModelChange)="generalCategory.set($event)"
+          />
+        </mat-form-field>
+
+        <mat-form-field
+          appearance="outline"
+          subscriptSizing="dynamic"
+          class="general__description"
+        >
+          <mat-label>Descrição</mat-label>
+          <textarea
+            matInput
+            rows="2"
+            [disabled]="!canEditDraft()"
+            [ngModel]="generalDescription()"
+            (ngModelChange)="generalDescription.set($event)"
+          ></textarea>
+        </mat-form-field>
+      </mat-card-content>
+
+      @if (canEditDraft()) {
+        <mat-card-actions align="end">
+          <button
+            matButton
+            type="button"
+            [disabled]="saving() || !generalChanged()"
+            (click)="saveGeneral()"
+          >
+            Salvar dados gerais
+          </button>
+        </mat-card-actions>
+      }
+    </mat-card>
+
+    @if (sections().length === 0) {
+      <app-empty-state
+        icon="view_list"
+        title="Nenhuma seção ainda"
+        message="Organize as perguntas em seções — por exemplo, por área ou etapa da inspeção."
+        [actionLabel]="canEditDraft() ? 'Nova seção' : null"
+        (action)="addSection()"
+      />
+    } @else {
+      <div class="sections">
+        @for (section of sections(); track section.id; let first = $first; let last = $last) {
+          <mat-card class="section">
+            <mat-card-header class="section__header">
+              <mat-card-title>{{ section.title }}</mat-card-title>
+
+              @if (section.description) {
+                <mat-card-subtitle>{{ section.description }}</mat-card-subtitle>
+              }
+
+              @if (canEditDraft()) {
+                <div class="section__actions">
+                  <button
+                    matIconButton
+                    type="button"
+                    aria-label="Mover seção para cima"
+                    [disabled]="first || saving()"
+                    (click)="moveSection(section, -1)"
+                  >
+                    <mat-icon>arrow_upward</mat-icon>
+                  </button>
+
+                  <button
+                    matIconButton
+                    type="button"
+                    aria-label="Mover seção para baixo"
+                    [disabled]="last || saving()"
+                    (click)="moveSection(section, 1)"
+                  >
+                    <mat-icon>arrow_downward</mat-icon>
+                  </button>
+
+                  <button
+                    matIconButton
+                    type="button"
+                    aria-label="Editar seção"
+                    (click)="editSection(section)"
+                  >
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                </div>
+              }
+            </mat-card-header>
+
+            <mat-card-content>
+              @if ((section.items ?? []).length === 0) {
+                <p class="section__empty">Nenhum item nesta seção ainda.</p>
+              } @else {
+                <ul class="items">
+                  @for (
+                    item of section.items ?? [];
+                    track item.id;
+                    let firstItem = $first;
+                    let lastItem = $last
+                  ) {
+                    <li class="item">
+                      <div class="item__text">
+                        <span class="item__title">{{ item.title }}</span>
+
+                        <span class="item__meta">
+                          {{ responseTypeLabel(item) }}
+
+                          @if (item.required) {
+                            · Obrigatório
+                          }
+                        </span>
+                      </div>
+
+                      @if (canEditDraft()) {
+                        <div class="item__actions">
+                          <button
+                            matIconButton
+                            type="button"
+                            aria-label="Mover item para cima"
+                            [disabled]="firstItem || saving()"
+                            (click)="moveItem(section, item, -1)"
+                          >
+                            <mat-icon>arrow_upward</mat-icon>
+                          </button>
+
+                          <button
+                            matIconButton
+                            type="button"
+                            aria-label="Mover item para baixo"
+                            [disabled]="lastItem || saving()"
+                            (click)="moveItem(section, item, 1)"
+                          >
+                            <mat-icon>arrow_downward</mat-icon>
+                          </button>
+
+                          <button
+                            matIconButton
+                            type="button"
+                            aria-label="Editar item"
+                            (click)="editItem(section, item)"
+                          >
+                            <mat-icon>edit</mat-icon>
+                          </button>
+                        </div>
+                      }
+                    </li>
+                  }
+                </ul>
+              }
+
+              @if (canEditDraft()) {
+                <button matButton type="button" (click)="addItem(section)">
+                  <mat-icon>add</mat-icon>
+                  Novo item
+                </button>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
+      </div>
+
+      @if (canEditDraft()) {
+        <button
+          matButton="outlined"
+          type="button"
+          class="add-section"
+          (click)="addSection()"
+        >
+          <mat-icon>add</mat-icon>
+          Nova seção
+        </button>
+      }
+    }
+  }
+</div>
+
   `,
   styles: `
     :host {
@@ -406,7 +428,9 @@ export class TemplateBuilderComponent implements OnInit {
   private readonly sectionDialog = inject(TemplateSectionFormDialogService);
   private readonly itemDialog = inject(TemplateItemFormDialogService);
 
-  readonly templateId = input.required<string>();
+  readonly templateId = input<string | null>(null);
+
+  protected readonly isCreating = computed(() => !this.templateId());
 
   protected readonly loading = signal(false);
   protected readonly saving = signal(false);
@@ -418,7 +442,11 @@ export class TemplateBuilderComponent implements OnInit {
   protected readonly generalCategory = signal('');
   protected readonly generalDescription = signal('');
 
-  protected readonly pageTitle = computed(() => this.template()?.title ?? 'Modelo de inspeção');
+  protected readonly pageTitle = computed(() =>
+    this.isCreating()
+      ? 'Novo modelo'
+      : this.template()?.title ?? 'Modelo de inspeção',
+  );
 
   protected readonly canEditDraft = computed(
     () => this.template()?.status === 'DRAFT' && canWrite('inspection-templates', this.auth.role()),
@@ -435,11 +463,21 @@ export class TemplateBuilderComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    if (this.isCreating()) {
+      this.startNewTemplate();
+      return;
+    }
+
     this.load();
   }
 
   protected load(): void {
     const id = this.templateId();
+
+    if (!id) {
+      this.startNewTemplate();
+      return;
+    }
     this.loading.set(true);
     this.error.set(null);
 
@@ -475,9 +513,32 @@ export class TemplateBuilderComponent implements OnInit {
       }));
   }
 
+  private startNewTemplate(): void {
+    this.template.set({
+      id: '',
+      title: '',
+      description: null,
+      category: '',
+      status: 'DRAFT',
+      currentVersion: null,
+      createdBy: '',
+      createdAt: '',
+      updatedAt: '',
+      version: 1,
+    });
+
+    this.generalTitle.set('');
+    this.generalCategory.set('');
+    this.generalDescription.set('');
+    this.sections.set([]);
+  }
+
   /** Recarrega só as seções, sem o esqueleto de página inteira. */
   private reloadSections(): void {
-    this.templates.listDraftSections(this.templateId()).subscribe((sections) => {
+    const templateId = this.templateId();
+    if (!templateId) return;
+
+    this.templates.listDraftSections(templateId).subscribe((sections) => {
       this.sections.set(this.sortTree(sections));
     });
   }
@@ -487,29 +548,84 @@ export class TemplateBuilderComponent implements OnInit {
   }
 
   protected saveGeneral(): void {
+    if (this.saving()) return;
+
+    const input = {
+      title: this.generalTitle().trim(),
+      category: this.generalCategory().trim(),
+      description: this.generalDescription().trim() || null,
+    };
+
+    if (!input.title || !input.category) {
+      this.notifications.error('Preencha o título e a categoria.');
+      return;
+    }
+
     const tpl = this.template();
-    if (!tpl || this.saving()) return;
+
+    // O modelo provisório possui ID vazio.
+    // Só usamos update quando ele já foi criado.
+    const isNew = !tpl?.id;
 
     this.saving.set(true);
-    this.templates
-      .update(tpl.id, {
-        title: this.generalTitle().trim(),
-        category: this.generalCategory().trim(),
-        description: this.generalDescription().trim() || null,
-      })
+
+    const request = isNew
+      ? this.templates.create(input)
+      : this.templates.update(tpl.id, input);
+
+    request
       .pipe(finalize(() => this.saving.set(false)))
-      .subscribe((updated) => {
-        this.applyTemplate(updated);
-        this.notifications.success('Dados gerais atualizados.');
+      .subscribe({
+        next: (saved) => {
+          this.applyTemplate(saved);
+
+          this.notifications.success(
+            isNew
+              ? 'Modelo criado com sucesso.'
+              : 'Dados gerais atualizados.',
+          );
+        },
+        error: (error: unknown) => {
+          this.notifications.error(
+            isApiError(error)
+              ? error.userMessage
+              : 'Não foi possível salvar o modelo.',
+          );
+        },
       });
   }
 
   protected addSection(): void {
     this.sectionDialog.open({}).subscribe((result) => {
       if (!result) return;
+
+      const nextOrder = this.sections().length + 1;
+      const templateId = this.templateId();
+
+      // Modelo novo: mantém a seção na tela, sem chamar a API.
+      if (!templateId) {
+        const newSection: TemplateSectionDetail = {
+          id: `local-${crypto.randomUUID()}`,
+          templateVersionId: '',
+          title: result.title,
+          description: result.description,
+          displayOrder: nextOrder,
+          createdAt: new Date().toISOString(),
+          items: [],
+        };
+
+        this.sections.update((current) => [...current, newSection]);
+        return;
+      }
+
+      // Modelo existente: mantém o comportamento atual.
       this.saving.set(true);
+
       this.templates
-        .createSection(this.templateId(), { ...result, displayOrder: this.sections().length + 1 })
+        .createSection(templateId, {
+          ...result,
+          displayOrder: nextOrder,
+        })
         .pipe(finalize(() => this.saving.set(false)))
         .subscribe(() => {
           this.reloadSections();
@@ -518,12 +634,35 @@ export class TemplateBuilderComponent implements OnInit {
     });
   }
 
+
   protected editSection(section: TemplateSectionDetail): void {
     this.sectionDialog.open({ section }).subscribe((result) => {
       if (!result) return;
+
+      const templateId = this.templateId();
+
+      // Modelo novo: atualiza a seção localmente.
+      if (!templateId) {
+        this.sections.update((current) =>
+          current.map((currentSection) =>
+            currentSection.id === section.id
+              ? {
+                ...currentSection,
+                title: result.title,
+                description: result.description,
+              }
+              : currentSection,
+          ),
+        );
+
+        return;
+      }
+
+      // Modelo existente: mantém a atualização pela API.
       this.saving.set(true);
+
       this.templates
-        .updateSection(this.templateId(), section.id, result)
+        .updateSection(templateId, section.id, result)
         .pipe(finalize(() => this.saving.set(false)))
         .subscribe(() => {
           this.reloadSections();
@@ -533,10 +672,14 @@ export class TemplateBuilderComponent implements OnInit {
   }
 
   protected moveSection(section: TemplateSectionDetail, direction: -1 | 1): void {
+    const templateId = this.templateId();
+    if (!templateId) return;
+
     const ordered = this.sections();
     const index = ordered.findIndex((candidate) => candidate.id === section.id);
     const neighbor = ordered[index + direction];
-    if (!neighbor || this.saving() || !this.canEditDraft()) return;
+
+    if (!neighbor || this.saving()) return;
 
     const originalOrder = section.displayOrder;
     const targetOrder = neighbor.displayOrder;
@@ -544,34 +687,58 @@ export class TemplateBuilderComponent implements OnInit {
     const second = { title: neighbor.title, description: neighbor.description };
     const temporaryOrder = Math.max(...ordered.map((entry) => entry.displayOrder)) + 1;
     this.saving.set(true);
-    this.templates
-      .updateSection(this.templateId(), section.id, { ...first, displayOrder: temporaryOrder })
-      .pipe(
-        concatMap(() =>
-          this.templates.updateSection(this.templateId(), neighbor.id, {
-            ...second,
-            displayOrder: originalOrder,
-          }),
-        ),
-        concatMap(() =>
-          this.templates.updateSection(this.templateId(), section.id, {
-            ...first,
-            displayOrder: targetOrder,
-          }),
-        ),
-        finalize(() => this.saving.set(false)),
-      )
-      .subscribe({ next: () => this.reloadSections(), error: () => this.orderFailed() });
+
+    forkJoin([
+      this.templates.updateSection(templateId, section.id, {
+        displayOrder: neighbor.displayOrder,
+      }),
+      this.templates.updateSection(templateId, neighbor.id, {
+        displayOrder: section.displayOrder,
+      }),
+    ])
+      .pipe(finalize(() => this.saving.set(false)))
+      .subscribe(() => this.reloadSections());
   }
+
 
   protected addItem(section: TemplateSectionDetail): void {
     this.itemDialog.open({}).subscribe((result) => {
       if (!result) return;
-      this.saving.set(true);
-      this.templates
-        .createItem(this.templateId(), section.id, {
+
+      const nextOrder = (section.items ?? []).length + 1;
+      const templateId = this.templateId();
+
+      // Modelo novo: mantém o item localmente.
+      if (!templateId) {
+        const newItem: TemplateItem = {
+          id: `local-${crypto.randomUUID()}`,
+          sectionId: section.id,
           ...result,
-          displayOrder: (section.items ?? []).length + 1,
+          displayOrder: nextOrder,
+          createdAt: new Date().toISOString(),
+        };
+
+        this.sections.update((current) =>
+          current.map((currentSection) =>
+            currentSection.id === section.id
+              ? {
+                ...currentSection,
+                items: [...(currentSection.items ?? []), newItem],
+              }
+              : currentSection,
+          ),
+        );
+
+        return;
+      }
+
+      // Modelo existente: mantém o comportamento atual.
+      this.saving.set(true);
+
+      this.templates
+        .createItem(templateId, section.id, {
+          ...result,
+          displayOrder: nextOrder,
         })
         .pipe(finalize(() => this.saving.set(false)))
         .subscribe(() => {
@@ -581,12 +748,41 @@ export class TemplateBuilderComponent implements OnInit {
     });
   }
 
+
   protected editItem(section: TemplateSectionDetail, item: TemplateItem): void {
     this.itemDialog.open({ item }).subscribe((result) => {
       if (!result) return;
+
+      const templateId = this.templateId();
+
+      // Modelo novo: atualiza o item localmente.
+      if (!templateId) {
+        this.sections.update((current) =>
+          current.map((currentSection) =>
+            currentSection.id === section.id
+              ? {
+                ...currentSection,
+                items: (currentSection.items ?? []).map((currentItem) =>
+                  currentItem.id === item.id
+                    ? {
+                      ...currentItem,
+                      ...result,
+                    }
+                    : currentItem,
+                ),
+              }
+              : currentSection,
+          ),
+        );
+
+        return;
+      }
+
+      // Modelo existente: mantém a atualização pela API.
       this.saving.set(true);
+
       this.templates
-        .updateItem(this.templateId(), item.id, result)
+        .updateItem(templateId, item.id, result)
         .pipe(finalize(() => this.saving.set(false)))
         .subscribe(() => {
           this.reloadSections();
@@ -595,65 +791,63 @@ export class TemplateBuilderComponent implements OnInit {
     });
   }
 
-  protected moveItem(section: TemplateSectionDetail, item: TemplateItem, direction: -1 | 1): void {
-    const items = section.items ?? [];
-    const index = items.findIndex((candidate) => candidate.id === item.id);
-    const neighbor = items[index + direction];
-    if (!neighbor || this.saving() || !this.canEditDraft()) return;
+  
 
-    const originalOrder = item.displayOrder;
-    const targetOrder = neighbor.displayOrder;
-    const first = this.itemPayload(item);
-    const second = this.itemPayload(neighbor);
-    const temporaryOrder = Math.max(...items.map((entry) => entry.displayOrder)) + 1;
-    this.saving.set(true);
-    this.templates
-      .updateItem(this.templateId(), item.id, { ...first, displayOrder: temporaryOrder })
-      .pipe(
-        concatMap(() =>
-          this.templates.updateItem(this.templateId(), neighbor.id, {
-            ...second,
-            displayOrder: originalOrder,
-          }),
+protected moveItem(
+  section: TemplateSectionDetail,
+  item: TemplateItem,
+  direction: -1 | 1,
+): void {
+  const templateId = this.templateId();
+  if (!templateId) return;
+
+  const items = section.items ?? [];
+  const index = items.findIndex((candidate) => candidate.id === item.id);
+  const neighbor = items[index + direction];
+
+  if (!neighbor || this.saving() || !this.canEditDraft()) return;
+
+  const temporaryOrder =
+    Math.max(...items.map((entry) => entry.displayOrder)) + 1;
+
+  const payload = (target: TemplateItem, displayOrder: number) => ({
+    title: target.title,
+    description: target.description,
+    responseType: target.responseType,
+    required: target.required,
+    observationRequiredOnFailure: target.observationRequiredOnFailure,
+    evidenceRequiredOnFailure: target.evidenceRequiredOnFailure,
+    optionsJson: target.optionsJson,
+    displayOrder,
+  });
+
+  this.saving.set(true);
+
+  this.templates
+    .updateItem(templateId, item.id, payload(item, temporaryOrder))
+    .pipe(
+      concatMap(() =>
+        this.templates.updateItem(
+          templateId,
+          neighbor.id,
+          payload(neighbor, item.displayOrder),
         ),
-        concatMap(() =>
-          this.templates.updateItem(this.templateId(), item.id, {
-            ...first,
-            displayOrder: targetOrder,
-          }),
+      ),
+      concatMap(() =>
+        this.templates.updateItem(
+          templateId,
+          item.id,
+          payload(item, neighbor.displayOrder),
         ),
-        finalize(() => this.saving.set(false)),
-      )
-      .subscribe({ next: () => this.reloadSections(), error: () => this.orderFailed() });
-  }
+      ),
+      finalize(() => this.saving.set(false)),
+    )
+    .subscribe({
+      next: () => this.reloadSections(),
+      error: () => {
+        this.notifications.error('Não foi possível reordenar os itens.');
+      },
+    });
+}
 
-  private orderFailed(): void {
-    this.notifications.error(
-      'A ordenação não foi concluída. Confira a ordem recarregada antes de tentar novamente.',
-    );
-    this.reloadSections();
-  }
-
-  private itemPayload(item: TemplateItem): Partial<TemplateItem> {
-    const {
-      code,
-      title,
-      description,
-      responseType,
-      required,
-      observationRequiredOnFailure,
-      evidenceRequiredOnFailure,
-      optionsJson,
-    } = item;
-    return {
-      code,
-      title,
-      description,
-      responseType,
-      required,
-      observationRequiredOnFailure,
-      evidenceRequiredOnFailure,
-      optionsJson,
-    };
-  }
 }

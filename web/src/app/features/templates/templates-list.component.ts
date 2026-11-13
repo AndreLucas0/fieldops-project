@@ -280,8 +280,6 @@ export class TemplatesListComponent {
         'edit',
       ],
       sortable: true,
-      type: 'link',
-      link: (row) => ['/inspection-templates', row.id, 'edit'],
     },
     { field: 'category', label: 'Categoria', sortable: true },
     {

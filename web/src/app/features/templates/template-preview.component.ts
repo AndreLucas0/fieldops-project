@@ -3,16 +3,18 @@ import { MatButtonModule } from '@angular/material/button';
 import {
     ChangeDetectionStrategy,
     Component,
+  DestroyRef,
     OnInit,
     computed,
     inject,
     input,
     signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { catchError, finalize, forkJoin, of, switchMap } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
-import { isApiError, type ApiError } from '../../core';
+import { AuthStore, canWrite, isApiError, type ApiError } from '../../core';
 import type {
     InspectionTemplate,
     TemplateItem,
@@ -25,6 +27,7 @@ import {
     PageHeaderComponent,
     StatusBadgeComponent,
 } from '../../shared/components';
+import { ConfirmDialogService } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { RESPONSE_TYPE_LABELS } from './template-item-form-dialog.component';
 
 @Component({
@@ -49,14 +52,17 @@ import { RESPONSE_TYPE_LABELS } from './template-item-form-dialog.component';
           { label: template()?.title ?? 'Prévia' },
         ]"
       >
-        <a
-  actions
-  matButton
-  [routerLink]="['/inspection-templates', templateId(), 'edit']"
->
-  <mat-icon>edit</mat-icon>
-  Voltar ao construtor
-</a>
+        <div actions class="actions">
+          <a matButton [routerLink]="['/inspection-templates', templateId(), 'edit']">
+            <mat-icon>edit</mat-icon>
+            Voltar ao construtor
+          </a>
+          @if (canPublish()) {
+            <button matButton="filled" type="button" [disabled]="saving()" (click)="publish()">
+              {{ saving() ? 'Publicando…' : 'Publicar modelo' }}
+            </button>
+          }
+        </div>
       </app-page-header>
 
       @if (loading()) {
@@ -248,6 +254,12 @@ import { RESPONSE_TYPE_LABELS } from './template-item-form-dialog.component';
       max-width: 52rem;
       margin: 0 auto;
       padding: 1.5rem;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
     }
 
     .summary,
@@ -467,11 +479,16 @@ import { RESPONSE_TYPE_LABELS } from './template-item-form-dialog.component';
 })
 export class TemplatePreviewComponent implements OnInit {
     private readonly templates = inject(TemplatesService);
+    private readonly auth = inject(AuthStore);
+    private readonly confirm = inject(ConfirmDialogService);
+    private readonly router = inject(Router);
+    private readonly destroyRef = inject(DestroyRef);
 
     readonly templateId = input.required<string>();
 
     protected readonly loading = signal(false);
     protected readonly error = signal<ApiError | null>(null);
+    protected readonly saving = signal(false);
     protected readonly template = signal<InspectionTemplate | null>(null);
     protected readonly sections = signal<TemplateSectionDetail[]>([]);
     protected readonly previewVersion = signal<number | null>(null);
@@ -481,6 +498,15 @@ export class TemplatePreviewComponent implements OnInit {
             (total, section) => total + (section.items?.length ?? 0),
             0,
         ),
+    );
+
+    protected readonly canPublish = computed(
+        () =>
+            !this.loading() &&
+            !this.error() &&
+            this.template()?.status === 'DRAFT' &&
+            canWrite('inspection-templates', this.auth.role()) &&
+            this.sections().some((section) => (section.items?.length ?? 0) > 0),
     );
 
     ngOnInit(): void {
@@ -572,5 +598,38 @@ export class TemplatePreviewComponent implements OnInit {
                 return typeof label === 'string' ? label : '';
             })
             .filter(Boolean);
+    }
+
+    publish(): void {
+        if (!this.canPublish() || this.saving()) return;
+
+        this.saving.set(true);
+        this.confirm
+            .open({
+                title: 'Publicar modelo',
+                message: 'A versão publicada será imutável e estará disponível para novas inspeções.',
+                confirmLabel: 'Publicar',
+            })
+            .pipe(
+                switchMap((result) =>
+                    result.confirmed ? this.templates.publish(this.templateId()) : of(null),
+                ),
+                finalize(() => this.saving.set(false)),
+                takeUntilDestroyed(this.destroyRef),
+            )
+            .subscribe({
+                next: (version) => {
+                    if (version) {
+                        void this.router.navigate([
+                            '/inspection-templates',
+                            this.templateId(),
+                            'versions',
+                        ]);
+                    }
+                },
+                error: (thrown: unknown) => {
+                    this.error.set(isApiError(thrown) ? thrown : null);
+                },
+            });
     }
 }

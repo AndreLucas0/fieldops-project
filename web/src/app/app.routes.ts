@@ -1,7 +1,6 @@
 import type { Route, Routes } from '@angular/router';
 
-import { authGuard, guestGuard } from './core/auth/auth.guard';
-
+import { authGuard, authGuardChild, guestGuard } from './core/auth/auth.guard';
 
 const ADMIN_FEATURE_ROUTES: Routes = [
   {
@@ -77,6 +76,7 @@ export const routes: Routes = [
   {
     path: '',
     canActivate: [authGuard],
+    canActivateChild: [authGuardChild],
     loadComponent: () =>
       import('./features/shell/admin-shell.component').then((module) => module.AdminShellComponent),
     children: [

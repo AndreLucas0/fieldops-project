@@ -280,6 +280,8 @@ export class TemplatesListComponent {
         'edit',
       ],
       sortable: true,
+      type: 'link',
+      link: (row) => ['/inspection-templates', row.id, 'edit'],
     },
     { field: 'category', label: 'Categoria', sortable: true },
     {
@@ -296,6 +298,20 @@ export class TemplatesListComponent {
       emptyText: 'Nenhuma publicada',
     },
     { field: 'updatedAt', label: 'Atualizado em', type: 'date', sortable: true },
+    {
+      field: 'preview',
+      label: 'Prévia',
+      type: 'link',
+      link: (row) => ['/inspection-templates', row.id, 'preview'],
+      format: () => 'Ver prévia',
+    },
+    {
+      field: 'versions',
+      label: 'Versões',
+      type: 'link',
+      link: (row) => ['/inspection-templates', row.id, 'versions'],
+      format: () => 'Ver versões',
+    },
   ];
 
   protected readonly templateRowLink = (row: InspectionTemplate) => [

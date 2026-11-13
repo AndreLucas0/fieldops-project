@@ -101,9 +101,7 @@ describe('InspectionsListComponent', () => {
     component.onPage({ page: 2, size: 20 });
     component.setStatus('ASSIGNED');
 
-    expect(list).toHaveBeenLastCalledWith(
-      expect.objectContaining({ status: 'ASSIGNED', page: 0 }),
-    );
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'ASSIGNED', page: 0 }));
   });
 
   it('envia técnico e cliente ao serviço', async () => {
@@ -129,9 +127,7 @@ describe('InspectionsListComponent', () => {
     expect(new Date(query.scheduledFrom!).getTime()).toBe(
       new Date('2026-11-01T00:00:00').getTime(),
     );
-    expect(new Date(query.scheduledTo!).getTime()).toBe(
-      new Date('2026-11-30T23:59:59').getTime(),
-    );
+    expect(new Date(query.scheduledTo!).getTime()).toBe(new Date('2026-11-30T23:59:59').getTime());
   });
 
   it('mostra etiquetas dos filtros ativos e remove o filtro ao fechar a etiqueta', async () => {
@@ -144,9 +140,7 @@ describe('InspectionsListComponent', () => {
     component.onFilter([]);
 
     expect(component.activeFilters()).toEqual([]);
-    expect(list).toHaveBeenLastCalledWith(
-      expect.objectContaining({ status: undefined, page: 0 }),
-    );
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ status: undefined, page: 0 }));
   });
 
   it('oferece revisão e cancelamento para o SUPERVISOR', async () => {

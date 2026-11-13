@@ -197,6 +197,67 @@ class InspectionTemplateControllerIT {
     }
 
     @Test
+    void inspectionTemplateDraftPersistsSectionsItemsAndOrder() {
+        String[] templateId = {null};
+        assertThat(mvc.post().uri("/inspection-templates").header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Draft with sections\",\"category\":\"Safety\"}").exchange())
+            .hasStatus(HttpStatus.CREATED).bodyJson()
+            .extractingPath("$.id").asString().satisfies(id -> templateId[0] = id);
+
+        String[] firstSectionId = {null};
+        String[] secondSectionId = {null};
+        assertThat(mvc.post().uri("/inspection-templates/" + templateId[0] + "/sections")
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"First section\",\"description\":\"First\"}").exchange())
+            .hasStatus(HttpStatus.CREATED).bodyJson()
+            .extractingPath("$.id").asString().satisfies(id -> firstSectionId[0] = id);
+        assertThat(mvc.post().uri("/inspection-templates/" + templateId[0] + "/sections")
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Second section\"}").exchange())
+            .hasStatus(HttpStatus.CREATED).bodyJson()
+            .extractingPath("$.id").asString().satisfies(id -> secondSectionId[0] = id);
+
+        assertThat(mvc.post().uri("/inspection-templates/" + templateId[0] + "/sections/"
+                + firstSectionId[0] + "/items")
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"title":"Grounding intact?","responseType":"CONFORMITY","required":true,
+                 "optionsJson":{"options":[{"value":"OK","label":"OK"}]}}"""))
+            .hasStatus(HttpStatus.CREATED)
+            .bodyJson()
+            .extractingPath("$.optionsJson.options[0].value").asString().isEqualTo("OK");
+
+        assertThat(mvc.patch().uri("/inspection-templates/" + templateId[0] + "/sections/order")
+            .header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"ids\":[\"" + secondSectionId[0] + "\",\"" + firstSectionId[0] + "\"]}"))
+            .hasStatus(HttpStatus.NO_CONTENT);
+
+        assertThat(mvc.get().uri("/inspection-templates/" + templateId[0] + "/sections")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$[0].title").asString().isEqualTo("Second section");
+
+        assertThat(mvc.get().uri("/templates/" + templateId[0] + "/sections")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$[1].items[0].title").asString().isEqualTo("Grounding intact?");
+
+        assertThat(mvc.post().uri("/inspection-templates/" + templateId[0] + "/publish")
+            .header("Authorization", bearer(adminToken))
+            .exchange())
+            .hasStatus(HttpStatus.CREATED)
+            .bodyJson()
+            .extractingPath("$.sections[0].title").asString().isEqualTo("Second section");
+    }
+
+    @Test
     void adminCanPublishTemplateWithSections() {
         String[] idHolder = {null};
         assertThat(mvc.post().uri("/templates").header("Authorization", bearer(adminToken))

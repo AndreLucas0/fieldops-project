@@ -3,7 +3,11 @@ package com.codemind.fieldops.template.mapper;
 import com.codemind.fieldops.template.domain.InspectionTemplate;
 import com.codemind.fieldops.template.domain.TemplateItem;
 import com.codemind.fieldops.template.domain.TemplateSection;
+import com.codemind.fieldops.template.domain.TemplateDraftItem;
+import com.codemind.fieldops.template.domain.TemplateDraftSection;
 import com.codemind.fieldops.template.domain.TemplateVersion;
+import com.codemind.fieldops.template.dto.TemplateDraftItemResponse;
+import com.codemind.fieldops.template.dto.TemplateDraftSectionResponse;
 import com.codemind.fieldops.template.dto.TemplateItemResponse;
 import com.codemind.fieldops.template.dto.TemplateResponse;
 import com.codemind.fieldops.template.dto.TemplateSectionResponse;
@@ -27,5 +31,11 @@ public interface TemplateMapper {
 
     @Mapping(source = "section.id", target = "sectionId")
     TemplateItemResponse toItemResponse(TemplateItem item);
+
+    @Mapping(source = "section.id", target = "sectionId")
+    TemplateDraftItemResponse toDraftItemResponse(TemplateDraftItem item);
+
+    @Mapping(source = "template.id", target = "templateVersionId")
+    TemplateDraftSectionResponse toDraftSectionResponse(TemplateDraftSection section);
 
 }

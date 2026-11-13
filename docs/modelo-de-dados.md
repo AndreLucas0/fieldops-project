@@ -455,10 +455,19 @@ Ela não representa diretamente uma versão publicada.
 ### Relacionamento
 
 ```
+INSPECTION_TEMPLATE 1 ── N TEMPLATE_DRAFT_SECTION
 INSPECTION_TEMPLATE 1 ── N INSPECTION_TEMPLATE_VERSION
 ```
 
 Um modelo pode possuir várias versões.
+
+O conteúdo ainda editável fica em `template_draft_sections` e
+`template_draft_items`, ligado diretamente ao modelo lógico. Essas tabelas
+mantêm título, descrição, ordem, tipo de resposta, obrigatoriedade, regras de
+falha e opções do item. A publicação copia esse conteúdo para as tabelas
+versionadas; alterações posteriores no rascunho não modificam versões já
+publicadas. Seções e itens do rascunho só podem ser alterados enquanto o modelo
+estiver em `DRAFT`.
 
 ---
 

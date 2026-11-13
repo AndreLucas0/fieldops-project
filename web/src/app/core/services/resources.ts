@@ -205,6 +205,8 @@ export abstract class TemplatesService {
     itemId: Uuid,
     input: Partial<TemplateItem>,
   ): Observable<TemplateItem>;
+  abstract reorderSections(templateId: Uuid, ids: readonly Uuid[]): Observable<void>;
+  abstract reorderItems(templateId: Uuid, sectionId: Uuid, ids: readonly Uuid[]): Observable<void>;
 }
 
 
@@ -346,6 +348,13 @@ export class HttpTemplatesService extends TemplatesService {
   list(query: PageQuery<TemplateFilters> = {}) {
     return this.api.getPage<InspectionTemplate, TemplateFilters>('/templates', query);
   }
+  create(
+    input: Pick<InspectionTemplate, 'title' | 'category'> & {
+      description?: string | null;
+    },
+  ) {
+    return this.api.post<InspectionTemplate>('/inspection-templates', input);
+  }
   get(id: Uuid) {
     return this.api.get<InspectionTemplate>(`/templates/${id}`);
   }
@@ -390,6 +399,15 @@ export class HttpTemplatesService extends TemplatesService {
   }
   updateItem(templateId: Uuid, itemId: Uuid, input: Partial<TemplateItem>) {
     return this.api.put<TemplateItem>(`/inspection-templates/${templateId}/items/${itemId}`, input);
+  }
+  reorderSections(templateId: Uuid, ids: readonly Uuid[]) {
+    return this.api.patch<void>(`/inspection-templates/${templateId}/sections/order`, { ids });
+  }
+  reorderItems(templateId: Uuid, sectionId: Uuid, ids: readonly Uuid[]) {
+    return this.api.patch<void>(
+      `/inspection-templates/${templateId}/sections/${sectionId}/items/order`,
+      { ids },
+    );
   }
 }
 

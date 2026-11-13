@@ -1,5 +1,6 @@
 package com.codemind.fieldops.template.domain;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -60,7 +61,7 @@ public class TemplateItem {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "options_json", columnDefinition = "jsonb")
-    private String optionsJson;
+    private JsonNode optionsJson;
 
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder;

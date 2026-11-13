@@ -1,5 +1,6 @@
 package com.codemind.fieldops.inspection.domain;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.codemind.fieldops.template.domain.TemplateItem;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -75,7 +76,7 @@ public class ItemSnapshot {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "options_json", columnDefinition = "jsonb")
-    private String optionsJson;
+    private JsonNode optionsJson;
 
     @Column(name = "item_order", nullable = false)
     private Integer itemOrder;

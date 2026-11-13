@@ -36,6 +36,7 @@ BEGIN;
 TRUNCATE TABLE
     audit_events, inspection_reviews, non_conformities, evidence,
     inspection_responses, inspection_item_snapshots, inspections,
+    template_draft_items, template_draft_sections,
     template_items, template_sections, inspection_template_versions,
     inspection_templates, equipment, inspection_sites, clients, users
 RESTART IDENTITY CASCADE;

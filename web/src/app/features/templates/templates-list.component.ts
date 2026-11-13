@@ -25,9 +25,8 @@ import {
  * FE-W13 — Modelos de inspeção (lista).
  *
  * Listagem paginada/filtrável de `InspectionTemplate`, servida por
- * `GET /inspection-templates` (`docs/telas-frontend.md` §3.9). A tela em si
- * não cria nem edita seções/itens — isso é FE-W15, o construtor, que ainda
- * não existe; por ora o botão "Novo modelo" fica desabilitado.
+ * `GET /inspection-templates` (`docs/telas-frontend.md` §3.9). O título abre
+ * o construtor e o botão de criação inicia um novo rascunho.
  */
 @Component({
   selector: 'app-templates-list',

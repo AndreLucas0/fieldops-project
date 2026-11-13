@@ -17,7 +17,7 @@ import { MatInputModule } from '@angular/material/input';
 import { forkJoin } from 'rxjs';
 import { catchError, finalize, of } from 'rxjs';
 
-import { AuthStore, canWrite, isApiError, type ApiError } from '../../core';
+import { ApiError, AuthStore, canWrite, isApiError } from '../../core';
 import type {
   InspectionTemplate,
   TemplateItem,
@@ -80,6 +80,13 @@ import { TemplateSectionFormDialogService } from './template-section-form-dialog
           Ver prévia
         </a>
       </app-page-header>
+
+      @if (mutationError(); as message) {
+        <div class="error" role="alert">
+          <mat-icon aria-hidden="true">error_outline</mat-icon>
+          <p>{{ message }}</p>
+        </div>
+      }
 
       @if (loading()) {
         <app-loading-state variant="form" [rows]="4" label="Carregando modelo…" />
@@ -411,6 +418,7 @@ export class TemplateBuilderComponent implements OnInit {
   protected readonly loading = signal(false);
   protected readonly saving = signal(false);
   protected readonly error = signal<ApiError | null>(null);
+  protected readonly mutationError = signal<string | null>(null);
   protected readonly template = signal<InspectionTemplate | null>(null);
   protected readonly sections = signal<TemplateSectionDetail[]>([]);
 
@@ -446,7 +454,16 @@ export class TemplateBuilderComponent implements OnInit {
     forkJoin([this.templates.get(id), this.templates.listDraftSections(id)])
       .pipe(
         catchError((thrown: unknown) => {
-          this.error.set(isApiError(thrown) ? thrown : null);
+          this.error.set(
+            isApiError(thrown)
+              ? thrown
+              : new ApiError({
+                  kind: 'UNKNOWN',
+                  status: 0,
+                  code: 'UNKNOWN',
+                  userMessage: 'Não foi possível carregar o modelo. Tente novamente.',
+                }),
+          );
           return of(null);
         }),
         finalize(() => this.loading.set(false)),
@@ -477,9 +494,16 @@ export class TemplateBuilderComponent implements OnInit {
 
   /** Recarrega só as seções, sem o esqueleto de página inteira. */
   private reloadSections(): void {
-    this.templates.listDraftSections(this.templateId()).subscribe((sections) => {
-      this.sections.set(this.sortTree(sections));
+    this.templates.listDraftSections(this.templateId()).subscribe({
+      next: (sections) => this.sections.set(this.sortTree(sections)),
+      error: (thrown: unknown) => this.reportMutationError(thrown),
     });
+  }
+
+  private reportMutationError(thrown: unknown): void {
+    this.mutationError.set(
+      isApiError(thrown) ? thrown.userMessage : 'Não foi possível salvar as alterações.',
+    );
   }
 
   protected responseTypeLabel(item: TemplateItem): string {
@@ -490,6 +514,7 @@ export class TemplateBuilderComponent implements OnInit {
     const tpl = this.template();
     if (!tpl || this.saving()) return;
 
+    this.mutationError.set(null);
     this.saving.set(true);
     this.templates
       .update(tpl.id, {
@@ -498,103 +523,122 @@ export class TemplateBuilderComponent implements OnInit {
         description: this.generalDescription().trim() || null,
       })
       .pipe(finalize(() => this.saving.set(false)))
-      .subscribe((updated) => {
-        this.applyTemplate(updated);
-        this.notifications.success('Dados gerais atualizados.');
-      });
+      .subscribe(
+        (updated) => {
+          this.applyTemplate(updated);
+          this.notifications.success('Dados gerais atualizados.');
+        },
+        (thrown: unknown) => this.reportMutationError(thrown),
+      );
   }
 
   protected addSection(): void {
     this.sectionDialog.open({}).subscribe((result) => {
       if (!result) return;
+      this.mutationError.set(null);
       this.saving.set(true);
       this.templates
         .createSection(this.templateId(), result)
         .pipe(finalize(() => this.saving.set(false)))
-        .subscribe(() => {
-          this.reloadSections();
-          this.notifications.success('Seção criada.');
-        });
+        .subscribe(
+          () => {
+            this.reloadSections();
+            this.notifications.success('Seção criada.');
+          },
+          (thrown: unknown) => this.reportMutationError(thrown),
+        );
     });
   }
 
   protected editSection(section: TemplateSectionDetail): void {
     this.sectionDialog.open({ section }).subscribe((result) => {
       if (!result) return;
+      this.mutationError.set(null);
       this.saving.set(true);
       this.templates
         .updateSection(this.templateId(), section.id, result)
         .pipe(finalize(() => this.saving.set(false)))
-        .subscribe(() => {
-          this.reloadSections();
-          this.notifications.success('Seção atualizada.');
-        });
+        .subscribe(
+          () => {
+            this.reloadSections();
+            this.notifications.success('Seção atualizada.');
+          },
+          (thrown: unknown) => this.reportMutationError(thrown),
+        );
     });
   }
 
   protected moveSection(section: TemplateSectionDetail, direction: -1 | 1): void {
     const ordered = this.sections();
     const index = ordered.findIndex((candidate) => candidate.id === section.id);
-    const neighbor = ordered[index + direction];
-    if (!neighbor || this.saving()) return;
+    const neighborIndex = index + direction;
+    if (index < 0 || !ordered[neighborIndex] || this.saving()) return;
 
+    const ids = ordered.map((candidate) => candidate.id);
+    [ids[index], ids[neighborIndex]] = [ids[neighborIndex], ids[index]];
+    this.mutationError.set(null);
     this.saving.set(true);
-    forkJoin([
-      this.templates.updateSection(this.templateId(), section.id, {
-        displayOrder: neighbor.displayOrder,
-      }),
-      this.templates.updateSection(this.templateId(), neighbor.id, {
-        displayOrder: section.displayOrder,
-      }),
-    ])
+    this.templates
+      .reorderSections(this.templateId(), ids)
       .pipe(finalize(() => this.saving.set(false)))
-      .subscribe(() => this.reloadSections());
+      .subscribe({
+        next: () => this.reloadSections(),
+        error: (thrown: unknown) => this.reportMutationError(thrown),
+      });
   }
 
   protected addItem(section: TemplateSectionDetail): void {
     this.itemDialog.open({}).subscribe((result) => {
       if (!result) return;
+      this.mutationError.set(null);
       this.saving.set(true);
       this.templates
         .createItem(this.templateId(), section.id, result)
         .pipe(finalize(() => this.saving.set(false)))
-        .subscribe(() => {
-          this.reloadSections();
-          this.notifications.success('Item criado.');
-        });
+        .subscribe(
+          () => {
+            this.reloadSections();
+            this.notifications.success('Item criado.');
+          },
+          (thrown: unknown) => this.reportMutationError(thrown),
+        );
     });
   }
 
   protected editItem(section: TemplateSectionDetail, item: TemplateItem): void {
     this.itemDialog.open({ item }).subscribe((result) => {
       if (!result) return;
+      this.mutationError.set(null);
       this.saving.set(true);
       this.templates
         .updateItem(this.templateId(), item.id, result)
         .pipe(finalize(() => this.saving.set(false)))
-        .subscribe(() => {
-          this.reloadSections();
-          this.notifications.success('Item atualizado.');
-        });
+        .subscribe(
+          () => {
+            this.reloadSections();
+            this.notifications.success('Item atualizado.');
+          },
+          (thrown: unknown) => this.reportMutationError(thrown),
+        );
     });
   }
 
   protected moveItem(section: TemplateSectionDetail, item: TemplateItem, direction: -1 | 1): void {
     const items = section.items ?? [];
     const index = items.findIndex((candidate) => candidate.id === item.id);
-    const neighbor = items[index + direction];
-    if (!neighbor || this.saving()) return;
+    const neighborIndex = index + direction;
+    if (index < 0 || !items[neighborIndex] || this.saving()) return;
 
+    const ids = items.map((candidate) => candidate.id);
+    [ids[index], ids[neighborIndex]] = [ids[neighborIndex], ids[index]];
+    this.mutationError.set(null);
     this.saving.set(true);
-    forkJoin([
-      this.templates.updateItem(this.templateId(), item.id, {
-        displayOrder: neighbor.displayOrder,
-      }),
-      this.templates.updateItem(this.templateId(), neighbor.id, {
-        displayOrder: item.displayOrder,
-      }),
-    ])
+    this.templates
+      .reorderItems(this.templateId(), section.id, ids)
       .pipe(finalize(() => this.saving.set(false)))
-      .subscribe(() => this.reloadSections());
+      .subscribe({
+        next: () => this.reloadSections(),
+        error: (thrown: unknown) => this.reportMutationError(thrown),
+      });
   }
 }

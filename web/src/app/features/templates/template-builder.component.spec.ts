@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideZonelessChangeDetection } from '@angular/core';
-import { of } from 'rxjs';
+import { firstValueFrom, of } from 'rxjs';
 
 import { resetMockStore, TEMPLATE_IDS } from '@fieldops/shared';
 
@@ -145,6 +145,25 @@ describe('TemplateBuilderComponent', () => {
       expect.objectContaining({ title: 'Disjuntor calibrado?', responseType: 'BOOLEAN' }),
     );
     expect(texto(fixture)).toContain('Disjuntor calibrado?');
+  });
+
+  it('reordena itens com uma única operação de serviço', async () => {
+    const fixture = setup(TEMPLATE_IDS.eletrico);
+    const templates = TestBed.inject(TemplatesService);
+    const [section] = await firstValueFrom(templates.listDraftSections(TEMPLATE_IDS.eletrico));
+    const items = [...(section.items ?? [])].sort(
+      (left, right) => left.displayOrder - right.displayOrder,
+    );
+    const expectedOrder = [items[1].id, items[0].id];
+    const reorderItems = vi.spyOn(templates, 'reorderItems');
+    const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      'button[aria-label="Mover item para baixo"]',
+    )!;
+
+    button.click();
+    fixture.detectChanges();
+
+    expect(reorderItems).toHaveBeenCalledWith(TEMPLATE_IDS.eletrico, section.id, expectedOrder);
   });
 
   it('modelo inexistente mostra o erro com botão de nova tentativa', () => {

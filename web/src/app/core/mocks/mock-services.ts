@@ -27,8 +27,10 @@ import {
 } from '@fieldops/shared';
 
 import { ApiError } from '../models/api-error.model';
+import { AuthStore } from '../auth/auth.store';
 import type {
   Client,
+  ActiveStatus,
   DashboardSummary,
   Equipment,
   EquipmentStatus,
@@ -47,6 +49,7 @@ import type {
   User,
   UserStatus,
   Uuid,
+  AuditEvent,
 } from '../models/domain';
 import { serializeSort, type Page, type PageParams, type PageQuery } from '../models/page.model';
 import {
@@ -163,6 +166,13 @@ export class MockUsersService extends MockBase implements UsersService {
   setStatus(id: Uuid, status: UserStatus): Observable<User> {
     return this.update(id, { status });
   }
+
+  resetPassword(id: Uuid): Observable<{ message: string }> {
+    return this.respond(() => {
+      this.require(findById(this.db.users, id), '/users', id);
+      return { message: 'Solicitação de redefinição de senha registrada.' };
+    });
+  }
 }
 
 @Injectable()
@@ -215,8 +225,14 @@ export class MockSitesService extends MockBase implements SitesService {
     return this.page(filtered, query);
   }
 
-  listByClient(clientId: Uuid): Observable<InspectionSite[]> {
-    return this.respond(() => this.db.sites.filter((site) => site.clientId === clientId));
+  listByClient(
+    clientId: Uuid,
+    query: PageQuery<SiteFilters> = {},
+  ): Observable<Page<InspectionSite>> {
+    return this.page(
+      this.db.sites.filter((site) => site.clientId === clientId),
+      query,
+    );
   }
 
   get(id: Uuid): Observable<InspectionSite> {
@@ -261,6 +277,10 @@ export class MockSitesService extends MockBase implements SitesService {
     const { clientId: _ignored, ...rest } = input;
     return this.respond(() => this.require(updateEntity(this.db.sites, id, rest), '/sites', id));
   }
+
+  setStatus(id: Uuid, status: ActiveStatus): Observable<InspectionSite> {
+    return this.update(id, { status });
+  }
 }
 
 @Injectable()
@@ -273,8 +293,11 @@ export class MockEquipmentService extends MockBase implements EquipmentService {
     return this.page(filtered, query);
   }
 
-  listBySite(siteId: Uuid): Observable<Equipment[]> {
-    return this.respond(() => this.db.equipment.filter((equipment) => equipment.siteId === siteId));
+  listBySite(siteId: Uuid, query: PageQuery<EquipmentFilters> = {}): Observable<Page<Equipment>> {
+    return this.page(
+      this.db.equipment.filter((equipment) => equipment.siteId === siteId),
+      query,
+    );
   }
 
   get(id: Uuid): Observable<Equipment> {
@@ -340,6 +363,29 @@ export class MockEquipmentService extends MockBase implements EquipmentService {
 
 @Injectable()
 export class MockTemplatesService extends MockBase implements TemplatesService {
+  create(input: Partial<InspectionTemplate>): Observable<InspectionTemplate> {
+    return this.respond(() => {
+      const timestamp = nowIso();
+
+      const template: InspectionTemplate = {
+        id: nextMockId('5500'),
+        title: input.title ?? 'Novo modelo',
+        description: input.description ?? null,
+        category: input.category ?? 'GERAL',
+        status: 'DRAFT',
+        currentVersion: null,
+        createdBy: '',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        version: 1,
+      };
+
+      insertEntity(this.db.templates, template);
+      this.db.draftSections[template.id] = [];
+
+      return template;
+    });
+  }
   list(query: PageQuery<TemplateFilters> = {}): Observable<Page<InspectionTemplate>> {
     const { category, status } = query;
     const filtered = this.db.templates.filter((template) =>
@@ -387,9 +433,107 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
     });
   }
 
-  listVersions(templateId: Uuid): Observable<InspectionTemplateVersionDetail[]> {
-    return this.respond(() =>
+
+  publish(templateId: Uuid): Observable<InspectionTemplateVersionDetail> {
+    return this.respond(() => {
+      const template = this.requireDraftTemplate(templateId);
+      const draftSections = this.draftSectionsOf(templateId);
+
+    // RN-015: o modelo precisa ter título, categoria,
+    // seção e pelo menos um item válido.
+    if (!template.title.trim() || !template.category.trim()) {
+      throw new ApiError({
+        kind: 'UNPROCESSABLE',
+        status: 422,
+        code: 'TEMPLATE_REQUIRED_FIELDS',
+        userMessage: 'Preencha o título e a categoria do modelo.',
+      });
+    }
+
+    const hasValidSection = draftSections.some(
+      (section) =>
+        section.title.trim().length > 0 &&
+        (section.items ?? []).some(
+          (item) =>
+            item.title.trim().length > 0 &&
+            !!item.responseType,
+        ),
+    );
+
+    if (!hasValidSection) {
+      throw new ApiError({
+        kind: 'UNPROCESSABLE',
+        status: 422,
+        code: 'TEMPLATE_WITHOUT_VALID_ITEMS',
+        userMessage:
+          'Adicione pelo menos uma seção com um item válido antes de publicar.',
+      });
+    }
+
+    const timestamp = nowIso();
+    const versionNumber = (template.currentVersion ?? 0) + 1;
+    const versionId = nextMockId('5800');
+
+    // Cria uma cópia independente das seções e dos itens.
+    const sections: TemplateSectionDetail[] = draftSections.map(
+      (section) => {
+        const sectionId = nextMockId('5600');
+
+        const items: TemplateItem[] = (section.items ?? []).map(
+          (item) => ({
+            ...item,
+            id: nextMockId('5700'),
+            sectionId,
+          }),
+        );
+
+        return {
+          ...section,
+          id: sectionId,
+          templateVersionId: versionId,
+          items,
+        };
+      },
+    );
+
+    const publishedVersion: InspectionTemplateVersionDetail = {
+      id: versionId,
+      templateId: template.id,
+      versionNumber,
+      titleSnapshot: template.title,
+      descriptionSnapshot: template.description ?? null,
+      publishedBy: template.createdBy ?? '',
+      publishedAt: timestamp,
+      activeForNewInspections: true,
+      createdAt: timestamp,
+      sections,
+    };
+
+    // Registra a versão publicada.
+    insertEntity(this.db.templateVersions, publishedVersion);
+
+    // Atualiza o modelo para ACTIVE.
+    this.require(
+      updateEntity(this.db.templates, templateId, {
+        status: 'ACTIVE',
+        currentVersion: versionNumber,
+      }),
+      '/inspection-templates',
+      templateId,
+    );
+
+    return publishedVersion;
+  });
+}
+
+
+  listVersions(
+    templateId: Uuid,
+    query: PageQuery = {},
+  ): Observable<Page<InspectionTemplateVersionDetail>> {
+    return this.page(
       this.db.templateVersions.filter((version) => version.templateId === templateId),
+      query,
     );
   }
 
@@ -611,6 +755,10 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
 
 @Injectable()
 export class MockInspectionsService extends MockBase implements InspectionsService {
+  history(id: Uuid, query: PageQuery = {}): Observable<Page<AuditEvent>> {
+    return this.page<AuditEvent>([], query);
+  }
+
   list(query: PageQuery<InspectionFilters> = {}): Observable<Page<Inspection>> {
     const { scheduledFrom, scheduledTo, overdue, page, size, sort, ...simple } = query;
 
@@ -841,9 +989,9 @@ export class MockInspectionsService extends MockBase implements InspectionsServi
 @Injectable()
 export class MockNonConformitiesService extends MockBase implements NonConformitiesService {
   list(query: PageQuery<NonConformityFilters> = {}): Observable<Page<NonConformity>> {
-    const { severity } = query;
+    const { inspectionId, severity } = query;
     const filtered = this.db.nonConformities.filter((nc) =>
-      matchesFilters(nc as unknown as Record<string, unknown>, { severity }),
+      matchesFilters(nc as unknown as Record<string, unknown>, { inspectionId, severity }),
     );
     return this.page(filtered, query);
   }

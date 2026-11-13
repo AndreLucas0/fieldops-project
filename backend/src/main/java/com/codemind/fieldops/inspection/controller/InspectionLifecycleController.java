@@ -31,12 +31,13 @@ public class InspectionLifecycleController {
     }
 
     @PostMapping("/{id}/start")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR','TECHNICIAN')")
     public InspectionResponse start(@PathVariable UUID id,
                                      @RequestBody(required = false) StartInspectionRequest request,
                                      @AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
-        Inspection inspection = executionService.start(id, userId,
+        boolean isTechnician = "TECHNICIAN".equals(jwt.getClaimAsString(JwtClaims.ROLE));
+        Inspection inspection = executionService.start(id, userId, isTechnician,
             request != null ? request.startedAtDevice() : null,
             request != null ? request.location() : null);
         return inspectionMapper.toResponse(inspection);

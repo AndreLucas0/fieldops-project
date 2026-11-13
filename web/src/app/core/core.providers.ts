@@ -20,14 +20,12 @@ import { HTTP_RESOURCE_PROVIDERS } from './services/resources';
  * mensagem ao usuário. Invertendo, todo token expirado produziria um aviso
  * indevido de sessão encerrada.
  */
-export function provideCore(): (Provider | EnvironmentProviders)[] {
+export function provideCore(useMock: boolean = environment.mockApi): (Provider | EnvironmentProviders)[] {
   return [
     provideHttpClient(withInterceptors([errorInterceptor, authInterceptor])),
-    ...provideResources(),
+    ...provideResources(useMock),
     provideSessionBootstrap(),
-    // Andaime do modo fictício: abre sessão para as rotas protegidas serem
-    // alcançáveis enquanto a tela de login (FE-W01) não existe.
-    provideMockSession(),
+    ...(useMock ? [provideMockSession()] : []),
   ];
 }
 

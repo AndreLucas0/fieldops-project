@@ -14,6 +14,9 @@ import com.codemind.fieldops.inspection.domain.ItemSnapshot;
 import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
+import com.codemind.fieldops.nonconformity.domain.NonConformity;
+import com.codemind.fieldops.nonconformity.domain.NonConformitySeverity;
+import com.codemind.fieldops.nonconformity.domain.NonConformityStatus;
 import com.codemind.fieldops.nonconformity.repository.NonConformityRepository;
 import com.codemind.fieldops.shared.security.JwtClaims;
 import com.codemind.fieldops.site.domain.InspectionSite;
@@ -35,6 +38,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -211,6 +215,95 @@ class NonConformityControllerIT {
               "severity": "%s",
               "snapshotId": "%s"
             }""".formatted(title, severity, testSnapshot.getId());
+    }
+
+    // ---- RN-082: approved inspection is read-only for non-conformities ----
+
+    private Inspection approvedInspection() {
+        return inspectionRepository.save(Inspection.builder()
+            .templateVersion(activeTemplateVersion)
+            .client(testClient)
+            .site(testSite)
+            .technician(technicianUser)
+            .createdBy(adminUser)
+            .priority(InspectionPriority.MEDIUM)
+            .status(InspectionStatus.APPROVED)
+            .scheduledFor(Instant.now().plusSeconds(3600))
+            .startedAtServer(Instant.now())
+            .build());
+    }
+
+    private NonConformity nonConformityOn(Inspection inspection) {
+        return nonConformityRepository.save(NonConformity.builder()
+            .id(UUID.randomUUID())
+            .inspection(inspection)
+            .reportedBy(technicianUser)
+            .title("Approved NC")
+            .description("Registered before approval")
+            .severity(NonConformitySeverity.LOW)
+            .status(NonConformityStatus.OPEN)
+            .build());
+    }
+
+    @Test
+    @DisplayName("RN-082 - não registra não conformidade em inspeção aprovada")
+    void createNonConformityOnApprovedInspectionReturns409() {
+        Inspection approved = approvedInspection();
+
+        assertThat(mvc.post().uri("/inspections/" + approved.getId() + "/non-conformities")
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(buildCreatePayload("Late NC", "LOW")))
+            .hasStatus(HttpStatus.CONFLICT)
+            .bodyJson()
+            .extractingPath("$.code").asString().isEqualTo("NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION");
+        assertThat(nonConformityRepository.findByInspectionId(approved.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("RN-082 - não altera não conformidade de inspeção aprovada")
+    void updateNonConformityOnApprovedInspectionReturns409() {
+        NonConformity nc = nonConformityOn(approvedInspection());
+
+        assertThat(mvc.put().uri("/non-conformities/" + nc.getId())
+            .header("Authorization", bearer(technicianToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"Edited\",\"description\":\"x\",\"severity\":\"LOW\"}"))
+            .hasStatus(HttpStatus.CONFLICT)
+            .bodyJson()
+            .extractingPath("$.code").asString().isEqualTo("NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION");
+        assertThat(nonConformityRepository.findById(nc.getId()).orElseThrow().getTitle()).isEqualTo("Approved NC");
+    }
+
+    @Test
+    @DisplayName("RN-082 - bloqueio vale também para supervisor (alteração de status)")
+    void updateStatusOnApprovedInspectionReturns409EvenForSupervisor() {
+        NonConformity nc = nonConformityOn(approvedInspection());
+
+        assertThat(mvc.patch().uri("/non-conformities/" + nc.getId() + "/status")
+            .header("Authorization", bearer(supervisorToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"status\": \"IN_PROGRESS\"}"))
+            .hasStatus(HttpStatus.CONFLICT)
+            .bodyJson()
+            .extractingPath("$.code").asString().isEqualTo("NON_CONFORMITY_READ_ONLY_APPROVED_INSPECTION");
+        assertThat(nonConformityRepository.findById(nc.getId()).orElseThrow().getStatus())
+            .isEqualTo(NonConformityStatus.OPEN);
+    }
+
+    @Test
+    @DisplayName("RN-082 - não conformidades de inspeção aprovada continuam legíveis")
+    void nonConformitiesOfApprovedInspectionRemainReadable() {
+        Inspection approved = approvedInspection();
+        NonConformity nc = nonConformityOn(approved);
+
+        assertThat(mvc.get().uri("/inspections/" + approved.getId() + "/non-conformities")
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatusOk()
+            .bodyJson().extractingPath("$").asList().hasSize(1);
+        assertThat(mvc.get().uri("/non-conformities/" + nc.getId())
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk();
     }
 
     // ---- POST non-conformity ----

@@ -12,6 +12,20 @@ const sharedRoot = path.resolve(projectRoot, '..', 'shared');
 
 const config = getDefaultConfig(projectRoot);
 
+// expo-sqlite usa WebAssembly e SharedArrayBuffer no preview web.
+if (!config.resolver.assetExts.includes('wasm')) {
+  config.resolver.assetExts.push('wasm');
+}
+const enhanceMiddleware = config.server.enhanceMiddleware;
+config.server.enhanceMiddleware = (middleware, metroServer) => {
+  const enhanced = enhanceMiddleware ? enhanceMiddleware(middleware, metroServer) : middleware;
+  return (req, res, next) => {
+    res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    return enhanced(req, res, next);
+  };
+};
+
 config.watchFolders = [sharedRoot];
 
 config.resolver.extraNodeModules = {

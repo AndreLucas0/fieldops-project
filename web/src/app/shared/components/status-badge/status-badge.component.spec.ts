@@ -31,6 +31,14 @@ describe('describeStatus', () => {
     });
   });
 
+  it('apresenta os perfis de usuário em etiquetas localizadas', () => {
+    expect(describeStatus('userRole', 'ADMIN')).toEqual({
+      label: 'Administrador',
+      tone: 'purple',
+    });
+    expect(describeStatus('userRole', 'TECHNICIAN').label).toBe('Técnico');
+  });
+
   it('exibe valor desconhecido como veio, sem quebrar a listagem', () => {
     expect(describeStatus('inspection', 'ESTADO_NOVO')).toEqual({
       label: 'ESTADO_NOVO',

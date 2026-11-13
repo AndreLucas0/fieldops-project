@@ -1,15 +1,23 @@
 :host {
   display: block;
+  min-width: 0;
 }
 
 .fo-table {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: 0.5rem;
-  background: var(--mat-sys-surface);
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #1b232b, #161c22);
   overflow: hidden;
 }
+
+:host-context(.catalog-card) .fo-table {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 
 .fo-table__filters {
   display: flex;
@@ -24,6 +32,10 @@
   font-weight: 500;
 }
 
+.fo-table__mono {
+  font-family: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', monospace;
+}
+
 /* Tabela larga rola sozinha, sem empurrar a página inteira. */
 .fo-table__viewport {
   width: 100%;
@@ -32,11 +44,28 @@
 
 table {
   width: 100%;
+  background: transparent;
 }
 
 th.align-center,
 td.align-center {
   text-align: center;
+}
+
+th {
+  color: var(--mat-sys-on-surface-variant);
+  white-space: nowrap;
+}
+
+td {
+  min-width: 7rem;
+  max-width: 24rem;
+  overflow-wrap: break-word;
+}
+
+td:first-child {
+  min-width: 11rem;
+  font-weight: 600;
 }
 
 th.align-end,
@@ -52,6 +81,37 @@ td a {
 td a:hover,
 td a:focus-visible {
   text-decoration: underline;
+}
+
+.fo-table__primary,
+.fo-table__secondary {
+  display: block;
+  white-space: nowrap;
+}
+
+.fo-table__inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.fo-table__inline-actions button {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding-inline: 0.5rem;
+  color: var(--mat-sys-on-surface);
+}
+
+.fo-table__inline-actions button.fo-action--danger {
+  color: #ffa3aa;
+}
+
+.fo-table__secondary {
+  margin-top: 0.2rem;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.8125rem;
+  font-weight: 400;
 }
 
 .fo-table__error {
@@ -84,4 +144,104 @@ td a:focus-visible {
 
 .fo-table__error button {
   margin-top: 0.75rem;
+}
+
+tr.fo-table__row--clickable {
+  cursor: pointer;
+}
+
+tr.fo-table__row--clickable:focus-visible {
+  outline: 2px solid #ffad0a;
+  outline-offset: -2px;
+}
+
+/* Personalização exclusiva da listagem de inspeções */
+:host-context(.inspection-list-page) {
+  .fo-table {
+    border: 1px solid #303a43;
+    border-radius: 0.75rem;
+    background: #171e24;
+  }
+
+  tr.fo-table__row--clickable {
+    cursor: pointer;
+  }
+
+  tr.fo-table__row--clickable:focus-visible {
+    outline: 2px solid #ffad0a;
+    outline-offset: -2px;
+  }
+
+  .fo-table__viewport {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    background: transparent;
+  }
+
+  th {
+    height: 3.25rem;
+    padding: 0 1rem;
+    color: #929ba5;
+    font-size: 0.82rem;
+    font-weight: 500;
+    border-bottom: 1px solid #303a43;
+    white-space: nowrap;
+  }
+
+  td {
+    height: 4.1rem;
+    padding: 0 1rem;
+    color: #e0e5e9;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #303a43;
+    white-space: nowrap;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  tr.mat-mdc-row {
+    transition: background 150ms ease;
+  }
+
+  tr.mat-mdc-row:hover {
+    background: #202a32;
+  }
+
+  td:first-child {
+    min-width: 16rem;
+    font-weight: 600;
+  }
+
+  .fo-table__inline-actions button {
+    color: #ff9ca5;
+  }
+
+  .fo-table__inline-actions button:hover {
+    background: rgba(255, 100, 120, 0.08);
+  }
+}
+
+:host-context(.template-list-page) {
+  // Destaque ao passar o cursor sobre uma linha clicável.
+  tr.mat-mdc-row {
+    transition: background 150ms ease;
+  }
+
+  tr.mat-mdc-row:hover {
+    background: #202a32;
+  }
+
+  // Divisórias entre as linhas.
+  td {
+    border-bottom: 1px solid #303a43;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
 }

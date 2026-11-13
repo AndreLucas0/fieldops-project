@@ -1,51 +1,58 @@
-import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-
 import { resetMockStore } from '@fieldops/shared';
-
+import { AuthStore } from '../../core/auth/auth.store';
 import { provideResources } from '../../core/core.providers';
 import { MOCK_LATENCY_MS } from '../../core/mocks/mock-services';
 import { TemplatesService } from '../../core/services/resources';
 import { TemplateCreateComponent } from './template-create.component';
 
-describe('TemplateCreateComponent', () => {
-  beforeEach(() => {
+describe('FE-W14 — novo modelo', () => {
+  function setup(role: 'SUPERVISOR' | 'TECHNICIAN' = 'SUPERVISOR') {
     resetMockStore();
     TestBed.configureTestingModule({
       providers: [
-        provideZonelessChangeDetection(),
         provideRouter([]),
         ...provideResources(true),
         { provide: MOCK_LATENCY_MS, useValue: 0 },
       ],
     });
-  });
-
-  it('creates a draft and opens its builder', () => {
+    TestBed.inject(AuthStore).setSession({
+      accessToken: 'token',
+      refreshToken: 'refresh',
+      expiresAt: Date.now() + 60000,
+      user: { id: 'user-1', name: 'Lucas', email: 'lucas@example.test', role },
+    });
     const fixture = TestBed.createComponent(TemplateCreateComponent);
-    const templates = TestBed.inject(TemplatesService);
-    const create = vi.spyOn(templates, 'create');
-    const router = TestBed.inject(Router);
-    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     fixture.detectChanges();
-
-    const root = fixture.nativeElement as HTMLElement;
-    const title = root.querySelector<HTMLInputElement>('input[name="title"]')!;
-    const category = root.querySelector<HTMLInputElement>('input[name="category"]')!;
-    title.value = 'Checklist de bombas';
-    category.value = 'Mecânica';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
-    category.dispatchEvent(new Event('input', { bubbles: true }));
-    fixture.detectChanges();
-    root.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
-    fixture.detectChanges();
-
+    const component = fixture.componentInstance;
+    return {
+      fixture,
+      component,
+      create: vi.spyOn(TestBed.inject(TemplatesService), 'create'),
+      navigate: vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true),
+    };
+  }
+  it('não cria sem título e categoria (RN-015)', () => {
+    const { component, create } = setup();
+    component.submit();
+    expect(create).not.toHaveBeenCalled();
+  });
+  it('cria DRAFT e abre o construtor sem inventar seções', () => {
+    const { component, create, navigate } = setup();
+    component.form.setValue({ title: '  Checklist  ', category: ' Operação ', description: '' });
+    component.submit();
     expect(create).toHaveBeenCalledWith({
-      title: 'Checklist de bombas',
-      category: 'Mecânica',
+      title: 'Checklist',
+      category: 'Operação',
       description: null,
     });
     expect(navigate).toHaveBeenCalledWith(['/inspection-templates', expect.any(String), 'edit']);
+  });
+  it('não permite criação por técnico', () => {
+    const { component, create } = setup('TECHNICIAN');
+    component.form.setValue({ title: 'Checklist', category: 'Operação', description: '' });
+    component.submit();
+    expect(create).not.toHaveBeenCalled();
   });
 });

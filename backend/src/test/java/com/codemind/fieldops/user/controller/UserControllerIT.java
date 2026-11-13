@@ -12,6 +12,7 @@ import com.codemind.fieldops.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -19,6 +20,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -43,6 +45,9 @@ class UserControllerIT {
 	private UserRepository userRepository;
 
 	@Autowired
+	private JdbcTemplate jdbcTemplate;
+
+	@Autowired
 	private PasswordEncoder passwordEncoder;
 
 	@Autowired
@@ -56,7 +61,8 @@ class UserControllerIT {
 
 	@BeforeEach
 	void setUp() {
-		userRepository.deleteAll();
+		// Isolate this ephemeral fixture from templates/inspections left by other IT classes.
+		jdbcTemplate.execute("TRUNCATE TABLE users CASCADE");
 		adminUser = userRepository.save(newUser("Ana Administradora", "admin.it@fieldops.local", UserRole.ADMIN));
 		technicianUser =
 			userRepository.save(newUser("Carlos Técnico", "tecnico.it@fieldops.local", UserRole.TECHNICIAN));
@@ -141,9 +147,14 @@ class UserControllerIT {
 	}
 
 	@Test
+	@DisplayName("RN-003, AC-SECURITY - técnico não gerencia usuários nem recebe dados administrativos")
 	void technicianCannotAccessUserManagementEndpoints() {
-		assertThat(mvc.get().uri("/users").header("Authorization", bearer(technicianToken)))
-			.hasStatus(HttpStatus.FORBIDDEN);
+		var result = mvc.get().uri("/users").header("Authorization", bearer(technicianToken)).exchange();
+
+		assertThat(result).hasStatus(HttpStatus.FORBIDDEN);
+		assertThat(result).bodyJson().doesNotHavePath("$.content");
+		assertThat(result).bodyJson().doesNotHavePath("$.email");
+		assertThat(result).bodyJson().doesNotHavePath("$.name");
 	}
 
 	@Test

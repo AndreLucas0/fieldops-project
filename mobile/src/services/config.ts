@@ -7,7 +7,7 @@
  * (docs.expo.dev/guides/environment-variables).
  */
 
-const DEFAULT_BASE_URL = 'http://localhost:8080/api/v1';
+const DEFAULT_BASE_URL = 'http://localhost:8090/api/v1';
 
 /** Tempo limite por requisição; em campo, esperar mais que isso é travar. */
 const DEFAULT_TIMEOUT_MS = 20_000;

@@ -1,7 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 
-import { EQUIPMENT_IDS, INSPECTION_IDS, USER_IDS, resetMockStore } from '@fieldops/shared';
+import {
+  EQUIPMENT_IDS,
+  INSPECTION_IDS,
+  SITE_IDS,
+  USER_IDS,
+  resetMockStore,
+} from '@fieldops/shared';
 
 import { ApiError } from '../models/api-error.model';
 import { provideResources } from '../core.providers';
@@ -122,6 +128,23 @@ describe('serviços fictícios da web', () => {
 
       expect(inativado.status).toBe('INACTIVE');
     });
+
+    it('solicita redefinição de senha e devolve a mensagem do contrato', async () => {
+      const response = await firstValueFrom(
+        TestBed.inject(UsersService).resetPassword(USER_IDS.technician),
+      );
+
+      expect(response.message).toBeTruthy();
+    });
+
+    it('devolve 404 ao redefinir senha de usuário inexistente', async () => {
+      const erro = await firstValueFrom(
+        TestBed.inject(UsersService).resetPassword('nao-existe'),
+      ).catch((e: ApiError) => e);
+
+      expect(erro).toBeInstanceOf(ApiError);
+      expect((erro as ApiError).status).toBe(404);
+    });
   });
 
   describe('paginação', () => {
@@ -151,8 +174,11 @@ describe('serviços fictícios da web', () => {
         TestBed.inject(SitesService).listByClient(clientes.content[0].id),
       );
 
-      expect(locais).toHaveLength(2);
-      expect(locais.map((site) => site.name)).toEqual(['Planta São Paulo', 'Filial Campinas']);
+      expect(locais.content).toHaveLength(2);
+      expect(locais.content.map((site) => site.name)).toEqual([
+        'Planta São Paulo',
+        'Filial Campinas',
+      ]);
     });
 
     it('recusa local sem cliente válido (RN-009)', async () => {
@@ -162,6 +188,15 @@ describe('serviços fictícios da web', () => {
 
       expect((erro as ApiError).status).toBe(422);
       expect((erro as ApiError).fieldError('clientId')).toBeTruthy();
+    });
+
+    it('inativa local sem removê-lo do histórico (RN-013)', async () => {
+      const service = TestBed.inject(SitesService);
+      const local = await firstValueFrom(service.setStatus(SITE_IDS.plantaSaoPaulo, 'INACTIVE'));
+      const page = await firstValueFrom(service.list());
+
+      expect(local.status).toBe('INACTIVE');
+      expect(page.content.some((site) => site.id === local.id)).toBe(true);
     });
   });
 
@@ -187,7 +222,7 @@ describe('serviços fictícios da web', () => {
       const gerador = await firstValueFrom(service.get(EQUIPMENT_IDS.gerador));
       const doLocal = await firstValueFrom(service.listBySite(gerador.siteId));
 
-      expect(doLocal).toHaveLength(2);
+      expect(doLocal.content).toHaveLength(2);
     });
   });
 
@@ -197,9 +232,9 @@ describe('serviços fictícios da web', () => {
       const modelos = await firstValueFrom(service.list({ status: 'ACTIVE' }));
       const versoes = await firstValueFrom(service.listVersions(modelos.content[0].id));
 
-      expect(versoes).toHaveLength(1);
-      expect(versoes[0].sections).toHaveLength(3);
-      expect(versoes[0].sections?.flatMap((secao) => secao.items ?? [])).toHaveLength(6);
+      expect(versoes.content).toHaveLength(1);
+      expect(versoes.content[0].sections).toHaveLength(3);
+      expect(versoes.content[0].sections?.flatMap((secao) => secao.items ?? [])).toHaveLength(6);
     });
 
     it('o rascunho não tem versão publicada, mas tem seções para editar', async () => {
@@ -207,7 +242,7 @@ describe('serviços fictícios da web', () => {
       const rascunhos = await firstValueFrom(service.list({ status: 'DRAFT' }));
       const id = rascunhos.content[0].id;
 
-      expect(await firstValueFrom(service.listVersions(id))).toHaveLength(0);
+      expect((await firstValueFrom(service.listVersions(id))).content).toHaveLength(0);
       expect(await firstValueFrom(service.listDraftSections(id))).toHaveLength(1);
     });
 
@@ -367,6 +402,15 @@ describe('serviços fictícios da web', () => {
 
       expect(page.totalElements).toBe(1);
       expect(page.content[0].severity).toBe('CRITICAL');
+    });
+
+    it('filtra por inspeção relacionada', async () => {
+      const page = await firstValueFrom(
+        TestBed.inject(NonConformitiesService).list({ inspectionId: INSPECTION_IDS.submitted }),
+      );
+
+      expect(page.totalElements).toBe(1);
+      expect(page.content[0].inspectionId).toBe(INSPECTION_IDS.submitted);
     });
   });
 

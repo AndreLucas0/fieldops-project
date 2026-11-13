@@ -56,9 +56,15 @@ class IdempotencyTest {
         nonConformityRepository = mock(NonConformityRepository.class);
         inspectionExecutionService = mock(InspectionExecutionService.class);
         nonConformityService = mock(NonConformityService.class);
+        SynchronizationService self = mock(SynchronizationService.class);
         service = new SynchronizationService(syncOperationRepository, inspectionRepository,
             inspectionResponseRepository, nonConformityRepository, inspectionExecutionService, nonConformityService,
-            null);
+            self);
+        // Stands in for the Spring proxy: the per-operation transactions are invoked through self (RN-070).
+        when(self.applyAndRecord(any(), any(), any())).thenAnswer(invocation -> service.applyAndRecord(
+            invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2)));
+        when(self.recordOutcome(any(), any(), any(), any())).thenAnswer(invocation -> service.recordOutcome(
+            invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2), invocation.getArgument(3)));
     }
 
     @Test

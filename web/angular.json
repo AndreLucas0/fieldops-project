@@ -58,6 +58,17 @@
                   "with": "src/environments/environment.development.ts"
                 }
               ]
+            },
+            "api": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.api.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"
@@ -70,6 +81,10 @@
             },
             "development": {
               "buildTarget": "web:build:development"
+            },
+            "api": {
+              "buildTarget": "web:build:api",
+              "proxyConfig": "proxy.conf.json"
             }
           },
           "defaultConfiguration": "development"

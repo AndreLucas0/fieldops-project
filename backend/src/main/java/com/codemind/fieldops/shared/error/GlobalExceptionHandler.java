@@ -2,17 +2,26 @@ package com.codemind.fieldops.shared.error;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -27,6 +36,82 @@ public class GlobalExceptionHandler {
 		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
 			"Request payload failed validation", fieldErrors);
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+	}
+
+	@ExceptionHandler(HandlerMethodValidationException.class)
+	ResponseEntity<ErrorResponse> handleMethodValidation(HandlerMethodValidationException ex, HttpServletRequest request) {
+		// Constraints on controller parameters (e.g. @Size on a @PathVariable) — built-in MVC method validation
+		List<FieldError> fieldErrors = ex.getParameterValidationResults().stream()
+			.flatMap(result -> result.getResolvableErrors().stream()
+				.map(error -> new FieldError(
+					Objects.requireNonNullElse(result.getMethodParameter().getParameterName(), "parameter"),
+					error.getDefaultMessage())))
+			.toList();
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+			"Request parameters failed validation", fieldErrors);
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+	}
+
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex, HttpServletRequest request) {
+		// Parser details are not exposed (api-rest.md §12.3: 400 "requisição malformada")
+		LOG.debug("Malformed request body on {} {}", request.getMethod(), request.getRequestURI());
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST",
+			"Request body is missing or is not valid JSON");
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+	}
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+		LOG.debug("Invalid parameter '{}' on {} {}", ex.getName(), request.getMethod(), request.getRequestURI());
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.BAD_REQUEST, "INVALID_PARAMETER",
+			"Request parameter has an invalid value", List.of(new FieldError(ex.getName(), "Invalid value")));
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+	}
+
+	@ExceptionHandler(MissingServletRequestParameterException.class)
+	ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException ex,
+			HttpServletRequest request) {
+		return missingParameter(ex.getParameterName(), request);
+	}
+
+	@ExceptionHandler(MissingServletRequestPartException.class)
+	ResponseEntity<ErrorResponse> handleMissingPart(MissingServletRequestPartException ex, HttpServletRequest request) {
+		return missingParameter(ex.getRequestPartName(), request);
+	}
+
+	private ResponseEntity<ErrorResponse> missingParameter(String name, HttpServletRequest request) {
+		LOG.debug("Missing required parameter '{}' on {} {}", name, request.getMethod(), request.getRequestURI());
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.BAD_REQUEST, "MISSING_PARAMETER",
+			"A required request parameter is missing", List.of(new FieldError(name, "Required")));
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+	}
+
+	@ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+	ResponseEntity<ErrorResponse> handleUnsupportedContentType(HttpMediaTypeNotSupportedException ex,
+			HttpServletRequest request) {
+		LOG.debug("Unsupported Content-Type on {} {}", request.getMethod(), request.getRequestURI());
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+			"UNSUPPORTED_CONTENT_TYPE", "Request Content-Type is not supported by this endpoint");
+		return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(body);
+	}
+
+	@ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+	ResponseEntity<ErrorResponse> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex,
+			HttpServletRequest request) {
+		LOG.debug("Method not allowed: {} {}", request.getMethod(), request.getRequestURI());
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED",
+			"HTTP method is not allowed on this route");
+		// RFC 9110 §15.5.6: a 405 response must list the supported methods in the Allow header
+		return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).headers(ex.getHeaders()).body(body);
+	}
+
+	@ExceptionHandler(NoResourceFoundException.class)
+	ResponseEntity<ErrorResponse> handleNoRoute(NoResourceFoundException ex, HttpServletRequest request) {
+		LOG.debug("No route for {} {}", request.getMethod(), request.getRequestURI());
+		ErrorResponse body = ErrorResponseFactory.create(request, HttpStatus.NOT_FOUND, "ROUTE_NOT_FOUND",
+			"No endpoint matches this route");
+		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
 	}
 
 	@ExceptionHandler(AuthenticationException.class)

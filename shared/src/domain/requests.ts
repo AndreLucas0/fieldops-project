@@ -245,7 +245,7 @@ export interface UploadFile {
 // ---------- Não conformidades ----------
 
 export interface NonConformityCreateRequest {
-  inspectionItemId?: Uuid | null;
+  snapshotId?: Uuid | null;
   responseId?: Uuid | null;
   title: string;
   description: string;

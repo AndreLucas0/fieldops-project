@@ -163,6 +163,45 @@ describe('AuthService', () => {
       expect(store.accessToken).toBe('access-2');
     });
 
+    it('com o contrato real (refresh sem `user`), busca a identidade em /auth/me após recarregar a página', async () => {
+      tokens.setRefreshToken('refresh-1');
+
+      const restored = firstValue(auth.restoreSession());
+      // RefreshTokenResponse do backend: { accessToken, refreshToken, expiresIn } — sem `user`.
+      backend.expectOne(`${API}/auth/refresh`).flush({
+        accessToken: 'access-2',
+        refreshToken: 'refresh-2',
+        expiresIn: 900,
+      });
+      const me = backend.expectOne(`${API}/auth/me`);
+      expect(me.request.headers.get('Authorization')).toBe('Bearer access-2');
+      // CurrentUserResponse: { id, name, email, role, status, phone }.
+      me.flush({ ...LOGIN_RESPONSE.user, status: 'ACTIVE', phone: null });
+
+      await expect(restored).resolves.toBe(true);
+      expect(store.snapshot.isAuthenticated).toBe(true);
+      expect(store.snapshot.role).toBe('SUPERVISOR');
+      expect(store.accessToken).toBe('access-2');
+      expect(tokens.getRefreshToken()).toBe('refresh-2');
+    });
+
+    it('devolve false e limpa a sessão quando /auth/me falha após o refresh sem `user`', async () => {
+      tokens.setRefreshToken('refresh-1');
+
+      const restored = firstValue(auth.restoreSession());
+      backend
+        .expectOne(`${API}/auth/refresh`)
+        .flush({ accessToken: 'access-2', refreshToken: 'refresh-2', expiresIn: 900 });
+      backend
+        .expectOne(`${API}/auth/me`)
+        .flush(null, { status: 401, statusText: 'Unauthorized' });
+
+      await expect(restored).resolves.toBe(false);
+      expect(store.snapshot.isAuthenticated).toBe(false);
+      expect(tokens.getRefreshToken()).toBeNull();
+      backend.expectNone(`${API}/auth/refresh`);
+    });
+
     it('devolve false e limpa tudo quando o refresh token não vale mais', async () => {
       tokens.setRefreshToken('refresh-expirado');
 

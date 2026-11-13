@@ -161,6 +161,10 @@ describe('toAuthFailureCode', () => {
     expect(toAuthFailureCode(ApiError.client('TIMEOUT', 'demorou'))).toBe('NETWORK_UNAVAILABLE');
   });
 
+  it('trata UNAUTHORIZED como credencial inválida (sessão expirada sem refresh)', () => {
+    expect(toAuthFailureCode(serverError('UNAUTHORIZED'))).toBe('INVALID_CREDENTIALS');
+  });
+
   it('qualquer outra falha vira inesperada', () => {
     expect(toAuthFailureCode(serverError('QUALQUER'))).toBe('UNEXPECTED');
     expect(toAuthFailureCode(new Error('boom'))).toBe('UNEXPECTED');

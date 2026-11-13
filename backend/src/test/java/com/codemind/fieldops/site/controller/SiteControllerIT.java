@@ -7,6 +7,9 @@ import com.codemind.fieldops.TestcontainersConfiguration;
 import com.codemind.fieldops.client.domain.Client;
 import com.codemind.fieldops.client.domain.ClientStatus;
 import com.codemind.fieldops.client.repository.ClientRepository;
+import com.codemind.fieldops.equipment.domain.Equipment;
+import com.codemind.fieldops.equipment.domain.EquipmentStatus;
+import com.codemind.fieldops.equipment.repository.EquipmentRepository;
 import com.codemind.fieldops.shared.security.JwtClaims;
 import com.codemind.fieldops.site.domain.InspectionSite;
 import com.codemind.fieldops.site.domain.SiteStatus;
@@ -17,6 +20,7 @@ import com.codemind.fieldops.user.domain.UserStatus;
 import com.codemind.fieldops.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +29,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -50,6 +55,9 @@ class SiteControllerIT {
     private ClientRepository clientRepository;
 
     @Autowired
+    private EquipmentRepository equipmentRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -57,6 +65,9 @@ class SiteControllerIT {
 
     @Autowired
     private JwtEncoder jwtEncoder;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private User adminUser;
     private User supervisorUser;
@@ -68,9 +79,13 @@ class SiteControllerIT {
 
     @BeforeEach
     void setUp() {
+        // TRUNCATE ... CASCADE also clears every table referencing users (templates,
+        // inspections and their children) left behind by other IT classes, preventing
+        // FK violations below when the full suite runs (ITORDER-001).
+        jdbcTemplate.execute("TRUNCATE TABLE users CASCADE");
+        equipmentRepository.deleteAll();
         siteRepository.deleteAll();
         clientRepository.deleteAll();
-        userRepository.deleteAll();
         adminUser = userRepository.save(newUser("Admin", "admin.site@fieldops.local", UserRole.ADMIN));
         supervisorUser = userRepository.save(newUser("Supervisor", "supervisor.site@fieldops.local", UserRole.SUPERVISOR));
         technicianUser = userRepository.save(newUser("Technician", "tech.site@fieldops.local", UserRole.TECHNICIAN));
@@ -78,6 +93,15 @@ class SiteControllerIT {
         supervisorToken = mintAccessToken(supervisorUser);
         technicianToken = mintAccessToken(technicianUser);
         testClient = clientRepository.save(Client.builder().name("Test Client").status(ClientStatus.ACTIVE).build());
+    }
+
+    @AfterEach
+    void tearDown() {
+        // Do not leave equipment/sites behind for IT classes that only delete down to sites (ITORDER-001).
+        equipmentRepository.deleteAll();
+        siteRepository.deleteAll();
+        clientRepository.deleteAll();
+        userRepository.deleteAll();
     }
 
     private User newUser(String name, String email, UserRole role) {
@@ -255,6 +279,62 @@ class SiteControllerIT {
     void anonymousCannotAccessSites() {
         assertThat(mvc.get().uri("/sites"))
             .hasStatus(HttpStatus.UNAUTHORIZED);
+    }
+
+    private Equipment saveEquipment(String name, String qrCode, InspectionSite site) {
+        return equipmentRepository.save(Equipment.builder()
+            .site(site)
+            .name(name)
+            .qrCode(qrCode)
+            .status(EquipmentStatus.ACTIVE)
+            .build());
+    }
+
+    @Test
+    void adminCanListEquipmentBySite() {
+        InspectionSite site = saveSite("Equipment Site", testClient);
+        saveEquipment("Pump A", "QR-PA-001", site);
+        saveEquipment("Pump B", "QR-PB-001", site);
+
+        assertThat(mvc.get().uri("/sites/" + site.getId() + "/equipment")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content").asList().hasSize(2);
+    }
+
+    @Test
+    void technicianCannotListSiteEquipment() {
+        InspectionSite site = saveSite("Forbidden Site", testClient);
+
+        assertThat(mvc.get().uri("/sites/" + site.getId() + "/equipment")
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatus(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void listEquipmentForNonExistentSiteReturnsNotFound() {
+        assertThat(mvc.get().uri("/sites/" + UUID.randomUUID() + "/equipment")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatus(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void listSiteEquipmentOnlyReturnsEquipmentForThatSite() {
+        InspectionSite siteA = saveSite("Site Alpha", testClient);
+        Client clientB = clientRepository.save(
+            Client.builder().name("Client Beta").status(ClientStatus.ACTIVE).build());
+        InspectionSite siteB = siteRepository.save(
+            InspectionSite.builder().client(clientB).name("Site Beta").status(SiteStatus.ACTIVE).build());
+        saveEquipment("Equipment Alpha", "QR-EQA-001", siteA);
+        saveEquipment("Equipment Beta", "QR-EQB-001", siteB);
+
+        assertThat(mvc.get().uri("/sites/" + siteA.getId() + "/equipment")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk()
+            .bodyJson()
+            .extractingPath("$.content[*].siteId").asList()
+            .containsOnly(siteA.getId().toString());
     }
 
 }

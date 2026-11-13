@@ -1,6 +1,7 @@
 package com.codemind.fieldops.nonconformity.mapper;
 
 import com.codemind.fieldops.nonconformity.domain.NonConformity;
+import com.codemind.fieldops.nonconformity.dto.MobileNonConformityDto;
 import com.codemind.fieldops.nonconformity.dto.NonConformityResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -13,5 +14,11 @@ public interface NonConformityMapper {
     @Mapping(source = "response.id", target = "responseId")
     @Mapping(source = "reportedBy.id", target = "reportedById")
     NonConformityResponse toResponse(NonConformity nonConformity);
+
+    @Mapping(source = "inspection.id", target = "inspectionId")
+    @Mapping(source = "snapshot.id", target = "inspectionItemId")
+    @Mapping(source = "response.id", target = "responseId")
+    @Mapping(source = "reportedBy.id", target = "createdBy")
+    MobileNonConformityDto toMobileDto(NonConformity nonConformity);
 
 }

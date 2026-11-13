@@ -103,9 +103,9 @@ Funcionalidades:
 - patrimônio;
 - número de série;
 - fabricante e modelo;
-- QR Code;
+- QR Code exibido como imagem gerada localmente a partir do identificador persistido;
 - situação;
-- histórico de inspeções, como P1.
+- histórico resumido e paginado de inspeções relacionadas (`equipmentId`); relatórios e eventos detalhados permanecem como P1.
 
 ## 14.8 Construtor de modelos de inspeção
 

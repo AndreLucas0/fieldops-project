@@ -15,6 +15,7 @@ import com.codemind.fieldops.shared.error.BusinessRuleViolationException;
 import com.codemind.fieldops.shared.error.ResourceConflictException;
 import com.codemind.fieldops.shared.error.ResourceNotFoundException;
 import com.codemind.fieldops.shared.storage.EvidenceStorageClient;
+import org.springframework.security.access.AccessDeniedException;
 import com.codemind.fieldops.shared.storage.EvidenceStorageProperties;
 import com.codemind.fieldops.user.domain.User;
 import com.codemind.fieldops.user.repository.UserRepository;
@@ -65,8 +66,14 @@ public class EvidenceService {
     }
 
     @Transactional
-    public Evidence upload(UUID inspectionId, UUID userId, EvidenceUploadCommand command, MultipartFile file) {
+    public Evidence upload(UUID inspectionId, UUID userId, boolean isTechnician, EvidenceUploadCommand command,
+            MultipartFile file) {
         Inspection inspection = getInspection(inspectionId);
+        checkTechnicianAccess(inspection, userId, isTechnician);
+        if (inspection.getStatus() == InspectionStatus.APPROVED) {
+            throw new ResourceConflictException(EVIDENCE_READ_ONLY_CODE,
+                "Evidence of an approved inspection is read-only");
+        }
         User createdBy = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND_CODE, "User not found"));
 
@@ -140,8 +147,9 @@ public class EvidenceService {
     }
 
     @Transactional(readOnly = true)
-    public List<Evidence> list(UUID inspectionId, UUID responseId, UUID nonConformityId) {
-        getInspection(inspectionId);
+    public List<Evidence> list(UUID inspectionId, UUID userId, boolean isTechnician, UUID responseId,
+            UUID nonConformityId) {
+        checkTechnicianAccess(getInspection(inspectionId), userId, isTechnician);
         if (responseId != null) {
             return evidenceRepository.findByInspectionIdAndResponseId(inspectionId, responseId);
         }
@@ -152,14 +160,20 @@ public class EvidenceService {
     }
 
     @Transactional(readOnly = true)
-    public Evidence getById(UUID id) {
+    public Evidence getById(UUID id, UUID userId, boolean isTechnician) {
+        Evidence evidence = findOrThrow(id);
+        checkTechnicianAccess(evidence.getInspection(), userId, isTechnician);
+        return evidence;
+    }
+
+    private Evidence findOrThrow(UUID id) {
         return evidenceRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException(EVIDENCE_NOT_FOUND_CODE, "Evidence not found"));
     }
 
     @Transactional
-    public void delete(UUID id, UUID userId) {
-        Evidence evidence = getById(id);
+    public void delete(UUID id, UUID userId, boolean isTechnician) {
+        Evidence evidence = getById(id, userId, isTechnician);
         if (evidence.getInspection().getStatus() == InspectionStatus.APPROVED) {
             throw new ResourceConflictException(EVIDENCE_READ_ONLY_CODE,
                 "Evidence of an approved inspection is read-only");
@@ -179,6 +193,13 @@ public class EvidenceService {
     private Inspection getInspection(UUID id) {
         return inspectionRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException(INSPECTION_NOT_FOUND_CODE, "Inspection not found"));
+    }
+
+    // RN-004 / PEND-05: a technician only reaches evidence of inspections assigned to them
+    private static void checkTechnicianAccess(Inspection inspection, UUID userId, boolean isTechnician) {
+        if (isTechnician && !inspection.getTechnician().getId().equals(userId)) {
+            throw new AccessDeniedException("You do not have access to this inspection");
+        }
     }
 
     private static String sha256Hex(byte[] content) {

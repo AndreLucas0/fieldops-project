@@ -49,6 +49,7 @@
 | **401** | Sessão ausente ou inválida. |
 | **403** | Usuário autenticado sem permissão. |
 | **404** | Recurso não encontrado ou não visível ao usuário. |
+| **405** | Método HTTP não permitido na rota (resposta inclui o cabeçalho `Allow`). |
 | **409** | Conflito de estado, versão ou unicidade. |
 | **413** | Arquivo acima do limite. |
 | **415** | Formato de arquivo não suportado. |
@@ -159,6 +160,7 @@ GET    /api/v1/inspection-templates
 GET    /api/v1/inspection-templates/{id}
 POST   /api/v1/inspection-templates
 PUT    /api/v1/inspection-templates/{id}
+GET    /api/v1/inspection-templates/{id}/sections
 POST   /api/v1/inspection-templates/{id}/sections
 PUT    /api/v1/inspection-templates/{id}/sections/{sectionId}
 POST   /api/v1/inspection-templates/{id}/sections/{sectionId}/items

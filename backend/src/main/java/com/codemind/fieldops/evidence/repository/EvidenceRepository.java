@@ -18,4 +18,6 @@ public interface EvidenceRepository extends JpaRepository<Evidence, UUID> {
 
     boolean existsByNonConformityId(UUID nonConformityId);
 
+    boolean existsByInspectionIdAndResponseId(UUID inspectionId, UUID responseId);
+
 }

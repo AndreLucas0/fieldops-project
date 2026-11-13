@@ -4,6 +4,7 @@ import { Redirect, Stack } from 'expo-router';
 import { colors, fonts, fontSizes, Screen } from '@/design-system';
 import { canUseFieldApp } from '@/domain/auth';
 import { useSession } from '@/features/auth/session-context';
+import { useSyncOnForeground } from '@/features/sync/use-sync';
 
 /**
  * Barreira de rota do aplicativo. A API continua validando cada requisição
@@ -16,6 +17,7 @@ import { useSession } from '@/features/auth/session-context';
  */
 export default function ProtectedLayout() {
   const { status, session } = useSession();
+  useSyncOnForeground();
 
   if (status === 'loading') {
     return (

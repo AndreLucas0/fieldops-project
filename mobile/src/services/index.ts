@@ -2,9 +2,8 @@
  * Camada de acesso a dados do FieldOps.
  *
  * Ponto de importação recomendado: `import { apiClient, useAuth } from
- * '@/services'`. Toda chamada vai direto à API — ou ao backend fictício do
- * modo mock, conforme `EXPO_PUBLIC_API_MOCK`. Não há banco local, fila de
- * envio nem motor de sincronização.
+ * '@/services'`. Toda chamada pode ir à API, ao backend fictício do
+ * modo mock, ou ao outbox SQLite local (offline-first via sync-service).
  */
 
 export {
@@ -52,3 +51,11 @@ export {
 } from './mock/mock-data';
 
 export { handleMockRequest } from './mock/mock-server';
+
+export {
+  getOrCreateDeviceId,
+  isOnline,
+  syncPending,
+  syncPendingIfOnline,
+  type SyncResult,
+} from './sync-service';

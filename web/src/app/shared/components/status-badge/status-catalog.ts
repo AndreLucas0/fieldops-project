@@ -13,6 +13,7 @@ export type BadgeContext =
   | 'inspection'
   | 'template'
   | 'user'
+  | 'userRole'
   | 'equipment'
   | 'priority'
   | 'severity'
@@ -70,6 +71,14 @@ const USER: ContextCatalog = {
   BLOCKED: { label: 'Bloqueado', tone: 'red' },
 };
 
+/** `UserRole` — perfis de acesso do contrato REST. */
+const USER_ROLE: ContextCatalog = {
+  ADMIN: { label: 'Administrador', tone: 'purple' },
+  SUPERVISOR: { label: 'Supervisor', tone: 'blue' },
+  TECHNICIAN: { label: 'Técnico', tone: 'gray' },
+  CLIENT_VIEWER: { label: 'Cliente', tone: 'orange' },
+};
+
 /** `EquipmentStatus`. "Baixado" evita confusão com "Inativo". */
 const EQUIPMENT: ContextCatalog = {
   ACTIVE: { label: 'Ativo', tone: 'green' },
@@ -110,6 +119,7 @@ export const STATUS_CATALOG: Readonly<Record<BadgeContext, ContextCatalog>> = {
   nonConformity: NON_CONFORMITY,
   template: TEMPLATE,
   user: USER,
+  userRole: USER_ROLE,
   equipment: EQUIPMENT,
   priority: PRIORITY,
   severity: SEVERITY,

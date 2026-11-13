@@ -6,6 +6,7 @@ import java.util.UUID;
 
 public record TemplateSectionResponse(
     UUID id,
+    UUID templateVersionId,
     String title,
     String description,
     int displayOrder,

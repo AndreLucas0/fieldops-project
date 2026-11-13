@@ -147,23 +147,72 @@ describe('TemplateBuilderComponent', () => {
     expect(texto(fixture)).toContain('Disjuntor calibrado?');
   });
 
-  it('reordena itens com uma única operação de serviço', async () => {
-    const fixture = setup(TEMPLATE_IDS.eletrico);
+  it('criar seção inclui displayOrder no payload enviado ao serviço', () => {
+    const fixture = setup(TEMPLATE_IDS.eletrico, {
+      sectionDialogResult: { title: 'Aterramento', description: null },
+    });
     const templates = TestBed.inject(TemplatesService);
-    const [section] = await firstValueFrom(templates.listDraftSections(TEMPLATE_IDS.eletrico));
-    const items = [...(section.items ?? [])].sort(
-      (left, right) => left.displayOrder - right.displayOrder,
-    );
-    const expectedOrder = [items[1].id, items[0].id];
-    const reorderItems = vi.spyOn(templates, 'reorderItems');
-    const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
-      'button[aria-label="Mover item para baixo"]',
-    )!;
+    const createSection = vi.spyOn(templates, 'createSection');
 
-    button.click();
+    const botao = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    ).find((el) => el.textContent?.includes('Nova seção'))!;
+    botao.click();
     fixture.detectChanges();
 
-    expect(reorderItems).toHaveBeenCalledWith(TEMPLATE_IDS.eletrico, section.id, expectedOrder);
+    expect(createSection).toHaveBeenCalledWith(
+      TEMPLATE_IDS.eletrico,
+      expect.objectContaining({ displayOrder: expect.any(Number) }),
+    );
+  });
+
+  it('criar item inclui displayOrder no payload enviado ao serviço', () => {
+    const fixture = setup(TEMPLATE_IDS.eletrico, {
+      itemDialogResult: {
+        code: null,
+        title: 'Disjuntor calibrado?',
+        description: null,
+        responseType: 'BOOLEAN',
+        required: true,
+        observationRequiredOnFailure: false,
+        evidenceRequiredOnFailure: false,
+        optionsJson: null,
+      },
+    });
+    const templates = TestBed.inject(TemplatesService);
+    const createItem = vi.spyOn(templates, 'createItem');
+
+    const botao = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    ).find((el) => el.textContent?.includes('Novo item'))!;
+    botao.click();
+    fixture.detectChanges();
+
+    expect(createItem).toHaveBeenCalledWith(
+      TEMPLATE_IDS.eletrico,
+      expect.any(String),
+      expect.objectContaining({ displayOrder: expect.any(Number) }),
+    );
+  });
+
+  it('reordenar itens preserva os campos obrigatórios do PUT (RN-023)', () => {
+    const fixture = setup(TEMPLATE_IDS.eletrico);
+    const update = vi.spyOn(TestBed.inject(TemplatesService), 'updateItem');
+    const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      '[aria-label="Mover item para baixo"]',
+    )!;
+    button.click();
+    expect(update).toHaveBeenCalledTimes(3);
+    expect(update).toHaveBeenCalledWith(
+      TEMPLATE_IDS.eletrico,
+      expect.any(String),
+      expect.objectContaining({
+        title: expect.any(String),
+        responseType: expect.any(String),
+        required: expect.any(Boolean),
+        displayOrder: expect.any(Number),
+      }),
+    );
   });
 
   it('modelo inexistente mostra o erro com botão de nova tentativa', () => {

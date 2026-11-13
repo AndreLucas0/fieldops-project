@@ -1,49 +1,119 @@
-import type { Routes } from '@angular/router';
+import type { Route, Routes } from '@angular/router';
 
-import { authGuard } from './core/auth/auth.guard';
+import { authGuard, authGuardChild, guestGuard } from './core/auth/auth.guard';
 
-/**
- * Rotas da interface administrativa.
- *
- * O `authGuard` resolve os perfis pelo mapa de `core/auth/permissions.ts`
- * (`/dashboard` → ADMIN e SUPERVISOR), então a rota não precisa repetir a
- * lista. Carregamento tardio: cada tela vira um pedaço próprio do pacote.
- */
+const ADMIN_FEATURE_ROUTES: Routes = [
+  {
+    path: 'clients',
+    title: 'Clientes — FieldOps',
+    loadComponent: () =>
+      import('./features/clients/clients-list.component').then(
+        (module) => module.ClientsListComponent,
+      ),
+  },
+  {
+    path: 'inspections/new',
+    title: 'Nova inspeção — FieldOps',
+    loadComponent: () =>
+      import('./features/inspections/inspection-create.component').then(
+        (module) => module.InspectionCreateComponent,
+      ),
+  },
+  {
+    path: 'inspections/:inspectionId/review',
+    title: 'Revisão da inspeção — FieldOps',
+    loadComponent: () =>
+      import('./features/inspections/inspection-review.component')
+        .then((m) => m.InspectionReviewComponent),
+  },
+  {
+    path: 'inspections/:inspectionId',
+    title: 'Detalhes da inspeção — FieldOps',
+    loadComponent: () =>
+      import('./features/inspections/inspection-detail.component').then(
+        (module) => module.InspectionDetailComponent,
+      ),
+  },
+  {
+    path: 'inspections',
+    title: 'Inspeções — FieldOps',
+    loadComponent: () =>
+      import('./features/inspections/inspections-list.component').then(
+        (module) => module.InspectionsListComponent,
+      ),
+  },
+
+  catalogRoute('clients/:clientId/sites', 'Locais do cliente', 'sites'),
+  catalogRoute('sites', 'Locais'),
+  catalogRoute('sites/:siteId/equipment', 'Equipamentos do local', 'equipment'),
+  catalogRoute('equipment', 'Equipamentos'),
+  catalogRoute('users', 'Usuários'),
+  catalogRoute('non-conformities', 'Não conformidades'),
+];
+
+function catalogRoute(path: string, title: string, catalog = path): Route {
+  return {
+    path,
+    title: `${title} — FieldOps`,
+    data: { catalog },
+    loadComponent: () =>
+      import('./features/catalog-list/catalog-list.component').then(
+        (module) => module.CatalogListComponent,
+      ),
+  };
+}
+
+/** Rotas públicas e a área autenticada do painel administrativo. */
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   {
-    path: 'dashboard',
-    canActivate: [authGuard],
-    title: 'Painel — FieldOps',
+    path: 'login',
+    canActivate: [guestGuard],
+    title: 'Entrar — FieldOps',
     loadComponent: () =>
-      import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
+      import('./features/login/login.component').then((module) => module.LoginComponent),
   },
   {
-    path: 'inspection-templates',
+    path: '',
     canActivate: [authGuard],
-    title: 'Modelos de inspeção — FieldOps',
+    canActivateChild: [authGuardChild],
     loadComponent: () =>
-      import('./features/templates/templates-list.component').then((m) => m.TemplatesListComponent),
+      import('./features/shell/admin-shell.component').then((module) => module.AdminShellComponent),
+    children: [
+      {
+        path: 'dashboard',
+        title: 'Painel — FieldOps',
+        loadComponent: () =>
+          import('./features/dashboard/dashboard.component').then(
+            (module) => module.DashboardComponent,
+          ),
+      },
+      {
+        path: 'inspection-templates',
+        title: 'Modelos de inspeção — FieldOps',
+        loadComponent: () =>
+          import('./features/templates/templates-list.component').then(
+            (module) => module.TemplatesListComponent,
+          ),
+      },
+      {
+        path: 'inspection-templates/new',
+        title: 'Novo modelo — FieldOps',
+        loadComponent: () =>
+          import('./features/templates/template-builder.component').then(
+            (module) => module.TemplateBuilderComponent,
+          ),
+      },
+      {
+        path: 'inspection-templates/:templateId/edit',
+        title: 'Construtor de modelo — FieldOps',
+        loadComponent: () =>
+          import('./features/templates/template-builder.component').then(
+            (module) => module.TemplateBuilderComponent,
+          ),
+      },
+      ...ADMIN_FEATURE_ROUTES,
+      { path: '**', redirectTo: 'dashboard' },
+    ],
   },
-  {
-    path: 'inspection-templates/new',
-    canActivate: [authGuard],
-    title: 'Novo modelo — FieldOps',
-    loadComponent: () =>
-      import('./features/templates/template-create.component').then(
-        (m) => m.TemplateCreateComponent,
-      ),
-  },
-  {
-    path: 'inspection-templates/:templateId/edit',
-    canActivate: [authGuard],
-    title: 'Construtor de modelo — FieldOps',
-    loadComponent: () =>
-      import('./features/templates/template-builder.component').then(
-        (m) => m.TemplateBuilderComponent,
-      ),
-  },
-  // As demais telas entram aqui conforme forem implementadas. Enquanto isso,
-  // um destino desconhecido volta para o painel em vez de deixar a tela vazia.
-  { path: '**', redirectTo: 'dashboard' },
 ];

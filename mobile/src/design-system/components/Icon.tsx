@@ -28,6 +28,12 @@ export const ICON_PATHS = {
     'M22 8.8a15 15 0 0 0-11.3-3.8',
     'm2 2 20 20',
   ],
+  sync: [
+    'M21 2v6h-6',
+    'M3 12a9 9 0 0 1 15-6.7L21 8',
+    'M3 22v-6h6',
+    'M21 12a9 9 0 0 1-15 6.7L3 16',
+  ],
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

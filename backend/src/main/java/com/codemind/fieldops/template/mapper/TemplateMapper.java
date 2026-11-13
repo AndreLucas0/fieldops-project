@@ -22,10 +22,14 @@ public interface TemplateMapper {
     TemplateResponse toResponse(InspectionTemplate template);
 
     @Mapping(source = "publishedBy.id", target = "publishedById")
+    @Mapping(source = "publishedBy.id", target = "publishedBy")
+    @Mapping(source = "template.id", target = "templateId")
     TemplateVersionResponse toVersionResponse(TemplateVersion version);
 
+    @Mapping(source = "templateVersion.id", target = "templateVersionId")
     TemplateSectionResponse toSectionResponse(TemplateSection section);
 
+    @Mapping(source = "section.id", target = "sectionId")
     TemplateItemResponse toItemResponse(TemplateItem item);
 
     @Mapping(source = "section.id", target = "sectionId")

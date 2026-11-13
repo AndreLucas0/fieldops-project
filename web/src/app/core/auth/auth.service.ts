@@ -1,6 +1,16 @@
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, catchError, finalize, map, of, shareReplay, tap, throwError } from 'rxjs';
+import {
+  Observable,
+  catchError,
+  finalize,
+  map,
+  of,
+  shareReplay,
+  switchMap,
+  tap,
+  throwError,
+} from 'rxjs';
 
 import { ApiService } from '../http/api.service';
 import { skipAuth } from '../http/http-context';
@@ -88,12 +98,21 @@ export class AuthService {
     this.refreshInFlight$ = this.api
       .post<RefreshTokenResponse>('/auth/refresh', { refreshToken }, { context: skipAuth() })
       .pipe(
-        map((response) => {
-          const user = response.user ?? this.store.snapshot.user;
-          if (!user) {
-            // Sem identidade não há como autorizar rota; trata como falha.
-            throw noRefreshTokenError();
-          }
+        switchMap((response) => {
+          const known = response.user ?? this.store.snapshot.user;
+          if (known) return of({ response, user: known });
+          // O backend não devolve `user` no refresh (RefreshTokenResponse) e,
+          // após um F5, o store está vazio: a identidade vem de /auth/me. Vai
+          // com `skipAuth()` e o token novo explícito — um 401 aqui não pode
+          // reentrar nesta mesma renovação pelo `authInterceptor`.
+          return this.api
+            .get<UserSummary>('/auth/me', {
+              context: skipAuth(),
+              headers: { Authorization: `Bearer ${response.accessToken}` },
+            })
+            .pipe(map((user) => ({ response, user: toUserSummary(user) })));
+        }),
+        map(({ response, user }) => {
           const session = sessionFromLogin({ ...response, user });
           this.applySession(session);
           return session.accessToken;
@@ -154,10 +173,19 @@ export class AuthService {
     return session;
   }
 
-  private clearSession(): void {
+  /**
+   * Descarta a sessão local sem chamar o servidor e sem navegar. Usado pelo
+   * login quando o perfil autenticado não tem área administrativa.
+   */
+  clearSession(): void {
     this.tokens.clear();
     this.store.clear();
   }
+}
+
+/** `CurrentUserResponse` traz também `status` e `phone`; a sessão guarda só o resumo. */
+function toUserSummary({ id, name, email, role }: UserSummary): UserSummary {
+  return { id, name, email, role };
 }
 
 function noRefreshTokenError(): ApiError {

@@ -55,11 +55,17 @@ export interface TableColumn<T> {
   link?: (row: T) => string | unknown[];
   /** Obrigatório quando `type` é `actions`. */
   actions?: readonly RowAction<T>[];
+  /** Mostra ações nomeadas na linha em vez de escondê-las no menu. */
+  actionsInline?: boolean;
   /** Formatação livre do valor; recebe o valor cru e a linha inteira. */
   format?: (value: unknown, row: T) => string;
+  /** Campo de apoio exibido abaixo do valor principal em células de texto. */
+  secondaryField?: string;
   align?: ColumnAlign;
   /** Largura CSS fixa (ex.: `'8rem'`). Sem valor, a coluna se ajusta. */
   width?: string;
+  /** Apresenta códigos e identificadores em fonte monoespaçada. */
+  monospace?: boolean;
   /** Texto para valor nulo ou vazio. Padrão: travessão. */
   emptyText?: string;
 }

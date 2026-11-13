@@ -6,7 +6,9 @@ jest.mock('expo-router', () => require('@/test-utils/expo-router-mock'));
 import InspectionsScreen from '../app/(protected)/(tabs)/inspections';
 import { resetRouterMock, routerMock } from '@/test-utils/expo-router-mock';
 import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/test-utils/render';
-import { getMockDatabase, resetMockDatabase } from '@/services';
+import { queueInspectionTransition } from '@/features/inspections/inspection-outbox';
+import { ApiError, CLIENT_ERROR_CODES } from '@/models';
+import { apiClient, getMockDatabase, resetMockDatabase } from '@/services';
 
 const TECHNICIAN_ID = USER_IDS.technician;
 
@@ -41,6 +43,12 @@ async function renderList() {
   return result;
 }
 
+/** Os chips de filtro ficam no painel lateral aberto pelo botão de filtros. */
+async function openFilters() {
+  await fireEvent.press(screen.getByTestId('inspections-filter-button'));
+  expect(screen.getByTestId('filtro-estado')).toBeOnTheScreen();
+}
+
 function visibleCount(): string {
   return screen.getByTestId('inspections-count').props.children.join('');
 }
@@ -66,6 +74,7 @@ describe('FE-M03 — Lista de inspeções', () => {
 
   it('filtra por estado sem nova busca', async () => {
     await renderList();
+    await openFilters();
 
     await fireEvent.press(screen.getByTestId('filtro-estado-IN_PROGRESS'));
 
@@ -79,6 +88,7 @@ describe('FE-M03 — Lista de inspeções', () => {
 
   it('combina estados como alternativas', async () => {
     await renderList();
+    await openFilters();
 
     await fireEvent.press(screen.getByTestId('filtro-estado-IN_PROGRESS'));
     await fireEvent.press(screen.getByTestId('filtro-estado-APPROVED'));
@@ -94,6 +104,7 @@ describe('FE-M03 — Lista de inspeções', () => {
 
   it('desmarca o chip ao tocar de novo', async () => {
     await renderList();
+    await openFilters();
     const total = getMockDatabase().inspections.length;
 
     await fireEvent.press(screen.getByTestId('filtro-estado-IN_PROGRESS'));
@@ -104,6 +115,7 @@ describe('FE-M03 — Lista de inspeções', () => {
 
   it('período é exclusivo: escolher outro substitui o anterior', async () => {
     await renderList();
+    await openFilters();
 
     await fireEvent.press(screen.getByTestId('filtro-periodo-today'));
     await fireEvent.press(screen.getByTestId('filtro-periodo-overdue'));
@@ -116,6 +128,7 @@ describe('FE-M03 — Lista de inspeções', () => {
 
   it('limpa todos os filtros', async () => {
     await renderList();
+    await openFilters();
     const total = getMockDatabase().inspections.length;
 
     await fireEvent.press(screen.getByTestId('filtro-estado-APPROVED'));
@@ -132,6 +145,7 @@ describe('FE-M03 — Lista de inspeções', () => {
 
   it('estado vazio por filtro oferece limpar, não recarregar', async () => {
     await renderList();
+    await openFilters();
 
     // Combinação sem resultado: cancelada e crítica não coexistem no mock.
     await fireEvent.press(screen.getByTestId('filtro-estado-CANCELED'));
@@ -183,5 +197,32 @@ describe('FE-M03 — Lista de inspeções', () => {
 
     await waitFor(() => expect(screen.getByTestId('inspections-error')).toBeOnTheScreen());
     expect(screen.getByTestId('inspections-error-retry')).toBeOnTheScreen();
+  });
+});
+
+describe('Offline-first — lista sem rede', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('sem rede, mostra a lista da última sincronização com o estado pendente', async () => {
+    const alvo = getMockDatabase().inspections.find((entry) => entry.status === 'ASSIGNED');
+    const online = await renderList();
+    await waitFor(() =>
+      expect(screen.getByTestId(`inspections-card-${alvo?.id}`)).toBeOnTheScreen(),
+    );
+    online.unmount();
+
+    jest
+      .spyOn(apiClient, 'get')
+      .mockRejectedValue(ApiError.client(CLIENT_ERROR_CODES.NETWORK_UNAVAILABLE, 'Sem conexão.'));
+    await queueInspectionTransition(alvo?.id ?? '', {
+      status: 'IN_PROGRESS',
+      startedAtDevice: '2026-10-20T12:00:00Z',
+    });
+    await renderList();
+
+    await waitFor(() =>
+      expect(screen.getByTestId(`inspections-card-${alvo?.id}`)).toHaveTextContent(/Em andamento/),
+    );
+    expect(screen.queryByTestId('inspections-error')).toBeNull();
   });
 });

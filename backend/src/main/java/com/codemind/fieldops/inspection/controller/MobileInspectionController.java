@@ -6,9 +6,17 @@ import com.codemind.fieldops.inspection.domain.ItemSnapshot;
 import com.codemind.fieldops.inspection.dto.InspectionResponse;
 import com.codemind.fieldops.inspection.dto.ItemSnapshotDto;
 import com.codemind.fieldops.inspection.dto.MobileInspectionDetailResponse;
+import com.codemind.fieldops.inspection.dto.MobileInspectionResponseDto;
 import com.codemind.fieldops.inspection.mapper.InspectionMapper;
 import com.codemind.fieldops.inspection.mapper.InspectionResponseMapper;
+import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
+import com.codemind.fieldops.nonconformity.dto.MobileNonConformityDto;
+import com.codemind.fieldops.nonconformity.mapper.NonConformityMapper;
+import com.codemind.fieldops.nonconformity.repository.NonConformityRepository;
+import com.codemind.fieldops.review.dto.InspectionReviewResponse;
+import com.codemind.fieldops.review.mapper.InspectionReviewMapper;
+import com.codemind.fieldops.review.repository.InspectionReviewRepository;
 import com.codemind.fieldops.shared.pagination.PageResponse;
 import java.util.List;
 import java.util.UUID;
@@ -31,15 +39,30 @@ public class MobileInspectionController {
     private final InspectionMapper inspectionMapper;
     private final InspectionResponseMapper responseMapper;
     private final ItemSnapshotRepository itemSnapshotRepository;
+    private final InspectionResponseRepository inspectionResponseRepository;
+    private final NonConformityRepository nonConformityRepository;
+    private final NonConformityMapper nonConformityMapper;
+    private final InspectionReviewRepository inspectionReviewRepository;
+    private final InspectionReviewMapper inspectionReviewMapper;
 
     public MobileInspectionController(InspectionExecutionService executionService,
                                        InspectionMapper inspectionMapper,
                                        InspectionResponseMapper responseMapper,
-                                       ItemSnapshotRepository itemSnapshotRepository) {
+                                       ItemSnapshotRepository itemSnapshotRepository,
+                                       InspectionResponseRepository inspectionResponseRepository,
+                                       NonConformityRepository nonConformityRepository,
+                                       NonConformityMapper nonConformityMapper,
+                                       InspectionReviewRepository inspectionReviewRepository,
+                                       InspectionReviewMapper inspectionReviewMapper) {
         this.executionService = executionService;
         this.inspectionMapper = inspectionMapper;
         this.responseMapper = responseMapper;
         this.itemSnapshotRepository = itemSnapshotRepository;
+        this.inspectionResponseRepository = inspectionResponseRepository;
+        this.nonConformityRepository = nonConformityRepository;
+        this.nonConformityMapper = nonConformityMapper;
+        this.inspectionReviewRepository = inspectionReviewRepository;
+        this.inspectionReviewMapper = inspectionReviewMapper;
     }
 
     @GetMapping
@@ -58,10 +81,28 @@ public class MobileInspectionController {
         UUID technicianId = UUID.fromString(jwt.getSubject());
         Inspection inspection = executionService.getInspectionForTechnician(id, technicianId);
 
-        List<ItemSnapshot> snapshots = itemSnapshotRepository
-            .findByInspectionIdOrderBySectionOrderAscItemOrderAsc(id);
-        List<ItemSnapshotDto> snapshotDtos = snapshots.stream()
+        List<ItemSnapshotDto> items = itemSnapshotRepository
+            .findByInspectionIdOrderBySectionOrderAscItemOrderAsc(id)
+            .stream()
             .map(responseMapper::toSnapshotDto)
+            .toList();
+
+        List<MobileInspectionResponseDto> responses = inspectionResponseRepository
+            .findByInspectionId(id)
+            .stream()
+            .map(responseMapper::toMobileResponseDto)
+            .toList();
+
+        List<MobileNonConformityDto> nonConformities = nonConformityRepository
+            .findByInspectionId(id)
+            .stream()
+            .map(nonConformityMapper::toMobileDto)
+            .toList();
+
+        List<InspectionReviewResponse> reviews = inspectionReviewRepository
+            .findByInspectionIdOrderByReviewCycleAsc(id)
+            .stream()
+            .map(inspectionReviewMapper::toResponse)
             .toList();
 
         return new MobileInspectionDetailResponse(
@@ -80,7 +121,10 @@ public class MobileInspectionController {
             inspection.getSubmittedAtServer(),
             inspection.getCreatedAt(),
             inspection.getUpdatedAt(),
-            snapshotDtos
+            items,
+            responses,
+            nonConformities,
+            reviews
         );
     }
 

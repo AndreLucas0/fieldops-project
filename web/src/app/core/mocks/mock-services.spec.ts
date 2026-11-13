@@ -107,7 +107,9 @@ describe('serviços fictícios da web', () => {
       const service = TestBed.inject(UsersService);
       const antes = await firstValueFrom(service.get(USER_IDS.technician));
 
-      const depois = await firstValueFrom(service.update(USER_IDS.technician, { name: 'Carlos S.' }));
+      const depois = await firstValueFrom(
+        service.update(USER_IDS.technician, { name: 'Carlos S.' }),
+      );
 
       expect(depois.name).toBe('Carlos S.');
       expect(depois.version).toBe(antes.version + 1);
@@ -165,7 +167,9 @@ describe('serviços fictícios da web', () => {
 
   describe('EquipmentService', () => {
     it('encontra por código QR', async () => {
-      const equipamento = await firstValueFrom(TestBed.inject(EquipmentService).getByQrCode('CP002'));
+      const equipamento = await firstValueFrom(
+        TestBed.inject(EquipmentService).getByQrCode('CP002'),
+      );
 
       expect(equipamento.name).toBe('Compressor CP-002');
     });
@@ -205,6 +209,35 @@ describe('serviços fictícios da web', () => {
 
       expect(await firstValueFrom(service.listVersions(id))).toHaveLength(0);
       expect(await firstValueFrom(service.listDraftSections(id))).toHaveLength(1);
+    });
+
+    it('cria um rascunho e mantém a árvore de seções em memória', async () => {
+      const service = TestBed.inject(TemplatesService);
+      const template = await firstValueFrom(
+        service.create({ title: 'Novo checklist', category: 'Segurança' }),
+      );
+      const section = await firstValueFrom(
+        service.createSection(template.id, { title: 'Inspeção' }),
+      );
+
+      expect(template.status).toBe('DRAFT');
+      expect(await firstValueFrom(service.listDraftSections(template.id))).toEqual([section]);
+    });
+
+    it('reordena seções e itens como operações únicas', async () => {
+      const service = TestBed.inject(TemplatesService);
+      const templateId = (await firstValueFrom(service.list({ status: 'DRAFT' }))).content[0].id;
+      const [section] = await firstValueFrom(service.listDraftSections(templateId));
+      const items = section.items ?? [];
+      const originalIds = items.map((item) => item.id);
+
+      await firstValueFrom(
+        service.reorderItems(templateId, section.id, [...originalIds].reverse()),
+      );
+
+      const reordered = await firstValueFrom(service.listDraftSections(templateId));
+      expect(reordered[0].items?.map((item) => item.displayOrder)).toEqual([1, 2]);
+      expect(reordered[0].items?.[0].id).toBe(originalIds[1]);
     });
   });
 
@@ -340,7 +373,9 @@ describe('serviços fictícios da web', () => {
   describe('DashboardService', () => {
     it('o resumo bate com as inspeções listadas', async () => {
       const resumo = await firstValueFrom(TestBed.inject(DashboardService).summary());
-      const inspecoes = await firstValueFrom(TestBed.inject(InspectionsService).list({ size: 100 }));
+      const inspecoes = await firstValueFrom(
+        TestBed.inject(InspectionsService).list({ size: 100 }),
+      );
 
       expect(resumo.totalInspections).toBe(inspecoes.totalElements);
       expect(resumo.inspectionsApproved).toBe(1);
@@ -352,7 +387,9 @@ describe('serviços fictícios da web', () => {
         TestBed.inject(InspectionsService).cancel(INSPECTION_IDS.assigned, 'adiado'),
       );
 
-      const porEstado = await firstValueFrom(TestBed.inject(DashboardService).inspectionsByStatus());
+      const porEstado = await firstValueFrom(
+        TestBed.inject(DashboardService).inspectionsByStatus(),
+      );
       expect(porEstado.find((entry) => entry.status === 'CANCELED')?.count).toBe(1);
       expect(porEstado.find((entry) => entry.status === 'ASSIGNED')).toBeUndefined();
     });

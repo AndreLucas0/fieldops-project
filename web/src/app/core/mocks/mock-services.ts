@@ -354,6 +354,28 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
     );
   }
 
+  create(
+    input: Pick<InspectionTemplate, 'title' | 'category'> & { description?: string | null },
+  ): Observable<InspectionTemplate> {
+    return this.respond(() => {
+      const timestamp = nowIso();
+      const template: InspectionTemplate = {
+        id: nextMockId('5800'),
+        title: input.title,
+        category: input.category,
+        description: input.description ?? null,
+        status: 'DRAFT',
+        currentVersion: null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        version: 1,
+      };
+      this.db.templates.push(template);
+      this.db.draftSections[template.id] = [];
+      return template;
+    });
+  }
+
   update(id: Uuid, input: Partial<InspectionTemplate>): Observable<InspectionTemplate> {
     return this.respond(() => {
       const template = this.requireDraftTemplate(id);
@@ -382,7 +404,17 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
   }
 
   listDraftSections(templateId: Uuid): Observable<TemplateSectionDetail[]> {
-    return this.respond(() => this.db.draftSections[templateId] ?? []);
+    return this.respond(() => {
+      this.require(findById(this.db.templates, templateId), '/inspection-templates', templateId);
+      return [...(this.db.draftSections[templateId] ?? [])]
+        .sort((left, right) => left.displayOrder - right.displayOrder)
+        .map((section) => ({
+          ...section,
+          items: [...(section.items ?? [])].sort(
+            (left, right) => left.displayOrder - right.displayOrder,
+          ),
+        }));
+    });
   }
 
   createSection(
@@ -497,6 +529,61 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
       }
       throw notFound('/inspection-templates/items', itemId);
     });
+  }
+
+  reorderSections(templateId: Uuid, ids: readonly Uuid[]): Observable<void> {
+    return this.respond(() => {
+      const sections = this.draftSectionsOf(this.requireDraftTemplate(templateId).id);
+      this.applyDraftOrder(sections, ids);
+    });
+  }
+
+  reorderItems(templateId: Uuid, sectionId: Uuid, ids: readonly Uuid[]): Observable<void> {
+    return this.respond(() => {
+      const sections = this.draftSectionsOf(this.requireDraftTemplate(templateId).id);
+      const section = this.require(
+        findById(sections, sectionId),
+        '/inspection-templates/sections',
+        sectionId,
+      );
+      this.applyDraftOrder(section.items ?? [], ids);
+    });
+  }
+
+  private applyDraftOrder<T extends { id: Uuid; displayOrder: number }>(
+    records: T[],
+    ids: readonly Uuid[],
+  ): void {
+    if (ids.length !== records.length || new Set(ids).size !== ids.length) {
+      throw new ApiError({
+        kind: 'BAD_REQUEST',
+        status: 400,
+        code: 'INVALID_TEMPLATE_ORDER',
+        userMessage: 'A ordem deve incluir cada item uma única vez.',
+      });
+    }
+    const byId = new Map(records.map((record) => [record.id, record]));
+    if (ids.some((id) => !byId.has(id))) {
+      throw new ApiError({
+        kind: 'BAD_REQUEST',
+        status: 400,
+        code: 'INVALID_TEMPLATE_ORDER',
+        userMessage: 'A ordem deve incluir cada item uma única vez.',
+      });
+    }
+    ids.forEach((id, index) => {
+      const record = byId.get(id);
+      if (!record) {
+        throw new ApiError({
+          kind: 'BAD_REQUEST',
+          status: 400,
+          code: 'INVALID_TEMPLATE_ORDER',
+          userMessage: 'A ordem deve incluir cada item uma única vez.',
+        });
+      }
+      record.displayOrder = index + 1;
+    });
+    records.sort((left, right) => left.displayOrder - right.displayOrder);
   }
 
   /** RN-018: só modelos DRAFT têm versão rascunho editável. */

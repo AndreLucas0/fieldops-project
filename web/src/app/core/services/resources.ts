@@ -107,6 +107,11 @@ export abstract class EquipmentService {
 export abstract class TemplatesService {
   abstract list(query?: PageQuery<TemplateFilters>): Observable<Page<InspectionTemplate>>;
   abstract get(id: Uuid): Observable<InspectionTemplate>;
+  abstract create(
+    input: Pick<InspectionTemplate, 'title' | 'category'> & {
+      description?: string | null;
+    },
+  ): Observable<InspectionTemplate>;
   /** Dados gerais (título, descrição, categoria) — só vale para modelos DRAFT (RN-018). */
   abstract update(id: Uuid, input: Partial<InspectionTemplate>): Observable<InspectionTemplate>;
   abstract listVersions(templateId: Uuid): Observable<InspectionTemplateVersionDetail[]>;
@@ -134,6 +139,8 @@ export abstract class TemplatesService {
     itemId: Uuid,
     input: Partial<TemplateItem>,
   ): Observable<TemplateItem>;
+  abstract reorderSections(templateId: Uuid, ids: readonly Uuid[]): Observable<void>;
+  abstract reorderItems(templateId: Uuid, sectionId: Uuid, ids: readonly Uuid[]): Observable<void>;
 }
 
 export abstract class InspectionsService {
@@ -258,6 +265,13 @@ export class HttpTemplatesService extends TemplatesService {
   list(query: PageQuery<TemplateFilters> = {}) {
     return this.api.getPage<InspectionTemplate, TemplateFilters>('/inspection-templates', query);
   }
+  create(
+    input: Pick<InspectionTemplate, 'title' | 'category'> & {
+      description?: string | null;
+    },
+  ) {
+    return this.api.post<InspectionTemplate>('/inspection-templates', input);
+  }
   get(id: Uuid) {
     return this.api.get<InspectionTemplate>(`/inspection-templates/${id}`);
   }
@@ -297,6 +311,15 @@ export class HttpTemplatesService extends TemplatesService {
   }
   updateItem(templateId: Uuid, itemId: Uuid, input: Partial<TemplateItem>) {
     return this.api.put<TemplateItem>(`/inspection-templates/${templateId}/items/${itemId}`, input);
+  }
+  reorderSections(templateId: Uuid, ids: readonly Uuid[]) {
+    return this.api.patch<void>(`/inspection-templates/${templateId}/sections/order`, { ids });
+  }
+  reorderItems(templateId: Uuid, sectionId: Uuid, ids: readonly Uuid[]) {
+    return this.api.patch<void>(
+      `/inspection-templates/${templateId}/sections/${sectionId}/items/order`,
+      { ids },
+    );
   }
 }
 

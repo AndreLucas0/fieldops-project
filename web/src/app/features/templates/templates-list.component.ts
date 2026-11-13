@@ -273,6 +273,12 @@ export class TemplatesListComponent {
     {
       field: 'title',
       label: 'Título',
+      type: 'link',
+      link: (row) => [
+        '/inspection-templates',
+        row.id,
+        'edit',
+      ],
       sortable: true,
     },
     { field: 'category', label: 'Categoria', sortable: true },
@@ -401,9 +407,9 @@ export class TemplatesListComponent {
     this.load();
   }
 
- protected createNew(): void {
-  if (!this.canCreate() || this.loading()) return;
+  protected createNew(): void {
+    if (!this.canCreate() || this.loading()) return;
 
-  void this.router.navigate(['/inspection-templates/new']);
-}
+    void this.router.navigate(['/inspection-templates/new']);
+  }
 }

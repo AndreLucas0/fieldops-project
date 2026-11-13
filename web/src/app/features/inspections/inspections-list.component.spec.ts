@@ -149,12 +149,12 @@ describe('InspectionsListComponent', () => {
     );
   });
 
-  it('oferece cancelar para o SUPERVISOR', async () => {
+  it('oferece revisão e cancelamento para o SUPERVISOR', async () => {
     const { component } = await render('SUPERVISOR');
 
     const actions = component.columns().find((c) => c.field === 'actions')?.actions;
 
-    expect(actions?.map((action) => action.id)).toEqual(['cancel']);
+    expect(actions?.map((action) => action.id)).toEqual(['review', 'cancel']);
   });
 
   it('não oferece cancelar para quem não pode escrever em inspeções', async () => {
@@ -167,11 +167,17 @@ describe('InspectionsListComponent', () => {
 
   it('esconde o cancelamento em inspeções aprovadas, enviadas ou já canceladas', async () => {
     const { component } = await render();
-    const visible = component.columns().find((c) => c.field === 'actions')!.actions![0]!.visible!;
+    const actions = component.columns().find((c) => c.field === 'actions')?.actions;
+    const cancelAction = actions?.find((action) => action.id === 'cancel');
+
+    expect(cancelAction).toBeDefined();
+
+    const visible = cancelAction!.visible!;
 
     for (const status of ['APPROVED', 'SUBMITTED', 'CANCELED'] as const) {
       expect(visible(inspectionWith(status))).toBe(false);
     }
+
     for (const status of ['DRAFT', 'ASSIGNED', 'IN_PROGRESS', 'UNDER_REVIEW', 'REJECTED'] as const) {
       expect(visible(inspectionWith(status))).toBe(true);
     }

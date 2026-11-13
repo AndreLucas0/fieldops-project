@@ -112,6 +112,14 @@ export const routes: Routes = [
             (module) => module.TemplateBuilderComponent,
           ),
       },
+      {
+        path: 'inspection-templates/:templateId/preview',
+        title: 'Prévia do modelo — FieldOps',
+        loadComponent: () =>
+          import('./features/templates/template-preview.component').then(
+            (module) => module.TemplatePreviewComponent,
+          ),
+      },
       ...ADMIN_FEATURE_ROUTES,
       { path: '**', redirectTo: 'dashboard' },
     ],

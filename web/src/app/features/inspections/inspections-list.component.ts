@@ -174,7 +174,7 @@ function formatDay(day: string): string {
         </mat-form-field>
 
         <mat-form-field appearance="outline" subscriptSizing="dynamic">
-          <mat-label>Agendada a partir de</mat-label>
+         <mat-label>Agendada para</mat-label>
           <input
             matInput
             type="date"
@@ -419,6 +419,13 @@ export class InspectionsListComponent {
         type: 'date',
         sortable: true,
         width: '12rem',
+      },
+      {
+        field: 'deadline',
+        label: 'Prazo',
+        width: '12rem',
+        format: (_value, row) =>
+          overdueLabel(row, this.now()),
       },
       {
         field: 'status',

@@ -19,6 +19,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -43,6 +44,9 @@ class AuthControllerIT {
 	private UserRepository userRepository;
 
 	@Autowired
+	private JdbcTemplate jdbcTemplate;
+
+	@Autowired
 	private PasswordEncoder passwordEncoder;
 
 	@Autowired
@@ -52,7 +56,8 @@ class AuthControllerIT {
 
 	@BeforeEach
 	void setUp() {
-		userRepository.deleteAll();
+		// Keep this suite isolated from templates and inspections created by other IT classes.
+		jdbcTemplate.execute("TRUNCATE TABLE users CASCADE");
 		activeUser = userRepository.save(User.builder()
 			.name("Carlos Técnico")
 			.email("tecnico.it@fieldops.local")

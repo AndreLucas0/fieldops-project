@@ -220,7 +220,7 @@ public class InspectionService {
         inspection.setStatus(InspectionStatus.CANCELED);
         inspection.setCanceledAt(Instant.now());
         inspection.setCanceledBy(canceledBy);
-        inspection.setCanceledReason(request != null ? request.reason() : null);
+        inspection.setCanceledReason(request.reason());
         return inspectionRepository.save(inspection);
     }
 

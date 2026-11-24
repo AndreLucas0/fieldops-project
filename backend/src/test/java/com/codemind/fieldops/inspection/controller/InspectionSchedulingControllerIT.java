@@ -381,6 +381,17 @@ class InspectionSchedulingControllerIT {
             {"reason":"Test cancellation"}""";
 
         assertThat(mvc.post().uri("/inspections/" + id + "/cancel").header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON))
+            .hasStatus(HttpStatus.BAD_REQUEST);
+
+        for (String invalidPayload : new String[] {"{}", "{\"reason\":\"   \"}",
+            "{\"reason\":\"" + "a".repeat(501) + "\"}"}) {
+            assertThat(mvc.post().uri("/inspections/" + id + "/cancel").header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON).content(invalidPayload))
+                .hasStatus(HttpStatus.BAD_REQUEST);
+        }
+
+        assertThat(mvc.post().uri("/inspections/" + id + "/cancel").header("Authorization", bearer(adminToken))
             .contentType(MediaType.APPLICATION_JSON).content(cancelPayload))
             .hasStatusOk()
             .bodyJson()

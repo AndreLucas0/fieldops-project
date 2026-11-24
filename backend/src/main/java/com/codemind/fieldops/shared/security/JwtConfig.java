@@ -23,7 +23,12 @@ public class JwtConfig {
 
 	@Bean
 	SecretKey jwtSigningKey(JwtProperties properties) {
-		return new SecretKeySpec(properties.secret().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+		String configuredSecret = properties.secret();
+		byte[] secret = configuredSecret == null ? new byte[0] : configuredSecret.getBytes(StandardCharsets.UTF_8);
+		if (secret.length < 32 || configuredSecret.isBlank()) {
+			throw new IllegalArgumentException("JWT signing secret must contain at least 32 bytes");
+		}
+		return new SecretKeySpec(secret, "HmacSHA256");
 	}
 
 	@Bean

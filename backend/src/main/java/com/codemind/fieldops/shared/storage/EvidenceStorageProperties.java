@@ -7,9 +7,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Binds the {@code EVIDENCE_STORAGE_*} variables from `.env.example` —
- * arquitetura.md §11.8. The same names point at MinIO in dev and at a
- * managed S3-compatible provider in production; only the endpoint/credentials
- * change between environments.
+ * arquitetura.md §11.8. Local development uses an explicit endpoint and
+ * credentials. The production profile uses the AWS SDK defaults.
  */
 @Component
 @ConfigurationProperties(prefix = "fieldops.storage.evidence")
@@ -18,6 +17,7 @@ import org.springframework.stereotype.Component;
 public class EvidenceStorageProperties {
 
     private String endpoint;
+    private boolean useAwsDefaults;
     private String region;
     private String bucket;
     private String accessKey;

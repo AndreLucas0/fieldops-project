@@ -2,11 +2,13 @@
 
 **INCOMPLETE** em 25 de novembro de 2026.
 
-A API passou a exigir justificativa válida de cancelamento (RN-029) e o OpenAPI documenta o limite de 500 caracteres. O commit `2b01a60` inclui teste unitário e cenários HTTP para a próxima execução com Docker. O commit `6275849` remove a dependência da latência simulada da suíte de detalhe mobile.
+A API passou a exigir justificativa válida de cancelamento (RN-029) e o OpenAPI documenta o limite de 500 caracteres. O commit `2b01a60` inclui a validação unitária e os cenários HTTP aprovados no teste de agendamento. O commit `6275849` remove a dependência da latência simulada da suíte de detalhe mobile.
 
 A [rastreabilidade inicial](REQUIREMENTS-TRACEABILITY.md) inventaria 90 regras locais. A [auditoria](PROJECT-AUDIT.md) registra as divergências encontradas na linha de base e o [relatório de testes](TEST-REPORT.md) traz a evidência por componente.
 
-A branch `fix/fieldops-production-profile` foi publicada com o commit `466372c`. O perfil `prod` exige configuração própria do banco e da chave JWT, desabilita a publicação do Swagger e utiliza a cadeia padrão de credenciais do SDK da AWS para o S3. O JAR foi gerado com o perfil e os 54 testes unitários passaram. A [proposta AWS](AWS-DEPLOYMENT.md) ainda depende de integração do perfil em `develop`, infraestrutura como código e validação com PostgreSQL e S3 reais.
+O Docker Desktop foi iniciado no Windows e as duas branches passaram no `mvnw.cmd -B verify` completo. A linha de base aprovou 53 testes unitários e o perfil de produção aprovou 54. Cada branch aprovou 304 testes de integração com PostgreSQL 17.4 no Testcontainers. A diferença de contagem decorre dos testes específicos de cada branch. O relatório distingue essas execuções da falha histórica de inicialização do Docker.
+
+A branch `fix/fieldops-production-profile` foi publicada com o commit `466372c`. O perfil `prod` exige configuração própria do banco e da chave JWT, desabilita a publicação do Swagger e utiliza a cadeia padrão de credenciais do SDK da AWS para o S3. O JAR inclui o perfil. A [proposta AWS](AWS-DEPLOYMENT.md) ainda depende de revisão do PR, infraestrutura como código e validação das configurações de produção com PostgreSQL 16, S3 e IAM.
 
 A branch `task/fieldops-baseline-20261124` também foi publicada no GitHub. O conector devolveu HTTP 403 ao tentar abrir os dois PRs para `develop` e o GitHub CLI não tem sessão ativa. PRs, verificações remotas e merges estão pendentes.
 

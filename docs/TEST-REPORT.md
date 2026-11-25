@@ -11,6 +11,9 @@ Execução de 24 de novembro de 2026 em Windows, com Node 22.19.0, npm 10.9.3 e 
 | Mobile · `npm run typecheck` e `npm run lint` | Tipagem aprovada. Lint sem erros e com quatro avisos de diretivas desnecessárias. |
 | Mobile · `expo export --platform android` e `expo export --platform web` | Bundles exportados. A exportação web inclui o WASM do SQLite. |
 | Backend · `mvnw.cmd -B verify` | A linha de base falhou com 304 erros de inicialização. Testcontainers não encontrou um Docker válido. |
-| Backend · `mvnw.cmd -B verify -DskipITs` | JAR gerado e 53 testes unitários aprovados, incluindo a validação de RN-029. |
+| Backend · `mvnw.cmd -B verify -DskipITs` | Linha de base com RN-029, 53 testes unitários aprovados e JAR gerado. |
+| Backend · `mvnw.cmd -B verify -DskipITs -Dcheckstyle.skip` | Perfil de produção em `466372c`, 54 testes unitários aprovados e JAR gerado. |
+
+Os totais históricos são de dois commits. As 12 classes comuns somam 52 testes. A linha de base acrescenta um caso em `CancelInspectionRequestTest` e a branch de produção acrescenta dois em `JwtConfigTest`. O XML de cancelamento foi gravado às 20:01 e os XMLs da execução de produção às 20:58. Como o Surefire preservou o XML antigo no mesmo diretório, a soma indiscriminada dos arquivos resultaria em 55, valor que não corresponde a nenhuma dessas execuções.
 
 Os fluxos com API e PostgreSQL reais, testes em aparelho, verificações do PR e implantação AWS ainda carecem de evidência.

@@ -12,7 +12,7 @@ import {
 import { buildTestAuthService, renderWithSession, seedStoredSession } from '@/test-utils/render';
 import { queueInspectionTransition } from '@/features/inspections/inspection-outbox';
 import { ApiError, CLIENT_ERROR_CODES } from '@/models';
-import { apiClient, getMockDatabase, resetMockDatabase } from '@/services';
+import { apiClient, configureApi, getMockDatabase, resetApiConfig, resetMockDatabase } from '@/services';
 import type { InspectionStatus } from '@/models';
 
 const TECHNICIAN_ID = USER_IDS.technician;
@@ -20,6 +20,11 @@ const TECHNICIAN_ID = USER_IDS.technician;
 beforeEach(() => {
   resetRouterMock();
   resetMockDatabase();
+  configureApi({ mockEnabled: true, mockLatencyMs: 0 });
+});
+
+afterEach(() => {
+  resetApiConfig();
 });
 
 async function signedIn(accessToken = 'mock-access.teste') {

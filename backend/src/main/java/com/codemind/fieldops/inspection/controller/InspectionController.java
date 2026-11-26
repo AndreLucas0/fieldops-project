@@ -105,7 +105,7 @@ public class InspectionController {
     @PostMapping("/{id}/cancel")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public InspectionResponse cancel(@PathVariable UUID id,
-                                      @Valid @RequestBody(required = false) CancelInspectionRequest request,
+                                      @Valid @RequestBody CancelInspectionRequest request,
                                       @AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
         return inspectionMapper.toResponse(inspectionService.cancel(id, userId, request));

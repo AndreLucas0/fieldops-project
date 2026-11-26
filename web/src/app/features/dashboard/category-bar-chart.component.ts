@@ -13,15 +13,16 @@ export interface CategoryDatum {
  * Barras horizontais de contagem por categoria.
  *
  * **Por que barras e não rosca:** a leitura pedida é comparar quantidades entre
- * categorias de nome longo ("Em andamento", "Em revisão"). Barra horizontal
- * compara comprimento sobre uma linha de base comum e acomoda o rótulo; rosca
- * exige comparar ângulos e empurra os nomes para uma legenda.
+ * categorias de nome longo ("Em andamento", "Aguardando revisão"). Barra
+ * horizontal compara comprimento sobre uma linha de base comum e acomoda o
+ * rótulo; rosca exige comparar ângulos e empurra os nomes para uma legenda.
  *
  * **Por que todas as barras da mesma cor:** o comprimento já codifica a
- * grandeza e a etiqueta já codifica a identidade. Pintar cada barra com a cor do
- * seu próprio estado gastaria o canal de cor repetindo o que o rótulo diz. A cor
- * reservada de cada estado continua presente — na etiqueta ao lado, a mesma que
- * aparece nas tabelas do sistema.
+ * grandeza e o rótulo já codifica a identidade.
+ *
+ * **Rótulo:** com `labels`, a categoria é escrita como texto simples (agrupamentos
+ * do painel que não existem no catálogo de estados); sem ele, vira a etiqueta do
+ * catálogo, a mesma das tabelas do sistema.
  *
  * Todo valor é rotulado na ponta da barra: a dica de mouse acrescenta o
  * percentual, nunca é a única forma de ler o número.
@@ -40,11 +41,13 @@ export interface CategoryDatum {
       </header>
 
       @if (rows().length === 0) {
-        <app-empty-state
-          icon="bar_chart"
-          title="Sem dados no período"
-          [message]="emptyMessage()"
-        />
+        <div class="chart__empty">
+          <app-empty-state
+            icon="bar_chart"
+            title="Sem dados no período"
+            [message]="emptyMessage()"
+          />
+        </div>
       } @else {
         <!-- Lista de descrição: o leitor de tela anuncia categoria e valor sem
              depender da barra, que é puramente visual. -->
@@ -57,7 +60,11 @@ export interface CategoryDatum {
               tabindex="0"
             >
               <dt class="row__label">
-                <app-status-badge [value]="row.key" [context]="context()" />
+                @if (row.text) {
+                  <span class="row__text">{{ row.text }}</span>
+                } @else {
+                  <app-status-badge [value]="row.key" [context]="context()" />
+                }
               </dt>
 
               <dd class="row__plot">
@@ -77,33 +84,33 @@ export interface CategoryDatum {
       display: block;
     }
 
-   .chart {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  min-width: 0;
-  padding: 1.5rem;
-  border: 1px solid #303842;
-  border-radius: 1rem;
-  background: #1a2027;
+    .chart {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid #303842;
+      border-radius: 1rem;
+      background: #1a2027;
 
-  --fo-viz-fill: #2a78d6;
-  --fo-viz-track: color-mix(
-    in srgb,
-    var(--mat-sys-on-surface) 6%,
-    transparent
-  );
-}
+      --fo-viz-fill: var(--mat-sys-primary);
+      --fo-viz-track: color-mix(in srgb, var(--mat-sys-on-surface) 8%, transparent);
+    }
+
     .chart__head {
       display: flex;
       flex-direction: column;
       gap: 0.125rem;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #303842;
     }
 
     .chart__title {
       margin: 0;
-      font-size: 1rem;
-      font-weight: 600;
+      font-size: 0.875rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
       color: var(--mat-sys-on-surface);
     }
 
@@ -113,6 +120,10 @@ export interface CategoryDatum {
       color: var(--mat-sys-on-surface-variant);
     }
 
+    .chart__empty {
+      padding: 1rem;
+    }
+
     .rows {
       display: flex;
       flex-direction: column;
@@ -120,11 +131,12 @@ export interface CategoryDatum {
          fundo — sem contorno desenhado em volta da marca. */
       gap: 0.75rem;
       margin: 0;
+      padding: 1.25rem;
     }
 
     .row {
       display: grid;
-      grid-template-columns: minmax(6.5rem, 8.5rem) 1fr;
+      grid-template-columns: minmax(6.5rem, 10rem) 1fr;
       align-items: center;
       gap: 0.75rem;
       border-radius: 6px;
@@ -140,6 +152,11 @@ export interface CategoryDatum {
       min-width: 0;
     }
 
+    .row__text {
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 0.8125rem;
+    }
+
     .row__plot {
       display: flex;
       align-items: center;
@@ -151,10 +168,10 @@ export interface CategoryDatum {
     .row__track {
       flex: 1;
       min-width: 0;
-      /* Espessura da marca abaixo do teto de 24px; a sobra da faixa é ar. */
-      height: 18px;
-      border-radius: 3px;
+      height: 10px;
+      border-radius: 5px;
       background: var(--fo-viz-track);
+      overflow: hidden;
     }
 
     .row__fill {
@@ -162,8 +179,7 @@ export interface CategoryDatum {
       height: 100%;
       min-width: 3px;
       background: var(--fo-viz-fill);
-      /* Ponta arredondada, base reta: a barra cresce de uma linha de base. */
-      border-radius: 0 4px 4px 0;
+      border-radius: 5px;
     }
 
     .row__value {
@@ -171,8 +187,7 @@ export interface CategoryDatum {
       min-width: 1.5rem;
       color: var(--mat-sys-on-surface);
       font-size: 0.875rem;
-      font-weight: 600;
-      /* Coluna de números alinhada verticalmente — aqui tabular ajuda. */
+      font-weight: 700;
       font-variant-numeric: tabular-nums;
       text-align: right;
     }
@@ -188,6 +203,9 @@ export class CategoryBarChartComponent {
   /** Ordem de exibição; o que não estiver na lista vai para o fim. */
   readonly order = input<readonly string[]>([]);
 
+  /** Rótulos em texto simples por `key`; o que não constar usa a etiqueta do catálogo. */
+  readonly labels = input<Readonly<Record<string, string>>>({});
+
   protected readonly titleId = computed(
     () => `chart-${this.title().toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
   );
@@ -199,6 +217,7 @@ export class CategoryBarChartComponent {
   protected readonly rows = computed(() => {
     const total = this.total();
     const order = this.order();
+    const labels = this.labels();
 
     const position = (key: string): number => {
       const index = order.indexOf(key);
@@ -213,6 +232,7 @@ export class CategoryBarChartComponent {
         return {
           key: entry.key,
           count: entry.count,
+          text: labels[entry.key] ?? null,
           label: entry.count.toLocaleString('pt-BR'),
           // A barra mais longa ocupa a faixa inteira: a comparação é entre
           // categorias, e escalar pelo total deixaria todas curtas demais.

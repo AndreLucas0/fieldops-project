@@ -8,10 +8,5 @@ export const environment = {
    * a origem do `ng serve`.
    */
   apiBaseUrl: '/api/v1',
-  /**
-   * Backend fictício ligado enquanto a API está sendo construída em paralelo.
-   * Usa o mesmo conjunto de dados do aplicativo Expo (`shared/src/mocks`).
-   * Desligue para falar com a API real.
-   */
-  mockApi: true,
+  mockApi: false,
 };

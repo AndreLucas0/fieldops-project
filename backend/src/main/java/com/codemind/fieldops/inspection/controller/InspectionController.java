@@ -98,14 +98,15 @@ public class InspectionController {
 
     @PostMapping("/{id}/assign")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
-    public InspectionResponse assign(@PathVariable UUID id, @Valid @RequestBody AssignInspectionRequest request) {
-        return inspectionMapper.toResponse(inspectionService.assign(id, request));
+    public InspectionResponse assign(@PathVariable UUID id, @Valid @RequestBody AssignInspectionRequest request,
+                                     @AuthenticationPrincipal Jwt jwt) {
+        return inspectionMapper.toResponse(inspectionService.assign(id, UUID.fromString(jwt.getSubject()), request));
     }
 
     @PostMapping("/{id}/cancel")
     @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
     public InspectionResponse cancel(@PathVariable UUID id,
-                                      @Valid @RequestBody(required = false) CancelInspectionRequest request,
+                                      @Valid @RequestBody CancelInspectionRequest request,
                                       @AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
         return inspectionMapper.toResponse(inspectionService.cancel(id, userId, request));

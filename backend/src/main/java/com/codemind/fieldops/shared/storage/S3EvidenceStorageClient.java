@@ -23,22 +23,20 @@ public class S3EvidenceStorageClient implements EvidenceStorageClient {
 
     public S3EvidenceStorageClient(EvidenceStorageProperties properties) {
         this.properties = properties;
-        AwsBasicCredentials credentials =
-            AwsBasicCredentials.create(properties.getAccessKey(), properties.getSecretKey());
-        StaticCredentialsProvider credentialsProvider = StaticCredentialsProvider.create(credentials);
+        Region region = Region.of(properties.getRegion());
+        var clientBuilder = S3Client.builder().region(region);
+        var presignerBuilder = S3Presigner.builder().region(region);
 
-        this.s3Client = S3Client.builder()
-            .endpointOverride(URI.create(properties.getEndpoint()))
-            .region(Region.of(properties.getRegion()))
-            .credentialsProvider(credentialsProvider)
-            .forcePathStyle(true)
-            .build();
+        if (!properties.isUseAwsDefaults()) {
+            URI endpoint = URI.create(properties.getEndpoint());
+            var credentialsProvider = StaticCredentialsProvider.create(
+                AwsBasicCredentials.create(properties.getAccessKey(), properties.getSecretKey()));
+            clientBuilder.endpointOverride(endpoint).credentialsProvider(credentialsProvider).forcePathStyle(true);
+            presignerBuilder.endpointOverride(endpoint).credentialsProvider(credentialsProvider);
+        }
 
-        this.s3Presigner = S3Presigner.builder()
-            .endpointOverride(URI.create(properties.getEndpoint()))
-            .region(Region.of(properties.getRegion()))
-            .credentialsProvider(credentialsProvider)
-            .build();
+        this.s3Client = clientBuilder.build();
+        this.s3Presigner = presignerBuilder.build();
     }
 
     @Override

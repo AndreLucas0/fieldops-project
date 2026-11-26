@@ -203,6 +203,8 @@ POST   /api/v1/inspections/{id}/reject
 GET    /api/v1/inspections/{id}/history
 ```
 
+O cancelamento (RN-029) exige um corpo JSON com `reason` de até 500 caracteres e ao menos um caractere que não seja espaço em branco. Corpo ausente ou justificativa inválida resultam em HTTP 400.
+
 ### Filtros administrativos
 
 - estado;

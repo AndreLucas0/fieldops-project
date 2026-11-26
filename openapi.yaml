@@ -81,6 +81,8 @@ tags:
     description: Registro e acompanhamento de não conformidades.
   - name: Reviews
     description: Revisão, aprovação e reprovação de inspeções.
+  - name: Audit
+    description: Consulta administrativa do catálogo de eventos.
   - name: Synchronization
     description: Outbox, idempotência e sincronização offline-first.
   - name: Dashboard
@@ -234,6 +236,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /users/inspection-assignees:
+    get:
+      tags: [Users]
+      operationId: listInspectionAssignees
+      summary: Listar usuários ativos para o seletor de inspeções
+      description: ADMIN e SUPERVISOR. Retorna apenas identificador e nome, preservando a restrição do cadastro de usuários.
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - name: role
+          in: query
+          required: true
+          schema: { type: string, enum: [TECHNICIAN, SUPERVISOR] }
+      responses:
+        '200':
+          description: Página de usuários ativos ordenada por nome.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageInfo'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: string, format: uuid }
+                            name: { type: string }
+                          required: [id, name]
+                    required: [content]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -1167,6 +1210,31 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /inspection-templates/{id}/versions/draft:
+    post:
+      operationId: openInspectionTemplateDraft
+      tags: [Inspection Templates]
+      summary: Abrir rascunho da próxima versão
+      description: Reutiliza o rascunho existente ou copia a estrutura da versão ativa. As versões publicadas permanecem imutáveis.
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Seções do rascunho com seus itens.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TemplateSectionDetail' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
   /inspection-template-versions/{versionId}:
     get:
       operationId: getInspectionTemplateVersion
@@ -1926,6 +1994,42 @@ paths:
   # ============================================================
   # NON-CONFORMITIES
   # ============================================================
+  /audit-events:
+    get:
+      tags: [Audit]
+      operationId: listAuditEvents
+      summary: Consultar eventos administrativos de auditoria
+      description: Disponível para ADMIN e SUPERVISOR. Retorna eventos mais recentes primeiro, sem payloads ou metadados de dispositivo.
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - name: action
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: inspectionId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Página de eventos.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageInfo'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/AuditOverviewEvent' }
+                    required: [content]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /non-conformities:
     get:
       operationId: listNonConformities
@@ -2819,6 +2923,10 @@ components:
         instructions: { type: string, nullable: true }
         priority: { $ref: '#/components/schemas/InspectionPriority' }
         scheduledFor: { type: string, format: date-time }
+        assignImmediately:
+          type: boolean
+          default: false
+          description: Quando verdadeiro, cria o snapshot e atribui a inspeção ao técnico na mesma transação.
       required: [templateVersionId, clientId, siteId, technicianId, priority, scheduledFor]
 
     InspectionUpdateRequest:
@@ -2840,7 +2948,11 @@ components:
     CancelInspectionRequest:
       type: object
       properties:
-        reason: { type: string, minLength: 1 }
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Justificativa com ao menos um caractere que não seja espaço em branco.
       required: [reason]
 
     StartInspectionRequest:
@@ -2893,6 +3005,21 @@ components:
             reviews:
               type: array
               items: { $ref: '#/components/schemas/InspectionReview' }
+            startLocation: { $ref: '#/components/schemas/InspectionLocation' }
+            completionLocation: { $ref: '#/components/schemas/InspectionLocation' }
+            technicianName: { type: string, nullable: true }
+            supervisorName: { type: string, nullable: true }
+
+    InspectionLocation:
+      type: object
+      nullable: true
+      description: Localização do evento mais recente daquela etapa, quando registrada pelo dispositivo.
+      properties:
+        latitude: { type: number, format: double }
+        longitude: { type: number, format: double }
+        accuracyMeters: { type: number, format: double, nullable: true }
+        capturedAt: { type: string, format: date-time, nullable: true }
+      required: [latitude, longitude]
 
     InspectionItemSnapshot:
       type: object
@@ -3126,6 +3253,18 @@ components:
       required: [reason]
 
     # ---------- Audit ----------
+    AuditOverviewEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        inspectionId: { type: string, format: uuid, nullable: true }
+        actorId: { type: string, format: uuid, nullable: true }
+        action: { type: string }
+        entityType: { type: string }
+        entityId: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time }
+      required: [id, action, entityType, entityId, occurredAt]
+
     AuditEvent:
       type: object
       properties:

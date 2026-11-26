@@ -17,6 +17,7 @@ import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.inspection.repository.InspectionResponseRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
 import com.codemind.fieldops.nonconformity.repository.NonConformityRepository;
+import com.codemind.fieldops.shared.audit.AuditEventRepository;
 import com.codemind.fieldops.shared.security.JwtClaims;
 import com.codemind.fieldops.site.domain.InspectionSite;
 import com.codemind.fieldops.site.domain.SiteStatus;
@@ -37,6 +38,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -98,6 +100,9 @@ class InspectionSchedulingControllerIT {
     @Autowired
     private EquipmentRepository equipmentRepository;
 
+    @Autowired
+    private AuditEventRepository auditEventRepository;
+
     private User adminUser;
     private User technicianUser;
     private User supervisorUser;
@@ -106,6 +111,11 @@ class InspectionSchedulingControllerIT {
     private Client testClient;
     private InspectionSite testSite;
     private TemplateVersion activeTemplateVersion;
+
+    @AfterEach
+    void clearAuditEvents() {
+        auditEventRepository.deleteAll();
+    }
 
     @BeforeEach
     void setUp() {
@@ -225,6 +235,25 @@ class InspectionSchedulingControllerIT {
             .hasStatus(HttpStatus.CREATED)
             .bodyJson()
             .extractingPath("$.status").asString().isEqualTo("DRAFT");
+    }
+
+    @Test
+    void schedulingCanCreateAndAssignInOneTransaction() {
+        String payload = buildCreatePayload("MEDIUM").replace("\"priority\"", "\"assignImmediately\":true,\"priority\"");
+        var created = mvc.post().uri("/inspections").header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON).content(payload).exchange();
+        assertThat(created).hasStatus(HttpStatus.CREATED).bodyJson()
+            .extractingPath("$.status").asString().isEqualTo("ASSIGNED");
+
+        Inspection saved = inspectionRepository.findAll().getFirst();
+        assertThat(itemSnapshotRepository.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(saved.getId()))
+            .isNotEmpty();
+        assertThat(mvc.get().uri("/mobile/inspections/" + saved.getId())
+            .header("Authorization", bearer(technicianToken)))
+            .hasStatusOk().bodyJson().extractingPath("$.status").asString().isEqualTo("ASSIGNED");
+        assertThat(mvc.get().uri("/inspections/" + saved.getId() + "/history")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk().bodyJson().extractingPath("$.content[*].action").asList().contains("INSPECTION_ASSIGNED");
     }
 
     @Test
@@ -366,6 +395,11 @@ class InspectionSchedulingControllerIT {
             .hasStatusOk()
             .bodyJson()
             .extractingPath("$.status").asString().isEqualTo("ASSIGNED");
+
+        assertThat(mvc.post().uri("/inspections/" + id + "/assign").header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON).content("{\"technicianId\":\"" + technicianUser.getId() + "\"}"))
+            .hasStatusOk().bodyJson().extractingPath("$.technicianId").asString()
+            .isEqualTo(technicianUser.getId().toString());
     }
 
     @Test
@@ -379,6 +413,17 @@ class InspectionSchedulingControllerIT {
 
         String cancelPayload = """
             {"reason":"Test cancellation"}""";
+
+        assertThat(mvc.post().uri("/inspections/" + id + "/cancel").header("Authorization", bearer(adminToken))
+            .contentType(MediaType.APPLICATION_JSON))
+            .hasStatus(HttpStatus.BAD_REQUEST);
+
+        for (String invalidPayload : new String[] {"{}", "{\"reason\":\"   \"}",
+            "{\"reason\":\"" + "a".repeat(501) + "\"}"}) {
+            assertThat(mvc.post().uri("/inspections/" + id + "/cancel").header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON).content(invalidPayload))
+                .hasStatus(HttpStatus.BAD_REQUEST);
+        }
 
         assertThat(mvc.post().uri("/inspections/" + id + "/cancel").header("Authorization", bearer(adminToken))
             .contentType(MediaType.APPLICATION_JSON).content(cancelPayload))

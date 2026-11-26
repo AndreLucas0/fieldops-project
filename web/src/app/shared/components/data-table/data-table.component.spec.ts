@@ -256,19 +256,23 @@ describe('DataTableComponent', () => {
     expect(events[0]).toEqual({ page: 2, size: 20 });
   });
 
-  it('emite sortChange ao clicar no cabeçalho ordenável', async () => {
-    const element = await render({ data: buildPage(ROWS) });
+ it('emite sortChange ao clicar no cabeçalho ordenável', async () => {
+  const element = await render({ data: buildPage(ROWS) });
 
-    const events: unknown[] = [];
-    fixture.componentInstance.sortChange.subscribe((event) => events.push(event));
+  const events: unknown[] = [];
+  fixture.componentInstance.sortChange.subscribe((event) => events.push(event));
 
-    const headers = element.querySelectorAll<HTMLElement>('th');
-    headers[3]?.click();
-    await fixture.whenStable();
+  const header = element.querySelectorAll<HTMLElement>('th')[3];
+  const sortButton = header?.querySelector<HTMLElement>('.mat-sort-header-container');
 
-    expect(events[0]).toEqual({ field: 'scheduledFor', direction: 'asc' });
+  sortButton?.click();
+  await fixture.whenStable();
+
+  expect(events[0]).toEqual({
+    field: 'scheduledFor',
+    direction: 'asc',
   });
-
+});
   it('não ordena por coluna sem sortable', async () => {
     const element = await render({ data: buildPage(ROWS) });
 

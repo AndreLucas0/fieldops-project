@@ -43,6 +43,23 @@ describe('FE-W16 — prévia e publicação', () => {
     expect(service.getVersion).toHaveBeenCalledWith('v1');
     expect(service.listDraftSections).not.toHaveBeenCalled();
   });
+  it('abre exatamente a versão histórica passada pela rota', () => {
+    const { fixture, service, component } = setup('ACTIVE');
+    fixture.componentRef.setInput('versionId', 'versao-anterior');
+    fixture.detectChanges();
+
+    expect(service.getVersion).toHaveBeenLastCalledWith('versao-anterior');
+    component.publish();
+    expect(service.publish).not.toHaveBeenCalled();
+  });
+
+  it('abre o rascunho de uma nova versão quando solicitado pelo construtor', () => {
+    const { fixture, service } = setup('ACTIVE');
+    fixture.componentRef.setInput('draft', '1');
+    fixture.detectChanges();
+
+    expect(service.listDraftSections).toHaveBeenCalledWith('t1');
+  });
   it('não publica quando a confirmação é cancelada', () => {
     const { component, service } = setup('DRAFT', [
       {

@@ -41,7 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping({"/templates", "/inspection-templates"})
 public class TemplateController {
 
-    private static final Set<String> SORTABLE_FIELDS = Set.of("title", "category", "status", "createdAt");
+    private static final Set<String> SORTABLE_FIELDS = Set.of("title", "category", "status", "createdAt", "updatedAt");
     private static final Set<String> VERSION_SORTABLE_FIELDS = Set.of("versionNumber", "publishedAt", "createdAt");
 
     private final TemplateService templateService;
@@ -155,6 +155,12 @@ public class TemplateController {
         SortFieldValidator.validate(pageable.getSort(), VERSION_SORTABLE_FIELDS);
         Page<TemplateVersion> versions = templateService.listVersions(id, pageable);
         return PageResponse.from(versions.map(templateMapper::toVersionResponse));
+    }
+
+    @PostMapping("/{id}/versions/draft")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+    public List<TemplateSectionResponse> openDraft(@PathVariable UUID id) {
+        return templateService.openDraft(id).stream().map(templateMapper::toSectionResponse).toList();
     }
 
 }

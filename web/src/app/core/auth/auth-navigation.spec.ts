@@ -12,6 +12,21 @@ class ShellForTest {}
 class PageForTest {}
 
 describe('Autorização entre páginas da mesma sessão', () => {
+  it('liga a criação e o histórico de modelos aos componentes próprios', async () => {
+    const children = routes.find((route) => route.children)?.children ?? [];
+    const create = children.find((route) => route.path === 'inspection-templates/new');
+    const versions = children.find(
+      (route) => route.path === 'inspection-templates/:templateId/versions',
+    );
+
+    expect(await create?.loadComponent?.()).toBe(
+      (await import('../../features/templates/template-create.component')).TemplateCreateComponent,
+    );
+    expect(await versions?.loadComponent?.()).toBe(
+      (await import('../../features/templates/template-versions.component')).TemplateVersionsComponent,
+    );
+  });
+
   it('supervisor que entrou no painel não consegue depois abrir usuários pela URL', async () => {
     const shell = routes.find((route) => route.children)!;
     TestBed.configureTestingModule({

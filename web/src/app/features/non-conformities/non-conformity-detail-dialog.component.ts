@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '
 import { DatePipe } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { catchError, finalize, forkJoin, of } from 'rxjs';
 import {
@@ -21,7 +22,7 @@ export interface NonConformityDetailDialogData {
 @Component({
   selector: 'app-non-conformity-detail-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, MatButtonModule, MatDialogModule],
+  imports: [DatePipe, MatButtonModule, MatDialogModule, RouterLink],
   template: `
     <h2 mat-dialog-title>Não conformidade</h2>
     <mat-dialog-content>
@@ -83,6 +84,11 @@ export interface NonConformityDetailDialogData {
       }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
+      @if (inspection(); as relatedInspection) {
+        <a matButton [routerLink]="['/inspections', relatedInspection.id]" (click)="close()">
+          Abrir inspeção
+        </a>
+      }
       <button matButton="filled" type="button" (click)="close()">Fechar</button>
     </mat-dialog-actions>
   `,

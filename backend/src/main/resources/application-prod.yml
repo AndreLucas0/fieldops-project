@@ -1,0 +1,43 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+
+logging:
+  level:
+    org.springframework.web.servlet.mvc.method.annotation: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN
+    software.amazon.awssdk.request: INFO
+
+fieldops:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:}
+    cors:
+      allowed-origins: ${CORS_ALLOWED_ORIGINS}
+  storage:
+    evidence:
+      use-aws-defaults: true
+      region: ${EVIDENCE_STORAGE_REGION}
+      bucket: ${EVIDENCE_STORAGE_BUCKET}

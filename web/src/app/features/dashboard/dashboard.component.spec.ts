@@ -7,16 +7,95 @@ import { resetMockStore } from '@fieldops/shared';
 
 import { ApiError } from '../../core/models/api-error.model';
 import { provideResources } from '../../core/core.providers';
-import { DashboardService } from '../../core/services/resources';
+import type { Inspection } from '../../core/models/domain';
+import type { Page } from '../../core/models/page.model';
+import { DashboardService, InspectionsService } from '../../core/services/resources';
 import { MOCK_LATENCY_MS } from '../../core/mocks/mock-services';
 import { DashboardComponent } from './dashboard.component';
 
 /**
- * FE-W02 — Painel.
+ * FE-W02 — Painel operacional.
  *
- * Os números vêm do conjunto fictício compartilhado, o mesmo do aplicativo:
- * conferir contra ele garante que a tela mostra o que a API mostraria.
+ * A maior parte dos testes usa dados fixos injetados nos serviços: o painel
+ * agrupa estados e escolhe quais números destacar, e conferir isso exige saber
+ * exatamente o que entrou.
  */
+const SUMMARY = { totalInspections: 8, inspectionsOverdue: 1, inspectionsPendingReview: 2 };
+
+const BY_STATUS = [
+  { status: 'DRAFT', count: 1 },
+  { status: 'ASSIGNED', count: 1 },
+  { status: 'IN_PROGRESS', count: 1 },
+  { status: 'SUBMITTED', count: 1 },
+  { status: 'UNDER_REVIEW', count: 1 },
+  { status: 'APPROVED', count: 1 },
+  { status: 'REJECTED', count: 1 },
+  { status: 'CANCELED', count: 1 },
+];
+
+const BY_SEVERITY = [
+  { severity: 'LOW', count: 1 },
+  { severity: 'MEDIUM', count: 1 },
+  { severity: 'HIGH', count: 1 },
+  { severity: 'CRITICAL', count: 2 },
+];
+
+const SUBMITTED = {
+  id: 'aaaaaaaa-0001',
+  title: 'INS-2026-0412',
+  clientId: 'client-x',
+  technicianId: 'technician-x',
+  status: 'SUBMITTED',
+  priority: 'HIGH',
+  scheduledFor: '2026-10-20T12:00:00Z',
+} as Inspection;
+
+const OVERDUE = {
+  id: 'bbbbbbbb-0002',
+  title: 'INS-2026-0413',
+  clientId: 'client-x',
+  technicianId: 'technician-x',
+  status: 'IN_PROGRESS',
+  priority: 'CRITICAL',
+  scheduledFor: '2026-10-18T12:00:00Z',
+} as Inspection;
+
+function page(content: Inspection[]): Page<Inspection> {
+  return { content, totalElements: content.length, totalPages: 1, page: 0, size: 5 };
+}
+
+function dashboardStub(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    provide: DashboardService,
+    useValue: {
+      summary: () => of(SUMMARY),
+      inspectionsByStatus: () => of(BY_STATUS),
+      nonConformitiesBySeverity: () => of(BY_SEVERITY),
+      ...overrides,
+    },
+  };
+}
+
+function inspectionsStub(withItems = true) {
+  return {
+    provide: InspectionsService,
+    useValue: {
+      list: (query: { status?: string; overdue?: boolean }) =>
+        of(
+          page(
+            !withItems
+              ? []
+              : query.overdue
+                ? [OVERDUE]
+                : query.status === 'SUBMITTED'
+                  ? [SUBMITTED]
+                  : [],
+          ),
+        ),
+    },
+  };
+}
+
 describe('DashboardComponent', () => {
   function setup(extraProviders: unknown[] = []) {
     resetMockStore();
@@ -36,98 +115,130 @@ describe('DashboardComponent', () => {
     return fixture;
   }
 
-  function texto(fixture: ReturnType<typeof setup>): string {
-    return (fixture.nativeElement as HTMLElement).textContent ?? '';
+  function withData(withItems = true) {
+    return setup([dashboardStub(), inspectionsStub(withItems)]);
   }
 
-  it('exibe os sete indicadores do resumo', () => {
-    const fixture = setup();
+  function root(fixture: ReturnType<typeof setup>): HTMLElement {
+    return fixture.nativeElement as HTMLElement;
+  }
 
-    const tiles = (fixture.nativeElement as HTMLElement).querySelectorAll('app-stat-tile');
-    expect(tiles).toHaveLength(7);
+  function texts(fixture: ReturnType<typeof setup>, selector: string): (string | undefined)[] {
+    return Array.from(root(fixture).querySelectorAll(selector)).map((el) =>
+      el.textContent?.trim(),
+    );
+  }
 
-    const conteudo = texto(fixture);
-    for (const rotulo of [
+  it('exibe os quatro indicadores do protótipo', () => {
+    const fixture = withData();
+
+    expect(root(fixture).querySelectorAll('app-stat-tile')).toHaveLength(4);
+    const content = root(fixture).textContent ?? '';
+    for (const label of [
       'Total de inspeções',
-      'Em andamento',
-      'Aguardando revisão',
       'Atrasadas',
-      'Aprovadas',
-      'Reprovadas',
-      'Não conformidades abertas',
+      'Aguardando revisão',
+      'NCs críticas',
     ]) {
-      expect(conteudo).toContain(rotulo);
+      expect(content).toContain(label);
     }
   });
 
-  it('os números batem com o conjunto fictício', () => {
-    const fixture = setup();
-    const valores = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll('.tile__number'),
-    ).map((el) => el.textContent?.trim());
+  it('mostra total, atrasadas, aguardando revisão e as NCs de criticidade crítica', () => {
+    const fixture = withData();
 
-    // 6 inspeções: 1 em andamento, 1 aguardando revisão, 1 atrasada,
-    // 1 aprovada, 1 reprovada; 3 não conformidades abertas.
-    expect(valores).toEqual(['6', '1', '1', '1', '1', '1', '3']);
+    expect(texts(fixture, '.tile__number')).toEqual(['8', '1', '2', '2']);
   });
 
-  it('desenha uma barra por estado presente, na ordem do ciclo de vida', () => {
-    const fixture = setup();
-    const primeiroGrafico = (fixture.nativeElement as HTMLElement).querySelector(
-      'app-category-bar-chart',
-    )!;
+  it('agrupa os oito estados em seis barras, na ordem do ciclo de vida', () => {
+    const fixture = withData();
 
-    const etiquetas = Array.from(primeiroGrafico.querySelectorAll('.fo-badge')).map((el) =>
-      el.textContent?.trim(),
-    );
-
-    expect(etiquetas).toEqual([
-      'Atribuída',
+    expect(texts(fixture, '.row__text')).toEqual([
+      'Planejada',
       'Em andamento',
-      'Enviada',
-      'Em revisão',
+      'Aguardando revisão',
       'Aprovada',
       'Reprovada',
+      'Cancelada',
     ]);
+    expect(texts(fixture, '.row__value')).toEqual(['2', '1', '2', '1', '1', '1']);
   });
 
   it('a barra mais longa ocupa a faixa inteira e as demais são proporcionais', () => {
-    const fixture = setup();
-    const larguras = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll('.row__fill'),
-    ).map((el) => (el as HTMLElement).style.width);
-
-    // Todas as contagens são 1 no conjunto semeado, então todas ficam cheias.
-    expect(larguras.every((largura) => largura === '100%')).toBe(true);
-  });
-
-  it('mostra as criticidades das não conformidades', () => {
-    const fixture = setup();
-    const graficos = (fixture.nativeElement as HTMLElement).querySelectorAll(
-      'app-category-bar-chart',
+    const fixture = withData();
+    const widths = Array.from(root(fixture).querySelectorAll('.row__fill')).map(
+      (el) => (el as HTMLElement).style.width,
     );
 
-    expect(graficos).toHaveLength(2);
-    const severidades = Array.from(graficos[1].querySelectorAll('.fo-badge')).map((el) =>
-      el.textContent?.trim(),
-    );
-
-    // Da menos para a mais grave, só as presentes.
-    expect(severidades).toEqual(['Baixa', 'Alta', 'Crítica']);
+    expect(widths).toEqual(['100%', '50%', '100%', '50%', '50%', '50%']);
   });
 
   it('cada valor é rotulado na ponta da barra, sem depender da dica de mouse', () => {
-    const fixture = setup();
-    const valores = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll('.row__value'),
-    );
+    const fixture = withData();
 
-    expect(valores.length).toBeGreaterThan(0);
-    expect(valores.every((el) => (el.textContent ?? '').trim().length > 0)).toBe(true);
+    const values = texts(fixture, '.row__value');
+    expect(values.length).toBeGreaterThan(0);
+    expect(values.every((value) => (value ?? '').length > 0)).toBe(true);
+  });
+
+  it('mostra as quatro criticidades com a contagem, inclusive as zeradas', () => {
+    const fixture = setup([
+      dashboardStub({ nonConformitiesBySeverity: () => of([{ severity: 'HIGH', count: 3 }]) }),
+      inspectionsStub(),
+    ]);
+
+    expect(texts(fixture, '.severities .fo-badge')).toEqual(['Baixa', 'Média', 'Alta', 'Crítica']);
+    expect(texts(fixture, '.severities__count')).toEqual(['0', '0', '3', '0']);
+  });
+
+  it('"Ver todas" leva às não conformidades', () => {
+    const fixture = withData();
+    const link = root(fixture).querySelector('.card__link') as HTMLAnchorElement;
+
+    expect(link.textContent).toContain('Ver todas');
+    expect(link.getAttribute('href')).toBe('/non-conformities');
+  });
+
+  it('lista as inspeções aguardando revisão com o atalho de revisão', () => {
+    const fixture = withData();
+    const link = Array.from(root(fixture).querySelectorAll('a')).find((el) =>
+      el.textContent?.includes('Revisar →'),
+    )!;
+
+    expect(root(fixture).textContent).toContain('INS-2026-0412');
+    expect(link.getAttribute('href')).toBe('/inspections/aaaaaaaa-0001/review');
+  });
+
+  it('lista as atrasadas com a data prevista, a prioridade e o estado', () => {
+    const fixture = withData();
+    const content = root(fixture).textContent ?? '';
+
+    expect(content).toContain('INS-2026-0413');
+    expect(content).toContain('Prevista para 18/10/2026');
+    expect(content).toContain('Urgente');
+    expect(content).toContain('Em andamento');
+  });
+
+  it('avisa quando não há inspeções nas listas', () => {
+    const fixture = withData(false);
+    const content = root(fixture).textContent ?? '';
+
+    expect(content).toContain('Nenhuma inspeção aguardando revisão.');
+    expect(content).toContain('Nenhuma inspeção atrasada.');
+  });
+
+  it('sem inspeções, o gráfico por estado mostra o estado vazio', () => {
+    const fixture = setup([
+      dashboardStub({ inspectionsByStatus: () => of([]) }),
+      inspectionsStub(false),
+    ]);
+
+    expect(root(fixture).textContent).toContain('Nenhuma inspeção cadastrada.');
+    expect(root(fixture).querySelectorAll('.row__fill')).toHaveLength(0);
   });
 
   describe('estados de carga', () => {
-    it('mostra o esqueleto enquanto as três chamadas não voltam', () => {
+    it('mostra o esqueleto enquanto as chamadas não voltam', () => {
       resetMockStore();
       TestBed.configureTestingModule({
         providers: [
@@ -142,102 +253,81 @@ describe('DashboardComponent', () => {
       const fixture = TestBed.createComponent(DashboardComponent);
       fixture.detectChanges();
 
-      expect(
-        (fixture.nativeElement as HTMLElement).querySelector('app-loading-state'),
-      ).not.toBeNull();
-      expect((fixture.nativeElement as HTMLElement).querySelector('app-stat-tile')).toBeNull();
+      expect(root(fixture).querySelector('app-loading-state')).not.toBeNull();
+      expect(root(fixture).querySelector('app-stat-tile')).toBeNull();
     });
 
-    it('uma falha em qualquer das três chamadas mostra o erro com nova tentativa', () => {
-      const falha = {
-        summary: () =>
-          throwError(
-            () =>
-              new ApiError({
-                kind: 'SERVER_ERROR',
-                status: 500,
-                code: 'SERVER_ERROR',
-                userMessage: 'Erro interno. Tente novamente em instantes.',
-              }),
-          ),
-        inspectionsByStatus: () => throwError(() => new Error('nao deveria importar')),
-        nonConformitiesBySeverity: () => throwError(() => new Error('nao deveria importar')),
-      };
+    it('uma falha em qualquer das chamadas mostra o erro com nova tentativa', () => {
+      const fixture = setup([
+        dashboardStub({
+          summary: () =>
+            throwError(
+              () =>
+                new ApiError({
+                  kind: 'SERVER_ERROR',
+                  status: 500,
+                  code: 'SERVER_ERROR',
+                  userMessage: 'Erro interno. Tente novamente em instantes.',
+                }),
+            ),
+        }),
+      ]);
 
-      const fixture = setup([{ provide: DashboardService, useValue: falha }]);
-
-      expect((fixture.nativeElement as HTMLElement).querySelector('app-empty-state')).not.toBeNull();
-      expect(texto(fixture)).toContain('Erro interno');
-      expect(texto(fixture)).toContain('Tentar novamente');
+      const content = root(fixture).textContent ?? '';
+      expect(root(fixture).querySelector('app-empty-state')).not.toBeNull();
+      expect(content).toContain('Erro interno');
+      expect(content).toContain('Tentar novamente');
       // Nenhum número é exibido: meio painel levaria à conclusão errada.
-      expect((fixture.nativeElement as HTMLElement).querySelector('app-stat-tile')).toBeNull();
+      expect(root(fixture).querySelector('app-stat-tile')).toBeNull();
     });
 
     it('mensagem genérica quando a falha não é do contrato', () => {
       const fixture = setup([
-        {
-          provide: DashboardService,
-          useValue: {
-            summary: () => throwError(() => new Error('rede caiu')),
-            inspectionsByStatus: () => throwError(() => new Error('rede caiu')),
-            nonConformitiesBySeverity: () => throwError(() => new Error('rede caiu')),
-          },
-        },
+        dashboardStub({ summary: () => throwError(() => new Error('rede caiu')) }),
       ]);
 
-      expect(texto(fixture)).toContain('Não foi possível falar com o servidor');
+      expect(root(fixture).textContent).toContain('Não foi possível falar com o servidor');
     });
 
     it('tentar novamente refaz a carga e mostra os números', () => {
-      // Primeira carga falha, segunda responde: é o caminho do botão de
-      // nova tentativa, que precisa refazer as três chamadas.
-      let falhar = true;
-      const serviceFalho = {
-        summary: () =>
-          falhar
-            ? throwError(() => new Error('indisponível'))
-            : of({ totalInspections: 6, inspectionsInProgress: 1 }),
-        inspectionsByStatus: () => of([{ status: 'APPROVED', count: 1 }]),
-        nonConformitiesBySeverity: () => of([{ severity: 'HIGH', count: 2 }]),
-      };
+      let fail = true;
+      const fixture = setup([
+        dashboardStub({
+          summary: () => (fail ? throwError(() => new Error('indisponível')) : of(SUMMARY)),
+        }),
+        inspectionsStub(),
+      ]);
+      expect(root(fixture).querySelector('app-empty-state')).not.toBeNull();
 
-      const fixture = setup([{ provide: DashboardService, useValue: serviceFalho }]);
-      expect((fixture.nativeElement as HTMLElement).querySelector('app-empty-state')).not.toBeNull();
-
-      falhar = false;
-      const botao = (fixture.nativeElement as HTMLElement).querySelector(
-        'app-empty-state button',
-      ) as HTMLButtonElement;
-      botao.click();
+      fail = false;
+      const button = root(fixture).querySelector('app-empty-state button') as HTMLButtonElement;
+      button.click();
       fixture.detectChanges();
 
-      expect((fixture.nativeElement as HTMLElement).querySelectorAll('app-stat-tile')).toHaveLength(
-        7,
-      );
-      expect((fixture.nativeElement as HTMLElement).querySelector('app-empty-state')).toBeNull();
+      expect(root(fixture).querySelectorAll('app-stat-tile')).toHaveLength(4);
+      expect(root(fixture).querySelector('app-empty-state')).toBeNull();
     });
   });
 
   describe('atalhos', () => {
-    it('"Revisar pendentes" leva à lista filtrada por enviadas', () => {
-      const fixture = setup();
-      const router = TestBed.inject(Router);
-      const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    it('"Revisar pendências" leva à lista filtrada por enviadas', () => {
+      const fixture = withData();
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
-      const botao = Array.from(
-        (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
-      ).find((el) => el.textContent?.includes('Revisar pendentes'))!;
-      botao.click();
+      const button = Array.from(root(fixture).querySelectorAll('button')).find((el) =>
+        el.textContent?.includes('Revisar pendências'),
+      )!;
+      button.click();
 
       expect(navigate).toHaveBeenCalledWith(['/inspections'], {
         queryParams: { status: 'SUBMITTED' },
       });
     });
 
-    it('"Criar inspeção" aponta para a rota de agendamento', () => {
-      const fixture = setup();
-      const link = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('a')).find(
-        (el) => el.textContent?.includes('Criar inspeção'),
+    it('"Nova inspeção" aponta para a rota de agendamento', () => {
+      const fixture = withData();
+      const link = Array.from(root(fixture).querySelectorAll('a')).find((el) =>
+        el.textContent?.includes('Nova inspeção'),
       )!;
 
       expect(link.getAttribute('href')).toBe('/inspections/new');

@@ -1,3 +1,5 @@
+process.env.EXPO_PUBLIC_API_MOCK = 'true';
+
 // As fontes do Google são baixadas em tempo de execução; nos testes basta
 // declarar que já carregaram para o layout raiz seguir adiante.
 jest.mock('expo-font', () => ({

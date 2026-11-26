@@ -270,7 +270,7 @@ describe('serviços fictícios da web', () => {
     it('criar gera o snapshot do checklist (RN-021)', async () => {
       const service = TestBed.inject(InspectionsService);
       const criada = await firstValueFrom(
-        service.create({ title: 'Nova inspeção', technicianId: USER_IDS.technician }),
+        service.create({ title: 'Nova inspeção', technicianId: USER_IDS.technician, assignImmediately: true }),
       );
 
       const detalhe = await firstValueFrom(service.get(criada.id));

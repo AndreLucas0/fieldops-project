@@ -1,5 +1,6 @@
 package com.codemind.fieldops.user.controller;
 
+import com.codemind.fieldops.shared.error.BusinessRuleViolationException;
 import com.codemind.fieldops.shared.pagination.PageResponse;
 import com.codemind.fieldops.shared.pagination.SortFieldValidator;
 import com.codemind.fieldops.user.application.UserService;
@@ -17,6 +18,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -56,6 +59,21 @@ public class UserController {
 		SortFieldValidator.validate(pageable.getSort(), SORTABLE_FIELDS);
 		Page<User> users = userService.list(name, email, role, status, pageable);
 		return PageResponse.from(users.map(userMapper::toResponse));
+	}
+
+	@GetMapping("/inspection-assignees")
+	@PreAuthorize("hasAnyRole('ADMIN','SUPERVISOR')")
+	public PageResponse<InspectionAssignee> listInspectionAssignees(@RequestParam UserRole role,
+			@PageableDefault(size = 20) Pageable page) {
+		if (role != UserRole.TECHNICIAN && role != UserRole.SUPERVISOR) {
+			throw new BusinessRuleViolationException("INVALID_ASSIGNEE_ROLE", "Choose TECHNICIAN or SUPERVISOR");
+		}
+		Pageable ordered = PageRequest.of(page.getPageNumber(), page.getPageSize(), Sort.by("name", "id"));
+		return PageResponse.from(userService.list(null, null, role, UserStatus.ACTIVE, ordered)
+			.map(user -> new InspectionAssignee(user.getId(), user.getName())));
+	}
+
+	public record InspectionAssignee(UUID id, String name) {
 	}
 
 	@PostMapping

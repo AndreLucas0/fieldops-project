@@ -82,6 +82,7 @@ import { TemplateSectionFormDialogService } from './template-section-form-dialog
       actions
       matButton
       [routerLink]="['/inspection-templates', templateId(), 'preview']"
+      [queryParams]="canEditDraft() ? { draft: '1' } : null"
     >
       <mat-icon>visibility</mat-icon>
       Ver prévia
@@ -104,7 +105,11 @@ import { TemplateSectionFormDialogService } from './template-section-form-dialog
   } @else if (template(); as tpl) {
     <app-status-badge class="status" [value]="tpl.status" context="template" />
 
-    @if (!canEditDraft()) {
+    @if (!canEditDraft() && tpl.status === 'ACTIVE' && canWriteTemplates()) {
+      <button matButton="outlined" type="button" [disabled]="saving()" (click)="openDraft()">
+        Editar nova versão
+      </button>
+    } @else if (!canEditDraft()) {
       <div class="notice" role="status">
         <mat-icon aria-hidden="true">info</mat-icon>
         <p>
@@ -122,7 +127,7 @@ import { TemplateSectionFormDialogService } from './template-section-form-dialog
           <mat-label>Título</mat-label>
           <input
             matInput
-            [disabled]="!canEditDraft()"
+            [disabled]="!canEditGeneral()"
             [ngModel]="generalTitle()"
             (ngModelChange)="generalTitle.set($event)"
           />
@@ -132,7 +137,7 @@ import { TemplateSectionFormDialogService } from './template-section-form-dialog
           <mat-label>Categoria</mat-label>
           <input
             matInput
-            [disabled]="!canEditDraft()"
+            [disabled]="!canEditGeneral()"
             [ngModel]="generalCategory()"
             (ngModelChange)="generalCategory.set($event)"
           />
@@ -147,14 +152,14 @@ import { TemplateSectionFormDialogService } from './template-section-form-dialog
           <textarea
             matInput
             rows="2"
-            [disabled]="!canEditDraft()"
+            [disabled]="!canEditGeneral()"
             [ngModel]="generalDescription()"
             (ngModelChange)="generalDescription.set($event)"
           ></textarea>
         </mat-form-field>
       </mat-card-content>
 
-      @if (canEditDraft()) {
+      @if (canEditGeneral()) {
         <mat-card-actions align="end">
           <button
             matButton
@@ -448,9 +453,12 @@ export class TemplateBuilderComponent implements OnInit {
       : this.template()?.title ?? 'Modelo de inspeção',
   );
 
-  protected readonly canEditDraft = computed(
-    () => this.template()?.status === 'DRAFT' && canWrite('inspection-templates', this.auth.role()),
-  );
+  protected readonly canWriteTemplates = computed(() => canWrite('inspection-templates', this.auth.role()));
+  protected readonly canEditGeneral = computed(() => this.template()?.status === 'DRAFT' && this.canWriteTemplates());
+  protected readonly canEditDraft = computed(() => this.canWriteTemplates() && (
+    this.template()?.status === 'DRAFT' ||
+    (this.template()?.status === 'ACTIVE' && this.sections().length > 0)
+  ));
 
   protected readonly generalChanged = computed(() => {
     const tpl = this.template();
@@ -548,7 +556,7 @@ export class TemplateBuilderComponent implements OnInit {
   }
 
   protected saveGeneral(): void {
-    if (this.saving()) return;
+    if (this.saving() || !this.canEditGeneral()) return;
 
     const input = {
       title: this.generalTitle().trim(),
@@ -593,6 +601,18 @@ export class TemplateBuilderComponent implements OnInit {
           );
         },
       });
+  }
+
+  protected openDraft(): void {
+    const template = this.template();
+    if (this.saving() || !this.canWriteTemplates() || template?.status !== 'ACTIVE') return;
+    this.saving.set(true);
+    this.templates.openDraft(template.id).pipe(finalize(() => this.saving.set(false))).subscribe({
+      next: sections => this.sections.set(this.sortTree(sections)),
+      error: (error: unknown) => this.notifications.error(
+        isApiError(error) ? error.userMessage : 'Não foi possível abrir o rascunho.',
+      ),
+    });
   }
 
   protected addSection(): void {

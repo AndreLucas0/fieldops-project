@@ -1,7 +1,7 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { resetMockStore } from '@fieldops/shared';
@@ -94,6 +94,26 @@ describe('InspectionsListComponent', () => {
     expect(format(undefined, { status: 'APPROVED', scheduledFor: past } as Inspection)).toBe('—');
   });
 
+  it('começa filtrada pelo estado recebido na URL', async () => {
+    TestBed.overrideProvider(ActivatedRoute, {
+      useValue: { snapshot: { queryParamMap: convertToParamMap({ status: 'SUBMITTED' }) } },
+    });
+
+    const { component } = await render();
+
+    expect(component.activeFilters().map((filter) => filter.value)).toEqual(['Enviada']);
+  });
+
+  it('ignora na URL um estado que não existe', async () => {
+    TestBed.overrideProvider(ActivatedRoute, {
+      useValue: { snapshot: { queryParamMap: convertToParamMap({ status: 'NAO_EXISTE' }) } },
+    });
+
+    const { component } = await render();
+
+    expect(component.activeFilters()).toEqual([]);
+  });
+
   it('envia o estado ao serviço e volta para a primeira página', async () => {
     const { component } = await render();
     const list = vi.spyOn(TestBed.inject(InspectionsService), 'list');
@@ -143,7 +163,7 @@ describe('InspectionsListComponent', () => {
     expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ status: undefined, page: 0 }));
   });
 
-  it('oferece cancelar para o SUPERVISOR', async () => {
+  it('oferece revisão e cancelamento para o SUPERVISOR', async () => {
     const { component } = await render('SUPERVISOR');
 
     const actions = component.columns().find((c) => c.field === 'actions')?.actions;
@@ -159,23 +179,20 @@ describe('InspectionsListComponent', () => {
     expect(actions).toEqual([]);
   });
 
-  it('esconde o cancelamento em inspeções aprovadas, enviadas ou já canceladas', async () => {
+  it('esconde o cancelamento em inspeções enviadas, em revisão, aprovadas ou canceladas', async () => {
     const { component } = await render();
-    const visible = component
-      .columns()
-      .find((c) => c.field === 'actions')!
-      .actions!.find((a) => a.id === 'cancel')!.visible!;
+    const actions = component.columns().find((c) => c.field === 'actions')?.actions;
+    const cancelAction = actions?.find((action) => action.id === 'cancel');
 
-    for (const status of ['APPROVED', 'SUBMITTED', 'CANCELED'] as const) {
+    expect(cancelAction).toBeDefined();
+
+    const visible = cancelAction!.visible!;
+
+    for (const status of ['APPROVED', 'SUBMITTED', 'UNDER_REVIEW', 'CANCELED'] as const) {
       expect(visible(inspectionWith(status))).toBe(false);
     }
-    for (const status of [
-      'DRAFT',
-      'ASSIGNED',
-      'IN_PROGRESS',
-      'UNDER_REVIEW',
-      'REJECTED',
-    ] as const) {
+
+    for (const status of ['DRAFT', 'ASSIGNED', 'IN_PROGRESS', 'REJECTED'] as const) {
       expect(visible(inspectionWith(status))).toBe(true);
     }
   });

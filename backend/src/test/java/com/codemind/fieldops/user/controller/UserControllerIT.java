@@ -159,8 +159,7 @@ class UserControllerIT {
 
 	@Test
 	void supervisorCanReadOnlyAssignableUserNamesWithoutUserManagementAccess() {
-		var supervisor = userRepository.save(newUser("Supervisora", "supervisor.it@fieldops.local", UserRole.SUPERVISOR));
-		String token = bearer(mintAccessToken(supervisor));
+		String token = bearer(supervisorToken);
 		var response = mvc.get().uri("/users/inspection-assignees?role=TECHNICIAN")
 			.header("Authorization", token).exchange();
 		assertThat(response).hasStatusOk().bodyJson().extractingPath("$.content[0].id").asString()

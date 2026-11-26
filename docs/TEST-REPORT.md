@@ -38,6 +38,13 @@ persistência em outbox SQLite via doubles de teste, reconexão, rebase de
 conflitos, tratamento de permissões, scanner, GPS e fotografia. Não foi
 localizado emulador Android neste host.
 
+O Angular aprovou 327 testes e o build. O novo cenário HTTP passou contra a
+API real com PostgreSQL 16 e MinIO. Confirmou duas versões de um modelo,
+imutabilidade do snapshot original, uso do seletor pelo supervisor sem acesso
+à administração de usuários, troca de responsável, perda do acesso do técnico
+anterior, GPS na revisão, evidência por URL assinada e auditoria com filtro.
+Os resultados da revisão publicada ficam no [PR #315](https://github.com/AndreLucas0/fieldops-project/pull/315).
+
 ## Histórico de 24 e 25 de novembro de 2026
 
 Execução de 24 de novembro de 2026 em Windows, com Node 22.19.0, npm 10.9.3 e Java 21.0.11.

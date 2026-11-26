@@ -17,7 +17,7 @@ import { MatInputModule } from '@angular/material/input';
 import { forkJoin } from 'rxjs';
 import { catchError, concatMap, finalize, of } from 'rxjs';
 
-import { AuthStore, canWrite, isApiError, type ApiError } from '../../core';
+import { ApiError, AuthStore, canWrite, isApiError } from '../../core';
 import type {
   InspectionTemplate,
   TemplateItem,
@@ -435,6 +435,7 @@ export class TemplateBuilderComponent implements OnInit {
   protected readonly loading = signal(false);
   protected readonly saving = signal(false);
   protected readonly error = signal<ApiError | null>(null);
+  protected readonly mutationError = signal<string | null>(null);
   protected readonly template = signal<InspectionTemplate | null>(null);
   protected readonly sections = signal<TemplateSectionDetail[]>([]);
 
@@ -484,7 +485,16 @@ export class TemplateBuilderComponent implements OnInit {
     forkJoin([this.templates.get(id), this.templates.listDraftSections(id)])
       .pipe(
         catchError((thrown: unknown) => {
-          this.error.set(isApiError(thrown) ? thrown : null);
+          this.error.set(
+            isApiError(thrown)
+              ? thrown
+              : new ApiError({
+                  kind: 'UNKNOWN',
+                  status: 0,
+                  code: 'UNKNOWN',
+                  userMessage: 'Não foi possível carregar o modelo. Tente novamente.',
+                }),
+          );
           return of(null);
         }),
         finalize(() => this.loading.set(false)),
@@ -543,6 +553,12 @@ export class TemplateBuilderComponent implements OnInit {
     });
   }
 
+  private reportMutationError(thrown: unknown): void {
+    this.mutationError.set(
+      isApiError(thrown) ? thrown.userMessage : 'Não foi possível salvar as alterações.',
+    );
+  }
+
   protected responseTypeLabel(item: TemplateItem): string {
     return RESPONSE_TYPE_LABELS[item.responseType];
   }
@@ -567,6 +583,7 @@ export class TemplateBuilderComponent implements OnInit {
     // Só usamos update quando ele já foi criado.
     const isNew = !tpl?.id;
 
+    this.mutationError.set(null);
     this.saving.set(true);
 
     const request = isNew
@@ -627,10 +644,13 @@ export class TemplateBuilderComponent implements OnInit {
           displayOrder: nextOrder,
         })
         .pipe(finalize(() => this.saving.set(false)))
-        .subscribe(() => {
-          this.reloadSections();
-          this.notifications.success('Seção criada.');
-        });
+        .subscribe(
+          () => {
+            this.reloadSections();
+            this.notifications.success('Seção criada.');
+          },
+          (thrown: unknown) => this.reportMutationError(thrown),
+        );
     });
   }
 
@@ -664,10 +684,13 @@ export class TemplateBuilderComponent implements OnInit {
       this.templates
         .updateSection(templateId, section.id, result)
         .pipe(finalize(() => this.saving.set(false)))
-        .subscribe(() => {
-          this.reloadSections();
-          this.notifications.success('Seção atualizada.');
-        });
+        .subscribe(
+          () => {
+            this.reloadSections();
+            this.notifications.success('Seção atualizada.');
+          },
+          (thrown: unknown) => this.reportMutationError(thrown),
+        );
     });
   }
 
@@ -697,7 +720,10 @@ export class TemplateBuilderComponent implements OnInit {
       }),
     ])
       .pipe(finalize(() => this.saving.set(false)))
-      .subscribe(() => this.reloadSections());
+      .subscribe({
+        next: () => this.reloadSections(),
+        error: (thrown: unknown) => this.reportMutationError(thrown),
+      });
   }
 
 
@@ -741,10 +767,13 @@ export class TemplateBuilderComponent implements OnInit {
           displayOrder: nextOrder,
         })
         .pipe(finalize(() => this.saving.set(false)))
-        .subscribe(() => {
-          this.reloadSections();
-          this.notifications.success('Item criado.');
-        });
+        .subscribe(
+          () => {
+            this.reloadSections();
+            this.notifications.success('Item criado.');
+          },
+          (thrown: unknown) => this.reportMutationError(thrown),
+        );
     });
   }
 
@@ -784,10 +813,13 @@ export class TemplateBuilderComponent implements OnInit {
       this.templates
         .updateItem(templateId, item.id, result)
         .pipe(finalize(() => this.saving.set(false)))
-        .subscribe(() => {
-          this.reloadSections();
-          this.notifications.success('Item atualizado.');
-        });
+        .subscribe(
+          () => {
+            this.reloadSections();
+            this.notifications.success('Item atualizado.');
+          },
+          (thrown: unknown) => this.reportMutationError(thrown),
+        );
     });
   }
 

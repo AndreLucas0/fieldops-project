@@ -1,6 +1,7 @@
 package com.codemind.fieldops.template.dto;
 
 import com.codemind.fieldops.template.domain.ResponseType;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -14,7 +15,7 @@ public record TemplateItemResponse(
     boolean required,
     boolean observationRequiredOnFailure,
     boolean evidenceRequiredOnFailure,
-    String optionsJson,
+    JsonNode optionsJson,
     int displayOrder,
     Instant createdAt) {
 }

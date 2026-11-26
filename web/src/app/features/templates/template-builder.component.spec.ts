@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideZonelessChangeDetection } from '@angular/core';
-import { of } from 'rxjs';
+import { firstValueFrom, of } from 'rxjs';
 
 import { resetMockStore, TEMPLATE_IDS } from '@fieldops/shared';
 

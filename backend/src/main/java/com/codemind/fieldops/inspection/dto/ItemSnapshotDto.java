@@ -1,5 +1,6 @@
 package com.codemind.fieldops.inspection.dto;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -15,7 +16,7 @@ public record ItemSnapshotDto(
     String itemDescription,
     String responseType,
     Boolean required,
-    String optionsJson,
+    JsonNode optionsJson,
     String rulesJson,
     Integer itemOrder,
     Instant createdAt) {

@@ -976,7 +976,7 @@ paths:
     post:
       operationId: createTemplateSection
       tags: [Inspection Templates]
-      summary: Criar seção na versão em rascunho do modelo (RN-017, RN-018)
+      summary: Criar seção no rascunho do modelo (RN-017, RN-018)
       parameters:
         - $ref: '#/components/parameters/IdParam'
       requestBody:
@@ -991,7 +991,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TemplateSection'
+                $ref: '#/components/schemas/TemplateSectionDetail'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1001,11 +1001,40 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: O modelo não possui uma versão em rascunho editável (RN-019).
+          description: O modelo não possui um rascunho editável (RN-019).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /inspection-templates/{id}/sections/order:
+    patch:
+      operationId: reorderInspectionTemplateDraftSections
+      tags: [Inspection Templates]
+      summary: Reordenar seções do rascunho
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateDraftOrderRequest'
+      responses:
+        '204':
+          description: Ordem atualizada de forma atômica.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /inspection-templates/{id}/sections/{sectionId}:
     put:
@@ -1030,7 +1059,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TemplateSection'
+                $ref: '#/components/schemas/TemplateSectionDetail'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1077,6 +1106,39 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
+  /inspection-templates/{id}/sections/{sectionId}/items/order:
+    patch:
+      operationId: reorderInspectionTemplateDraftItems
+      tags: [Inspection Templates]
+      summary: Reordenar itens da seção no rascunho
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+        - name: sectionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateDraftOrderRequest'
+      responses:
+        '204':
+          description: Ordem atualizada de forma atômica.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /inspection-templates/{id}/items/{itemId}:
     put:
       operationId: updateTemplateItem
@@ -1118,11 +1180,18 @@ paths:
       tags: [Inspection Templates]
       summary: Publicar nova versão do modelo (AC-TEMPLATE — publicar modelo válido)
       description: >
-        Exige título, categoria, ao menos uma seção e ao menos um item com
-        tipo de resposta válido (RN-015, RN-016). Tipos de resposta fora do
-        enum `ResponseType` do MVP não podem ser publicados (RN-023).
+        Publica o conteúdo persistido do rascunho. Exige título, categoria,
+        ao menos uma seção e ao menos um item com tipo de resposta válido
+        (RN-015, RN-016). Tipos de resposta fora do enum `ResponseType` do MVP
+        não podem ser publicados (RN-023).
       parameters:
         - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        description: Conteúdo legado opcional para modelos sem rascunho salvo.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishTemplateRequest'
       responses:
         '201':
           description: Nova versão publicada e disponível para novos agendamentos.
@@ -2714,8 +2783,7 @@ components:
       properties:
         title: { type: string, maxLength: 150 }
         description: { type: string, nullable: true }
-        displayOrder: { type: integer }
-      required: [title, displayOrder]
+      required: [title]
 
     TemplateSectionUpdateRequest:
       $ref: '#/components/schemas/TemplateSectionCreateRequest'
@@ -2755,11 +2823,20 @@ components:
           type: object
           nullable: true
           additionalProperties: true
-        displayOrder: { type: integer }
-      required: [title, responseType, displayOrder]
+      required: [title, responseType]
 
     TemplateItemUpdateRequest:
       $ref: '#/components/schemas/TemplateItemCreateRequest'
+
+    TemplateDraftOrderRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          items: { type: string, format: uuid }
+          uniqueItems: true
+      required: [ids]
 
     # ---------- Inspections ----------
     Inspection:

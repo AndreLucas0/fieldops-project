@@ -245,6 +245,35 @@ describe('serviços fictícios da web', () => {
       expect((await firstValueFrom(service.listVersions(id))).content).toHaveLength(0);
       expect(await firstValueFrom(service.listDraftSections(id))).toHaveLength(1);
     });
+
+    it('cria um rascunho e mantém a árvore de seções em memória', async () => {
+      const service = TestBed.inject(TemplatesService);
+      const template = await firstValueFrom(
+        service.create({ title: 'Novo checklist', category: 'Segurança' }),
+      );
+      const section = await firstValueFrom(
+        service.createSection(template.id, { title: 'Inspeção' }),
+      );
+
+      expect(template.status).toBe('DRAFT');
+      expect(await firstValueFrom(service.listDraftSections(template.id))).toEqual([section]);
+    });
+
+    it('reordena seções e itens como operações únicas', async () => {
+      const service = TestBed.inject(TemplatesService);
+      const templateId = (await firstValueFrom(service.list({ status: 'DRAFT' }))).content[0].id;
+      const [section] = await firstValueFrom(service.listDraftSections(templateId));
+      const items = section.items ?? [];
+      const originalIds = items.map((item) => item.id);
+
+      await firstValueFrom(
+        service.reorderItems(templateId, section.id, [...originalIds].reverse()),
+      );
+
+      const reordered = await firstValueFrom(service.listDraftSections(templateId));
+      expect(reordered[0].items?.map((item) => item.displayOrder)).toEqual([1, 2]);
+      expect(reordered[0].items?.[0].id).toBe(originalIds[1]);
+    });
   });
 
   describe('InspectionsService', () => {

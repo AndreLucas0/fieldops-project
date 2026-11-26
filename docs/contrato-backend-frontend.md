@@ -294,19 +294,22 @@ Fonte: `arquitetura.md` §11.14.
 | POST | `/inspection-templates` | Criar modelo em `DRAFT` |
 | GET | `/inspection-templates/{id}` | Consultar modelo |
 | PUT | `/inspection-templates/{id}` | Atualizar título/descrição/categoria |
-| POST | `/inspection-templates/{id}/sections` | Criar seção **na versão rascunho implícita** |
-| PUT | `/inspection-templates/{id}/sections/{sectionId}` | Atualizar seção |
+| GET | `/inspection-templates/{id}/sections` | Listar seções e itens do rascunho |
+| POST | `/inspection-templates/{id}/sections` | Criar seção no rascunho |
+| PUT | `/inspection-templates/{id}/sections/{sectionId}` | Atualizar seção do rascunho |
+| PATCH | `/inspection-templates/{id}/sections/order` | Reordenar seções atomicamente |
 | POST | `/inspection-templates/{id}/sections/{sectionId}/items` | Criar item |
 | PUT | `/inspection-templates/{id}/items/{itemId}` | Atualizar item |
+| PATCH | `/inspection-templates/{id}/sections/{sectionId}/items/order` | Reordenar itens atomicamente |
 | POST | `/inspection-templates/{id}/publish` | Publicar versão imutável |
 | GET | `/inspection-templates/{id}/versions` | Listar versões publicadas |
 | GET | `/inspection-template-versions/{versionId}` | Detalhe de uma versão (com seções/itens) |
 
-**Decisão de contrato (openapi.yaml, normalização #3):** os endpoints de seção/item operam implicitamente sobre a versão em `DRAFT` do modelo, porque RN-018 permite alteração livre **somente** nesse estado. Não existe endpoint para editar seção/item de uma versão já publicada (RN-019) — `409` se o modelo não tiver uma versão rascunho editável.
+**Decisão de contrato (openapi.yaml, normalização #3):** os endpoints de seção/item operam sobre o conteúdo de rascunho associado ao modelo, porque RN-018 permite alteração livre **somente** nesse estado. O conteúdo é persistido separadamente das versões publicadas; a publicação cria o snapshot versionado. Não existe endpoint para editar seções/itens de uma versão já publicada (RN-019) — `409` se o modelo não tiver uma versão rascunho editável. As rotas legadas `/templates` continuam aceitas pelo backend; `/inspection-templates` é o caminho canônico do contrato.
 
 ### `POST /inspection-templates/{id}/publish` — regras e exemplo
 
-**Bloqueia a publicação (`422`) quando:** o modelo não tem título/categoria, não tem ao menos uma seção com item válido (RN-015), ou existe item sem `responseType` (RN-016). **Efeito:** cria uma `InspectionTemplateVersion` imutável, numerada sequencialmente por modelo (RN-020); versões antigas continuam válidas para inspeções já criadas (RN-022).
+**Bloqueia a publicação (`422`) quando:** o modelo não tem título/categoria, não tem ao menos uma seção com item válido (RN-015), ou existe item sem `responseType` (RN-016). A API publica o rascunho persistido; para compatibilidade, também aceita o payload legado de seções quando o modelo ainda não tem conteúdo de rascunho salvo. **Efeito:** cria uma `InspectionTemplateVersion` imutável, numerada sequencialmente por modelo (RN-020); versões antigas continuam válidas para inspeções já criadas (RN-022).
 
 ```json
 // Exemplo de item dentro do construtor (TemplateItemCreateRequest)

@@ -1,5 +1,31 @@
 # FieldOps — Current Progress
 
+## Retomada de 26 de novembro de 2026
+
+Workspace e raiz Git confirmados em `C:\Users\Lucas\Documents\fieldops-project`.
+`develop` estava limpa em `64b8b0a`, também confirmado no remoto `origin`
+(`https://github.com/AndreLucas0/fieldops-project.git`). A leitura do README
+e a gravação com leitura de retorno em arquivo temporário foram aprovadas.
+O teste removeu o arquivo que criou. A execução segue na branch
+`task/fieldops-mission-20261126`, criada a partir dessa base.
+
+Os merges `3161d10` e `64b8b0a` preservam os históricos das duas branches da
+rodada de 25 de novembro. A próxima validação usa o commit integrado, o
+PostgreSQL 16 adotado pelo Compose e o perfil `prod`. O título exato do
+documento da missão foi procurado no checkout e nas fontes conectadas
+consultadas. O plano local e a Definition of Done orientam os passos em curso.
+
+O perfil `prod` agora permite o health check agregado para o ALB. Registra-se
+55 testes unitários e 309 de integração aprovados no PostgreSQL 16.14, 324
+testes web, 444 mobile, build Angular e exports Expo. O fluxo HTTP passou com
+PostgreSQL e MinIO isolados. A imagem da API também iniciou como usuário sem
+privilégios sobre um banco restaurado. O job `android-apk` prepara um APK de
+demonstração. [Relatório de testes](../docs/TEST-REPORT.md)
+
+O [quadro da entrega](../docs/FINAL-DELIVERY.md) registra as fontes consultadas,
+os requisitos pendentes e a diferença entre o cenário HTTP e o aceite em
+aparelho. A AWS retornou `InvalidClientTokenId` para a identidade configurada.
+
 Last updated: 2026-11-04 — recuperação integrada, PR #296.
 
 Estado mais recente: [recovery-validation-20261104.md](recovery-validation-20261104.md).

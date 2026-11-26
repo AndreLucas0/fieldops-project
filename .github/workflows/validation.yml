@@ -50,6 +50,35 @@ jobs:
       - run: npx expo export --platform web --output-dir "${{ runner.temp }}/fieldops-mobile-web"
       - run: npx expo export --platform android --output-dir "${{ runner.temp }}/fieldops-mobile-android"
 
+  android-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      EXPO_PUBLIC_API_MOCK: 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: npm ci --no-audit --no-fund
+      - run: npx expo prebuild --platform android --no-install
+      - run: ./gradlew --no-daemon :app:assembleRelease
+        working-directory: mobile/android
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fieldops-android-demo
+          path: mobile/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
   backend:
     runs-on: ubuntu-24.04
     timeout-minutes: 25

@@ -1,5 +1,32 @@
 # Relatório de testes
 
+## Branch de retomada em 26 de novembro de 2026
+
+Base `64b8b0a` e Docker Desktop Linux 27.4.0, Node 22.19.0 e Java 21.0.11.
+
+| Verificação | Resultado |
+|---|---|
+| API · `mvnw.cmd -B -ntp verify` | 55 testes unitários e 309 de integração aprovados com PostgreSQL 16.14 e Flyway V1–V14. O teste `ProductionProfileIT` reproduziu HTTP 401 no health check antes da correção. |
+| Web · `npm test -- --watch=false` e `npm run build` | 324 testes em 38 arquivos e build aprovados. Dois avisos existentes de orçamento de CSS, em detalhe e revisão. |
+| Mobile · `npm test -- --runInBand --silent`, `npm run typecheck` e `npm run lint` | 444 testes em 37 suítes e tipagem aprovados. Lint sem erros e com quatro avisos existentes. |
+| Mobile · `npx expo export --platform android` e `npx expo export --platform web` | Ambos os bundles foram gerados. O export web inclui o WASM do SQLite. |
+| API isolada · `node backend/scripts/smoke-release.mjs` | JAR com perfil `prod`, PostgreSQL 16 e MinIO. Após as migrações e a carga inicial de `db/seed.sql`, o fluxo executou por HTTP. Usou usuário, catálogo e modelo de demonstração. Verificou agendamento, atribuição, leitura pelo técnico, resolução de código QR, início, quatro respostas, evidência com coordenadas e leitura dos mesmos bytes pela URL assinada, encerramento, aprovação, pull e histórico. Reenvios de sync retornaram `ALREADY_APPLIED`. O reenvio da foto retornou 409 e a listagem manteve uma única evidência. |
+| Web via proxy | `GET /login` pelo servidor Angular retornou 200. Através do mesmo servidor, a API retornou `UP`, aceitou o login e listou a inspeção aprovada do cenário HTTP. |
+| Restauração PostgreSQL e imagem da API | `pg_dump -Fc` e `pg_restore --exit-on-error` foram executados em bancos separados de teste. Origem e cópia retornaram 14 migrações válidas, uma inspeção aprovada do cenário e uma evidência vinculada. `docker build` gerou a imagem `fieldops-api:mission-20261126`. Em execução como `10001:10001`, a imagem validou o schema restaurado, retornou `UP` e serviu a inspeção aprovada pelo endpoint autenticado. |
+
+O teste HTTP forneceu a imagem e as coordenadas como entradas de teste. A
+câmera, o leitor QR, o GPS, a desconexão real do dispositivo, a reinstalação e
+a recuperação da fila em SQLite no Android precisam de uma execução em aparelho.
+O host de automação de navegador retornou indisponível, o que limitou a
+validação do painel ao build, à suíte e ao fluxo HTTP pelo proxy. A AWS precisa
+de credenciais válidas para verificar IAM, serviços gerenciados e rollback.
+
+O job `android-apk` da CI foi configurado para gerar `fieldops-android-demo`
+com dados simulados e assinatura do template para testes internos. A execução
+remota e o teste de instalação precisam de evidência. [Build de APKs com Expo](https://docs.expo.dev/build-reference/apk/)
+
+## Histórico de 24 e 25 de novembro de 2026
+
 Execução de 24 de novembro de 2026 em Windows, com Node 22.19.0, npm 10.9.3 e Java 21.0.11.
 
 | Comando | Resultado |

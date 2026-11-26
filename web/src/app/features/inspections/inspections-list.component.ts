@@ -16,12 +16,13 @@ import { MatSelectModule } from '@angular/material/select';
 import { catchError, finalize, of } from 'rxjs';
 
 import { AuthStore, canWrite, isApiError, type ApiError } from '../../core';
-import type { Client, Inspection, InspectionStatus, User } from '../../core/models/domain';
+import type { Client, Inspection, InspectionStatus } from '../../core/models/domain';
 import { emptyPage, type Page, type PageParams, type Sort } from '../../core/models/page.model';
 import {
   ClientsService,
   InspectionsService,
   UsersService,
+  type InspectionAssignee,
   type InspectionFilters,
 } from '../../core/services/resources';
 import {
@@ -49,14 +50,10 @@ const STATUS_OPTIONS: readonly { value: InspectionStatus; label: string }[] = [
   { value: 'CANCELED', label: 'Cancelada' },
 ];
 
-/**
- * O backend recusa cancelar `APPROVED` e `SUBMITTED` (`InspectionService.cancel`).
- * `CANCELED` fica de fora só por coerência da tela: o backend hoje aceitaria
- * cancelar de novo e sobrescreveria data, autor e justificativa.
- */
 const NOT_CANCELABLE: ReadonlySet<InspectionStatus> = new Set<InspectionStatus>([
   'APPROVED',
   'SUBMITTED',
+  'UNDER_REVIEW',
   'CANCELED',
 ]);
 
@@ -353,7 +350,7 @@ export class InspectionsListComponent {
     row.id,
   ];
 
-  protected readonly technicians = signal<User[]>([]);
+  protected readonly technicians = signal<InspectionAssignee[]>([]);
   protected readonly clientOptions = signal<Client[]>([]);
 
   protected readonly data = signal<Page<Inspection>>(emptyPage());
@@ -542,9 +539,9 @@ export class InspectionsListComponent {
   /** Opções dos selects. Falha aqui não derruba a tela: o filtro fica só com "Todos". */
   private loadFilterOptions(): void {
     this.users
-      .list({ role: 'TECHNICIAN' as User['role'], page: 0, size: 100 })
+      .listInspectionAssignees('TECHNICIAN', { page: 0, size: 100 })
       .pipe(
-        catchError(() => of(emptyPage<User>())),
+        catchError(() => of(emptyPage<InspectionAssignee>())),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((page) => this.technicians.set(page.content));

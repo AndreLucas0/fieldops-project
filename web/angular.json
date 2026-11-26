@@ -80,7 +80,8 @@
               "buildTarget": "web:build:production"
             },
             "development": {
-              "buildTarget": "web:build:development"
+              "buildTarget": "web:build:development",
+              "proxyConfig": "proxy.conf.json"
             },
             "api": {
               "buildTarget": "web:build:api",

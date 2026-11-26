@@ -110,7 +110,7 @@ startup. Swagger em `http://localhost:8090/api/v1/swagger-ui.html`.
 ```bash
 cd web
 npm ci
-npm start        # backend fictício, nenhuma API necessária
+npm start          # API real, via proxy para localhost:8090
 npm run start:api  # API real, via proxy para localhost:8090
 ```
 
@@ -119,11 +119,13 @@ npm run start:api  # API real, via proxy para localhost:8090
 ```bash
 cd mobile
 npm ci
-npm start        # backend fictício ligado por padrão
+npm start
 ```
 
-Para falar com a API real, defina `EXPO_PUBLIC_API_MOCK=false` e
-`EXPO_PUBLIC_API_BASE_URL` apontando para o host acessível pelo aparelho.
+Defina `EXPO_PUBLIC_API_BASE_URL` no ambiente do Expo com o endereço da API
+acessível pelo aparelho. O APK da CI usa a variável `FIELDOPS_API_BASE_URL`
+do repositório quando configurada. Para homologação, aponte-a para a URL HTTPS
+da API, incluindo o prefixo `/api/v1`. Os mocks são usados nas suítes automatizadas.
 
 ### Testes
 
@@ -133,6 +135,21 @@ cd backend && ./mvnw verify    # + integração (Testcontainers, exige Docker)
 cd web     && npm test
 cd mobile  && npm test
 ```
+
+### Cenário HTTP de aceitação
+
+Em uma instância local isolada, inicie a API com PostgreSQL 16 e armazenamento
+compatível com S3. Depois que a API aplicar as migrações, carregue `db/seed.sql`
+no banco isolado. A seed recria os dados de demonstração. Com a API na porta
+18090, execute na raiz:
+
+```sh
+node backend/scripts/smoke-release.mjs http://127.0.0.1:18090/api/v1
+```
+
+O script usa a seed para criar uma inspeção, enviar o checklist, ler a foto
+pela URL assinada e validar aprovação, sincronização e histórico. Use uma
+instância com o bucket de teste acessível localmente. [Relatório de testes](docs/TEST-REPORT.md)
 
 ---
 
@@ -148,9 +165,9 @@ cd mobile  && npm test
 * Nickolas Machado
 ---
 
-## 🔑 Credenciais do modo fictício
+## 🔑 Usuários de demonstração local
 
-Senha `FieldOps@2026` ou `fieldops123` para qualquer uma das contas:
+Depois de carregar `db/seed.sql` em uma instância isolada, use `FieldOps@2026` para as contas:
 `admin@fieldops.local`, `supervisor@fieldops.local`, `tecnico@fieldops.local`.
 A conta `inativo@fieldops.local` é recusada de propósito (RN-001).
 

@@ -43,6 +43,7 @@ const NAVIGATION: readonly NavigationItem[] = [
     icon: 'report_problem',
     group: 'OPERAÇÃO',
   },
+  { label: 'Auditoria', route: '/audit', icon: 'history', group: 'OPERAÇÃO' },
 
   // Cadastros
   {

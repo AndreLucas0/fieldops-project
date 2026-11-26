@@ -49,6 +49,13 @@ const ADMIN_FEATURE_ROUTES: Routes = [
   catalogRoute('equipment', 'Equipamentos'),
   catalogRoute('users', 'Usuários'),
   catalogRoute('non-conformities', 'Não conformidades'),
+  {
+    path: 'audit',
+    title: 'Auditoria — FieldOps',
+    loadComponent: () => import('./features/audit/audit-overview.component').then(
+      (module) => module.AuditOverviewComponent,
+    ),
+  },
 ];
 
 function catalogRoute(path: string, title: string, catalog = path): Route {
@@ -100,8 +107,8 @@ export const routes: Routes = [
         path: 'inspection-templates/new',
         title: 'Novo modelo — FieldOps',
         loadComponent: () =>
-          import('./features/templates/template-builder.component').then(
-            (module) => module.TemplateBuilderComponent,
+          import('./features/templates/template-create.component').then(
+            (module) => module.TemplateCreateComponent,
           ),
       },
       {
@@ -118,6 +125,14 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/templates/template-preview.component').then(
             (module) => module.TemplatePreviewComponent,
+          ),
+      },
+      {
+        path: 'inspection-templates/:templateId/versions',
+        title: 'Versões do modelo — FieldOps',
+        loadComponent: () =>
+          import('./features/templates/template-versions.component').then(
+            (module) => module.TemplateVersionsComponent,
           ),
       },
       ...ADMIN_FEATURE_ROUTES,

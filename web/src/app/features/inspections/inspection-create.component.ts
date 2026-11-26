@@ -12,7 +12,6 @@ import type {
   InspectionSite,
   InspectionTemplate,
   InspectionTemplateVersionDetail,
-  User,
 } from '../../core/models/domain';
 import {
   ClientsService,
@@ -21,6 +20,7 @@ import {
   SitesService,
   TemplatesService,
   UsersService,
+  type InspectionAssignee,
 } from '../../core/services/resources';
 import { PageHeaderComponent } from '../../shared/components';
 
@@ -344,8 +344,8 @@ export class InspectionCreateComponent {
   protected readonly clients = signal<Client[]>([]);
   protected readonly sites = signal<InspectionSite[]>([]);
   protected readonly equipmentOptions = signal<Equipment[]>([]);
-  protected readonly technicians = signal<User[]>([]);
-  protected readonly supervisors = signal<User[]>([]);
+  protected readonly technicians = signal<InspectionAssignee[]>([]);
+  protected readonly supervisors = signal<InspectionAssignee[]>([]);
   protected readonly templates = signal<InspectionTemplate[]>([]);
 
   protected readonly templateId = signal('');
@@ -380,17 +380,13 @@ export class InspectionCreateComponent {
   private loadInitialData(): void {
     forkJoin({
       clients: this.clientsService.list({ page: 0, size: 100, status: 'ACTIVE' }),
-      technicians: this.usersService.list({
+      technicians: this.usersService.listInspectionAssignees('TECHNICIAN', {
         page: 0,
         size: 100,
-        role: 'TECHNICIAN',
-        status: 'ACTIVE',
       }),
-      supervisors: this.usersService.list({
+      supervisors: this.usersService.listInspectionAssignees('SUPERVISOR', {
         page: 0,
         size: 100,
-        role: 'SUPERVISOR',
-        status: 'ACTIVE',
       }),
       templates: this.templatesService.list({
         page: 0,
@@ -565,6 +561,7 @@ export class InspectionCreateComponent {
         instructions: this.instructions.trim() || null,
         priority: this.priority,
         scheduledFor: scheduledDate.toISOString(),
+        assignImmediately: true,
       })
       .pipe(
         catchError((error: unknown) => {
@@ -580,7 +577,7 @@ export class InspectionCreateComponent {
       )
       .subscribe((inspection) => {
         if (inspection) {
-          void this.router.navigate(['/inspections']);
+          void this.router.navigate(['/inspections', inspection.id]);
         }
       });
   }

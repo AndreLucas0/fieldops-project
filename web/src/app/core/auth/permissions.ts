@@ -49,6 +49,7 @@ export const ROUTE_PERMISSIONS: readonly RoutePermission[] = [
 
   { pattern: '/non-conformities', roles: ADMIN_AND_SUPERVISOR },
   { pattern: '/non-conformities/**', roles: ADMIN_AND_SUPERVISOR },
+  { pattern: '/audit', roles: ADMIN_AND_SUPERVISOR },
 ];
 
 /** Recursos com escrita mais restrita que a leitura (§6.6). */

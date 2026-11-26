@@ -37,6 +37,10 @@
 
       <div class="summary-grid">
         <div class="summary-item">
+          <span class="info-label">Técnico responsável</span>
+          <strong>{{ data.technicianName || 'Não informado' }}</strong>
+        </div>
+        <div class="summary-item">
           <span class="info-label">Status</span>
           <strong>{{ label('inspection', data.status) }}</strong>
         </div>
@@ -56,6 +60,11 @@
         </div>
 
         <div class="summary-item">
+          <span class="info-label">Iniciada em</span>
+          <strong>{{ data.startedAtServer ? (data.startedAtServer | date: 'dd/MM/yyyy HH:mm') : 'Não informada' }}</strong>
+        </div>
+
+        <div class="summary-item">
           <span class="info-label">Enviada em</span>
           <strong>
             {{
@@ -65,6 +74,26 @@
             }}
           </strong>
         </div>
+
+        @for (entry of [
+          { label: 'Localização no início', location: data.startLocation },
+          { label: 'Localização na conclusão', location: data.completionLocation }
+        ]; track entry.label) {
+          <div class="summary-item">
+            <span class="info-label">{{ entry.label }}</span>
+            @if (entry.location; as location) {
+              <strong>{{ location.latitude | number: '1.4-6' }}, {{ location.longitude | number: '1.4-6' }}</strong>
+              @if (location.accuracyMeters != null) {
+                <span>Precisão {{ location.accuracyMeters | number: '1.0-1' }} m</span>
+              }
+              @if (location.capturedAt) {
+                <span>{{ location.capturedAt | date: 'dd/MM/yyyy HH:mm' }}</span>
+              }
+            } @else {
+              <span>Não registrada</span>
+            }
+          </div>
+        }
       </div>
     </section>
 

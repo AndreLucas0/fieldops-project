@@ -179,7 +179,7 @@ describe('InspectionsListComponent', () => {
     expect(actions).toEqual([]);
   });
 
-  it('esconde o cancelamento em inspeções aprovadas, enviadas ou já canceladas', async () => {
+  it('esconde o cancelamento em inspeções enviadas, em revisão, aprovadas ou canceladas', async () => {
     const { component } = await render();
     const actions = component.columns().find((c) => c.field === 'actions')?.actions;
     const cancelAction = actions?.find((action) => action.id === 'cancel');
@@ -188,11 +188,11 @@ describe('InspectionsListComponent', () => {
 
     const visible = cancelAction!.visible!;
 
-    for (const status of ['APPROVED', 'SUBMITTED', 'CANCELED'] as const) {
+    for (const status of ['APPROVED', 'SUBMITTED', 'UNDER_REVIEW', 'CANCELED'] as const) {
       expect(visible(inspectionWith(status))).toBe(false);
     }
 
-    for (const status of ['DRAFT', 'ASSIGNED', 'IN_PROGRESS', 'UNDER_REVIEW', 'REJECTED'] as const) {
+    for (const status of ['DRAFT', 'ASSIGNED', 'IN_PROGRESS', 'REJECTED'] as const) {
       expect(visible(inspectionWith(status))).toBe(true);
     }
   });

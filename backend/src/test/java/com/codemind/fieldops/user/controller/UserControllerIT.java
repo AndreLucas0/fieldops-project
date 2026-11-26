@@ -158,6 +158,20 @@ class UserControllerIT {
 	}
 
 	@Test
+	void supervisorCanReadOnlyAssignableUserNamesWithoutUserManagementAccess() {
+		var supervisor = userRepository.save(newUser("Supervisora", "supervisor.it@fieldops.local", UserRole.SUPERVISOR));
+		String token = bearer(mintAccessToken(supervisor));
+		var response = mvc.get().uri("/users/inspection-assignees?role=TECHNICIAN")
+			.header("Authorization", token).exchange();
+		assertThat(response).hasStatusOk().bodyJson().extractingPath("$.content[0].id").asString()
+			.isEqualTo(technicianUser.getId().toString());
+		assertThat(response).bodyJson().doesNotHavePath("$.content[0].email");
+		assertThat(mvc.get().uri("/users").header("Authorization", token)).hasStatus(HttpStatus.FORBIDDEN);
+		assertThat(mvc.get().uri("/users/inspection-assignees?role=TECHNICIAN")
+			.header("Authorization", bearer(technicianToken))).hasStatus(HttpStatus.FORBIDDEN);
+	}
+
+	@Test
 	void supervisorCannotManageUsersWithoutThatPermissionAssigned() {
 		assertThat(mvc.get().uri("/users").header("Authorization", bearer(supervisorToken)))
 			.hasStatus(HttpStatus.FORBIDDEN);

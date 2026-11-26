@@ -39,6 +39,41 @@ const adminKey = admin.accessToken;
 const techKey = technician.accessToken;
 const reviewerKey = supervisor.accessToken;
 
+await request('/dashboard/summary', { key: reviewerKey });
+await request('/users', { key: adminKey });
+await request('/users', { key: reviewerKey, status: 403 });
+await request('/non-conformities', { key: reviewerKey });
+const assignable = await request('/users/inspection-assignees?role=TECHNICIAN', { key: reviewerKey });
+assert.deepEqual(Object.keys(assignable.content.find(user => user.id === technician.user.id)).sort(), ['id', 'name']);
+
+const template = await request('/inspection-templates', {
+  key: adminKey, method: 'POST', status: 201,
+  body: { title: 'AC-RELEASE Modelo', category: 'Homologação' },
+});
+const templatePath = `/inspection-templates/${template.id}`;
+const section = await request(`${templatePath}/sections`, {
+  key: adminKey, method: 'POST', status: 201, body: { title: 'Segurança', displayOrder: 1 },
+});
+await request(`${templatePath}/sections/${section.id}/items`, {
+  key: adminKey, method: 'POST', status: 201,
+  body: { title: 'Verificar proteção', responseType: 'TEXT_SHORT', displayOrder: 1 },
+});
+const firstVersion = await request(`${templatePath}/publish`, { key: adminKey, method: 'POST', status: 201 });
+const reopened = await request(`${templatePath}/versions/draft`, { key: reviewerKey, method: 'POST' });
+assert.notEqual(reopened[0].id, section.id);
+const reopenedItem = reopened[0].items[0];
+await request(`${templatePath}/items/${reopenedItem.id}`, {
+  key: reviewerKey, method: 'PUT',
+  body: { title: 'Verificar proteção atualizada', responseType: 'TEXT_SHORT', displayOrder: 1 },
+});
+const secondVersion = await request(`${templatePath}/publish`, { key: reviewerKey, method: 'POST', status: 201 });
+assert.equal(secondVersion.versionNumber, 2);
+const original = await request(`/inspection-template-versions/${firstVersion.id}`, { key: reviewerKey });
+assert.equal(original.sections[0].items[0].title, 'Verificar proteção');
+assert.deepEqual((await request(`${templatePath}/versions`, { key: reviewerKey })).content
+  .map(version => version.versionNumber), [2, 1]);
+console.log('Criação de modelo, construtor, nova versão e histórico imutável conferidos.');
+
 const clientId = '20000000-0000-0000-0000-000000000001';
 const siteId = '30000000-0000-0000-0000-000000000001';
 const equipmentId = '40000000-0000-0000-0000-000000000001';
@@ -50,14 +85,21 @@ const inspection = await request('/inspections', {
     clientId, siteId, equipmentId, templateVersionId, technicianId: technician.user.id,
     supervisorId: supervisor.user.id, title: 'AC-RELEASE HTTP', priority: 'MEDIUM',
     scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+    assignImmediately: true,
   },
 });
 const inspectionPath = `/inspections/${inspection.id}`;
 const mobilePath = `/mobile${inspectionPath}`;
-const assigned = await request(`${inspectionPath}/assign`, {
-  key: adminKey, method: 'POST', body: { technicianId: technician.user.id },
+assert.equal(inspection.status, 'ASSIGNED');
+
+const otherTechnician = await login('tecnico2@fieldops.local', 'TECHNICIAN');
+const assign = technicianId => request(`${inspectionPath}/assign`, {
+  key: adminKey, method: 'POST', body: { technicianId },
 });
-assert.equal(assigned.status, 'ASSIGNED');
+assert.equal((await assign(otherTechnician.user.id)).technicianId, otherTechnician.user.id);
+await request(mobilePath, { key: techKey, status: 403 });
+assert.equal((await request(mobilePath, { key: otherTechnician.accessToken })).status, 'ASSIGNED');
+assert.equal((await assign(technician.user.id)).technicianId, technician.user.id);
 
 const downloaded = await request(mobilePath, { key: techKey });
 assert.equal(downloaded.status, 'ASSIGNED');
@@ -123,7 +165,11 @@ console.log('Evidência vinculada, coordenadas gravadas, duplicata rejeitada e c
 const completion = operation('INSPECTION', inspection.id, { status: 'SUBMITTED', completedAtDevice: capturedAt, location });
 assert.equal((await push([completion])).results[0].status, 'APPLIED');
 assert.equal((await push([completion])).results[0].status, 'ALREADY_APPLIED');
-assert.equal((await request(inspectionPath, { key: adminKey })).status, 'SUBMITTED');
+const submitted = await request(inspectionPath, { key: adminKey });
+assert.equal(submitted.status, 'SUBMITTED');
+assert.equal(submitted.startLocation.latitude, location.latitude);
+assert.equal(submitted.completionLocation.longitude, location.longitude);
+assert.equal(submitted.completionLocation.accuracyMeters, location.accuracyMeters);
 assert.equal((await request(`${inspectionPath}/begin-review`, { key: reviewerKey, method: 'POST' })).status,
   'UNDER_REVIEW');
 assert.equal((await request(`${inspectionPath}/approve`, { key: reviewerKey, method: 'POST' })).status, 'APPROVED');
@@ -135,4 +181,9 @@ const history = await request(`${inspectionPath}/history`, { key: adminKey });
 for (const action of ['INSPECTION_STARTED', 'INSPECTION_SUBMITTED', 'INSPECTION_APPROVED']) {
   assert.ok(history.content.some(entry => entry.action === action), `Missing ${action} in inspection history`);
 }
+const auditPath = `/audit-events?action=INSPECTION_APPROVED&inspectionId=${inspection.id}`;
+const audit = await request(auditPath, { key: reviewerKey });
+assert.equal(audit.content.length, 1);
+assert.equal(audit.content[0].metadataJson, undefined);
+await request(auditPath, { key: techKey, status: 403 });
 console.log('Conclusão idempotente, revisão, aprovação, atualização por pull e histórico aprovados.');

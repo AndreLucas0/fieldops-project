@@ -26,6 +26,24 @@ O [quadro da entrega](../docs/FINAL-DELIVERY.md) registra as fontes consultadas,
 os requisitos pendentes e a diferença entre o cenário HTTP e o aceite em
 aparelho. A AWS retornou `InvalidClientTokenId` para a identidade configurada.
 
+Branch publicada em `origin` e submetida pelo [PR #313](https://github.com/AndreLucas0/fieldops-project/pull/313).
+O rollback local para `64b8b0a` manteve o acesso à inspeção restaurada, com
+HTTP 401 na sonda sem autenticação dessa versão. O resultado e seu impacto
+na configuração do ALB constam do [relatório de testes](../docs/TEST-REPORT.md).
+
+Após a orientação de priorizar FE-W13–FE-W21, foram restabelecidas as rotas de
+criação e versões de modelos e implementados o rascunho de nova versão,
+prévia histórica, agendamento com atribuição atômica, reatribuição e GPS na
+revisão. FE-W22 liga o modal à inspeção e FE-W23 ganhou um catálogo de auditoria
+autorizado. [Matriz de telas](pending-web.md)
+
+A execução `45907907227` do PR #313 aprovou os quatro jobs do commit inicial,
+incluindo o APK da configuração anterior. O job e os ambientes executáveis
+foram ajustados para API real conforme a orientação mais recente. Os mocks
+ficam nas suítes automatizadas. AWS permanece o destino oficial e a
+homologação depende de sessão autorizada. Não foi localizado emulador ou
+dispositivo Android disponível no host.
+
 Last updated: 2026-11-04 — recuperação integrada, PR #296.
 
 Estado mais recente: [recovery-validation-20261104.md](recovery-validation-20261104.md).

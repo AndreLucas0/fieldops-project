@@ -216,6 +216,13 @@ public class TemplateService {
     }
 
     @Transactional
+    public List<TemplateSection> openDraft(UUID templateId) {
+        TemplateVersion draft = getOrCreateDraft(getById(templateId));
+        draft.getSections().forEach(section -> section.getItems().size());
+        return draft.getSections();
+    }
+
+    @Transactional
     public TemplateSection createSection(UUID templateId, TemplateSectionCreateRequest request) {
         TemplateVersion draft = getOrCreateDraft(getById(templateId));
         requireFreeSectionOrder(draft, request.displayOrder(), null);

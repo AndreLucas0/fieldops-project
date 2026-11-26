@@ -15,8 +15,10 @@ import com.codemind.fieldops.inspection.dto.InspectionUpdateRequest;
 import com.codemind.fieldops.inspection.repository.InspectionRepository;
 import com.codemind.fieldops.inspection.repository.ItemSnapshotRepository;
 import com.codemind.fieldops.shared.audit.AuditEventDto;
+import com.codemind.fieldops.shared.audit.AuditEventPublisher;
 import com.codemind.fieldops.shared.audit.AuditService;
 import com.codemind.fieldops.shared.error.BusinessRuleViolationException;
+import com.codemind.fieldops.shared.error.ResourceConflictException;
 import com.codemind.fieldops.shared.error.ResourceNotFoundException;
 import com.codemind.fieldops.shared.pagination.PageResponse;
 import com.codemind.fieldops.site.application.SiteService;
@@ -32,6 +34,7 @@ import com.codemind.fieldops.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -59,6 +62,7 @@ public class InspectionService {
     private final EquipmentService equipmentService;
     private final UserRepository userRepository;
     private final AuditService auditService;
+    private final AuditEventPublisher auditPublisher;
 
     public InspectionService(InspectionRepository inspectionRepository,
                               ItemSnapshotRepository itemSnapshotRepository,
@@ -67,7 +71,8 @@ public class InspectionService {
                               SiteService siteService,
                               EquipmentService equipmentService,
                               UserRepository userRepository,
-                              AuditService auditService) {
+                              AuditService auditService,
+                              AuditEventPublisher auditPublisher) {
         this.inspectionRepository = inspectionRepository;
         this.itemSnapshotRepository = itemSnapshotRepository;
         this.templateVersionRepository = templateVersionRepository;
@@ -76,6 +81,7 @@ public class InspectionService {
         this.equipmentService = equipmentService;
         this.userRepository = userRepository;
         this.auditService = auditService;
+        this.auditPublisher = auditPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -122,10 +128,16 @@ public class InspectionService {
 
         Client client = clientService.getById(request.clientId());
         InspectionSite site = siteService.getById(request.siteId());
+        if (!site.getClient().getId().equals(client.getId())) {
+            throw new BusinessRuleViolationException("SITE_CLIENT_MISMATCH", "Site does not belong to the client");
+        }
 
         Equipment equipment = null;
         if (request.equipmentId() != null) {
             equipment = equipmentService.getById(request.equipmentId());
+            if (!equipment.getSite().getId().equals(site.getId())) {
+                throw new BusinessRuleViolationException("EQUIPMENT_SITE_MISMATCH", "Equipment does not belong to the site");
+            }
         }
 
         User technician = userRepository.findById(request.technicianId())
@@ -147,6 +159,7 @@ public class InspectionService {
         User createdBy = userRepository.findById(createdByUserId)
             .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND_CODE, "User not found"));
 
+        boolean assignImmediately = Boolean.TRUE.equals(request.assignImmediately());
         Inspection inspection = Inspection.builder()
             .templateVersion(templateVersion)
             .client(client)
@@ -158,7 +171,7 @@ public class InspectionService {
             .title(request.title())
             .instructions(request.instructions())
             .priority(request.priority())
-            .status(InspectionStatus.DRAFT)
+            .status(assignImmediately ? InspectionStatus.ASSIGNED : InspectionStatus.DRAFT)
             .scheduledFor(request.scheduledFor())
             .build();
 
@@ -166,6 +179,9 @@ public class InspectionService {
 
         // Create snapshots from template version
         createSnapshots(savedInspection, templateVersion);
+        if (assignImmediately) {
+            auditAssignment(savedInspection, createdByUserId, null);
+        }
 
         return savedInspection;
     }
@@ -173,6 +189,9 @@ public class InspectionService {
     @Transactional
     public Inspection update(UUID id, InspectionUpdateRequest request) {
         Inspection inspection = getById(id);
+        if (!canChangePlanning(inspection)) {
+            throw new ResourceConflictException("INSPECTION_CANNOT_BE_UPDATED", "Inspection planning is locked");
+        }
         inspection.setTitle(request.title());
         inspection.setInstructions(request.instructions());
         inspection.setPriority(request.priority());
@@ -181,12 +200,12 @@ public class InspectionService {
     }
 
     @Transactional
-    public Inspection assign(UUID id, AssignInspectionRequest request) {
+    public Inspection assign(UUID id, UUID actorId, AssignInspectionRequest request) {
         Inspection inspection = getById(id);
 
-        if (inspection.getStatus() != InspectionStatus.DRAFT) {
-            throw new BusinessRuleViolationException(INSPECTION_CANNOT_BE_ASSIGNED_CODE,
-                "Only DRAFT inspections can be assigned");
+        if (!canChangePlanning(inspection)) {
+            throw new ResourceConflictException(INSPECTION_CANNOT_BE_ASSIGNED_CODE,
+                "Only DRAFT or ASSIGNED inspections can be assigned");
         }
 
         User technician = userRepository.findById(request.technicianId())
@@ -199,18 +218,36 @@ public class InspectionService {
             throw new BusinessRuleViolationException(TECHNICIAN_NOT_ACTIVE_CODE, "Technician is not active");
         }
 
+        var previousAssignment = Map.<String, Object>of(
+            "status", inspection.getStatus().name(), "technicianId", inspection.getTechnician().getId());
+        if (inspection.getStatus() == InspectionStatus.ASSIGNED && inspection.getTechnician().getId().equals(technician.getId())) {
+            return inspection;
+        }
         inspection.setTechnician(technician);
         inspection.setStatus(InspectionStatus.ASSIGNED);
-        return inspectionRepository.save(inspection);
+        Inspection saved = inspectionRepository.save(inspection);
+        auditAssignment(saved, actorId, previousAssignment);
+        return saved;
+    }
+
+    private static boolean canChangePlanning(Inspection inspection) {
+        return inspection.getStatus() == InspectionStatus.DRAFT || inspection.getStatus() == InspectionStatus.ASSIGNED;
+    }
+
+    private void auditAssignment(Inspection inspection, UUID actorId, Map<String, Object> previousAssignment) {
+        UUID id = inspection.getId();
+        auditPublisher.record("INSPECTION_ASSIGNED", "INSPECTION", id, id, actorId, previousAssignment,
+            Map.of("status", InspectionStatus.ASSIGNED.name(), "technicianId", inspection.getTechnician().getId()), null);
     }
 
     @Transactional
     public Inspection cancel(UUID id, UUID canceledByUserId, CancelInspectionRequest request) {
         Inspection inspection = getById(id);
 
-        if (inspection.getStatus() == InspectionStatus.APPROVED ||
-            inspection.getStatus() == InspectionStatus.SUBMITTED) {
-            throw new BusinessRuleViolationException(INSPECTION_CANNOT_BE_CANCELED_CODE,
+        InspectionStatus previousStatus = inspection.getStatus();
+        if (!canChangePlanning(inspection) && previousStatus != InspectionStatus.IN_PROGRESS
+                && previousStatus != InspectionStatus.REJECTED) {
+            throw new ResourceConflictException(INSPECTION_CANNOT_BE_CANCELED_CODE,
                 "Inspection in status " + inspection.getStatus() + " cannot be canceled");
         }
 
@@ -221,7 +258,10 @@ public class InspectionService {
         inspection.setCanceledAt(Instant.now());
         inspection.setCanceledBy(canceledBy);
         inspection.setCanceledReason(request.reason());
-        return inspectionRepository.save(inspection);
+        Inspection saved = inspectionRepository.save(inspection);
+        auditPublisher.record("INSPECTION_CANCELED", "INSPECTION", id, id, canceledByUserId,
+            Map.of("status", previousStatus.name()), Map.of("status", InspectionStatus.CANCELED.name()), null);
+        return saved;
     }
 
     private void createSnapshots(Inspection inspection, TemplateVersion templateVersion) {

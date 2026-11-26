@@ -64,6 +64,8 @@ import {
   type ClientFilters,
   type EquipmentFilters,
   type InspectionFilters,
+  type InspectionCreateInput,
+  type InspectionAssigneeRole,
   type NonConformityFilters,
   type SiteFilters,
   type TemplateFilters,
@@ -139,6 +141,11 @@ export class MockUsersService extends MockBase implements UsersService {
       matchesFilters(user as unknown as Record<string, unknown>, { name, email, role, status }),
     );
     return this.page(filtered, query);
+  }
+
+  listInspectionAssignees(role: InspectionAssigneeRole, query: PageQuery = {}) {
+    return this.page(this.db.users.filter(user => user.role === role && user.status === 'ACTIVE')
+      .map(({ id, name }) => ({ id, name })), query);
   }
 
   get(id: Uuid): Observable<User> {
@@ -529,6 +536,23 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
     return this.respond(() => this.db.draftSections[templateId] ?? []);
   }
 
+  openDraft(templateId: Uuid): Observable<TemplateSectionDetail[]> {
+    return this.respond(() => {
+      const template = this.require(findById(this.db.templates, templateId), '/inspection-templates', templateId);
+      if (template.status === 'INACTIVE') this.requireDraftTemplate(templateId);
+      const active = this.db.templateVersions.find(version =>
+        version.templateId === templateId && version.activeForNewInspections,
+      );
+      return this.db.draftSections[templateId] ??= (active?.sections ?? []).map(section => {
+        const sectionId = nextMockId('5600');
+        return {
+          ...section, id: sectionId,
+          items: (section.items ?? []).map(item => ({ ...item, id: nextMockId('5700'), sectionId })),
+        };
+      });
+    });
+  }
+
   createSection(
     templateId: Uuid,
     input: Partial<TemplateSection>,
@@ -643,14 +667,14 @@ export class MockTemplatesService extends MockBase implements TemplatesService {
     });
   }
 
-  /** RN-018: só modelos DRAFT têm versão rascunho editável. */
   private requireDraftTemplate(templateId: Uuid): InspectionTemplate {
     const template = this.require(
       findById(this.db.templates, templateId),
       '/inspection-templates',
       templateId,
     );
-    if (template.status !== 'DRAFT') {
+    if (template.status !== 'DRAFT' &&
+        !(template.status === 'ACTIVE' && this.db.draftSections[templateId])) {
       throw new ApiError({
         kind: 'CONFLICT',
         status: 409,
@@ -697,6 +721,8 @@ export class MockInspectionsService extends MockBase implements InspectionsServi
 
       return {
         ...inspection,
+        technicianName: findById(this.db.users, inspection.technicianId)?.name,
+        supervisorName: inspection.supervisorId ? findById(this.db.users, inspection.supervisorId)?.name : null,
         items: this.db.items[id] ?? [],
         responses: this.db.responses[id] ?? [],
         nonConformities: this.db.nonConformities.filter((nc) => nc.inspectionId === id),
@@ -705,7 +731,7 @@ export class MockInspectionsService extends MockBase implements InspectionsServi
     });
   }
 
-  create(input: Partial<Inspection>): Observable<Inspection> {
+  create(input: InspectionCreateInput): Observable<Inspection> {
     return this.respond(() => {
       const equipmentId = input.equipmentId ?? null;
 
@@ -735,7 +761,7 @@ export class MockInspectionsService extends MockBase implements InspectionsServi
         title: input.title ?? null,
         instructions: input.instructions ?? null,
         priority: input.priority ?? 'MEDIUM',
-        status: 'ASSIGNED',
+        status: input.assignImmediately ? 'ASSIGNED' : 'DRAFT',
         scheduledFor: input.scheduledFor ?? nowIso(),
         ...auditFields(),
       };
@@ -775,6 +801,10 @@ export class MockInspectionsService extends MockBase implements InspectionsServi
     return this.respond(() =>
       this.require(updateEntity(this.db.inspections, id, input), '/inspections', id),
     );
+  }
+
+  assign(id: Uuid, technicianId: Uuid): Observable<Inspection> {
+    return this.update(id, { technicianId, status: 'ASSIGNED' });
   }
 
   cancel(id: Uuid, reason: string): Observable<Inspection> {

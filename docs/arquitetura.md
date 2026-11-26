@@ -388,3 +388,9 @@ Cada ambiente deverá possuir:
 | RNF-010 | Dados sensíveis não deverão ser incluídos no repositório. |
 | RNF-011 | Alterações críticas deverão ser auditáveis. |
 | RNF-012 | Os componentes deverão poder ser executados por instruções documentadas. |
+
+## 11.15 Perfil de produção da API
+
+Ative o perfil com `SPRING_PROFILES_ACTIVE=prod`. Configure `DB_URL`, `DB_USER` e `DB_PASSWORD` para o PostgreSQL. O Flyway aplica as migrações e o Hibernate valida o mapeamento contra o schema. Injete `JWT_SECRET` com pelo menos 32 bytes, configure `CORS_ALLOWED_ORIGINS` com as origens HTTPS do painel e informe `EVIDENCE_STORAGE_REGION` e `EVIDENCE_STORAGE_BUCKET`. O cliente S3 e o assinador usam os endpoints e a cadeia de credenciais do SDK, que pode obter credenciais temporárias do papel de uma tarefa ECS. Swagger e a exposição automática do OpenAPI ficam desabilitados nesse perfil.
+
+O ambiente local mantém as configurações do emulador S3. A validação com PostgreSQL e S3 reais depende de um ambiente isolado.

@@ -1,5 +1,27 @@
 # Entrega parcial do FieldOps
 
+## Situação em 26 de novembro de 2026
+
+**Definition of Done do MVP em aberto.** O workspace oficial foi validado e
+`origin/develop` já continha a linha de base e o perfil de produção, pelos
+merges `64b8b0a` e `3161d10`. As instruções de abertura dos PRs da rodada
+anterior permanecem abaixo como histórico.
+
+| Etapa | Evidência e pendências |
+|---|---|
+| 1. Linha de base e RN-029 | Correção integrada em `develop`. A auditoria registra que a interface web usa mínimo de dez caracteres, enquanto o OpenAPI aceita uma justificativa de um caractere. A regra local exige justificativa, autor e data. O caráter intencional do limite da interface continua sem confirmação. |
+| 2. Requisitos e design | Foram preservados o [plano local](IMPLEMENTATION-PLAN.md), a [Definition of Done](definition-of-done.md), os [critérios de aceitação](criterios-de-aceitacao.md) e a [matriz de rastreabilidade](REQUIREMENTS-TRACEABILITY.md). O texto integral do anexo original da missão não estava acessível nesta retomada. A equivalência entre as fontes, eventuais requisitos exclusivos do anexo, o conteúdo acadêmico do Notion e a paridade visual autenticada com o Lovable seguem sem confirmação. |
+| 3. API e persistência | Teste do perfil `prod` cobre health check, CORS, autenticação e Swagger desabilitado. A suíte passou a usar PostgreSQL 16, como o Compose. A API executada aplicou V1–V14 em banco vazio. |
+| 4. Fluxo de inspeção | Um ciclo HTTP real em `prod` passou com logins, agendamento, atribuição, download, resolução de QR, localização fornecida no payload, foto, reenvios, aprovação e retorno por pull. O proxy do servidor Angular retornou a inspeção aprovada. A automação de navegador ficou indisponível. Captura física, SQLite e reconexão em aparelho Android continuam sem evidência ponta a ponta. |
+| 5. Preparação de produção | Imagem Java 21 construída e iniciada como usuário sem privilégios. Backup PostgreSQL restaurado em banco separado e a API iniciou sobre a restauração. O perfil AWS local retornou `InvalidClientTokenId` em `sts get-caller-identity`. Deploy, IAM, RDS, S3 gerenciado, publicação do OpenAPI e rollback em AWS seguem em aberto. |
+| 6. Integração | O incremento foi preparado na branch `task/fieldops-mission-20261126`, criada de `64b8b0a`. A publicação e o estado remoto são registrados em [progresso](../project-state/progress.md). |
+
+Os [resultados por componente](TEST-REPORT.md) distinguem o cenário HTTP do
+teste em aparelho exigido pelo AC-RELEASE. O export Android gera o bundle Expo.
+A instalação de um APK continua pendente.
+
+## Histórico de 25 de novembro de 2026
+
 **INCOMPLETE** em 25 de novembro de 2026.
 
 A API passou a exigir justificativa válida de cancelamento (RN-029) e o OpenAPI documenta o limite de 500 caracteres. O commit `2b01a60` inclui a validação unitária e os cenários HTTP aprovados no teste de agendamento. O commit `6275849` remove a dependência da latência simulada da suíte de detalhe mobile.

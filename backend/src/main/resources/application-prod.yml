@@ -13,6 +13,16 @@ springdoc:
   swagger-ui:
     enabled: false
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+
 fieldops:
   security:
     jwt:

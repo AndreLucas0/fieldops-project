@@ -34,7 +34,9 @@ import com.codemind.fieldops.user.domain.UserStatus;
 import com.codemind.fieldops.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -81,6 +83,11 @@ class InspectionHistoryControllerIT {
     private Client testClient;
     private InspectionSite testSite;
     private Inspection testInspection;
+
+    @AfterEach
+    void clearAuditEvents() {
+        auditEventRepository.deleteAll();
+    }
 
     @BeforeEach
     void setUp() {
@@ -145,6 +152,23 @@ class InspectionHistoryControllerIT {
 
     private String bearer(String token) {
         return "Bearer " + token;
+    }
+
+    @Test
+    void auditOverviewIsRestrictedAndOmitsDetailedPayloads() {
+        UUID id = testInspection.getId();
+        auditEventRepository.save(AuditEvent.builder().inspectionId(id).actorId(technicianUser.getId())
+            .action("INSPECTION_STARTED").entityType("INSPECTION").entityId(id)
+            .metadataJson(Map.of("latitude", -23.5)).build());
+        for (String token : List.of(adminToken, supervisorToken)) {
+            var response = mvc.get().uri("/audit-events?action=inspection_started&inspectionId=" + id)
+                .header("Authorization", bearer(token)).exchange();
+            assertThat(response).hasStatusOk().bodyJson().extractingPath("$.content[0].action").asString()
+                .isEqualTo("INSPECTION_STARTED");
+            assertThat(response).bodyJson().doesNotHavePath("$.content[0].metadataJson");
+        }
+        assertThat(mvc.get().uri("/audit-events").header("Authorization", bearer(technicianToken)))
+            .hasStatus(HttpStatus.FORBIDDEN);
     }
 
     @Test

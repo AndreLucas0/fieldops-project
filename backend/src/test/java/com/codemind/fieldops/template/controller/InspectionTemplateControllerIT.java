@@ -263,6 +263,21 @@ class InspectionTemplateControllerIT {
             .hasStatusOk()
             .bodyJson()
             .extractingPath("$.status").asString().isEqualTo("ACTIVE");
+
+        String[] draftSection = {null};
+        String draftPath = "/inspection-templates/" + id + "/versions/draft";
+        var opened = mvc.post().uri(draftPath).header("Authorization", bearer(adminToken)).exchange();
+        assertThat(opened).hasStatusOk().bodyJson().extractingPath("$[0].id").asString()
+            .satisfies(sectionId -> draftSection[0] = sectionId);
+        assertThat(opened).bodyJson().extractingPath("$[0].items[0].title").asString().isEqualTo("I1");
+        assertThat(mvc.post().uri(draftPath).header("Authorization", bearer(adminToken)))
+            .hasStatusOk().bodyJson().extractingPath("$[0].id").asString().isEqualTo(draftSection[0]);
+        assertThat(mvc.post().uri("/inspection-templates/" + id + "/publish")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatus(HttpStatus.CREATED).bodyJson().extractingPath("$.versionNumber").asNumber().isEqualTo(2);
+        assertThat(mvc.get().uri("/inspection-templates/" + id + "/versions")
+            .header("Authorization", bearer(adminToken)))
+            .hasStatusOk().bodyJson().extractingPath("$.content[*].versionNumber").asList().containsExactly(2, 1);
     }
 
     @Test

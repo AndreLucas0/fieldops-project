@@ -6,7 +6,7 @@
  * `required` vira opcional.
  */
 
-import type { IsoDate, IsoDateTime, JsonObject, Uuid } from './common';
+import type { GeoLocation, IsoDate, IsoDateTime, JsonObject, Uuid } from './common';
 import type {
   ActiveStatus,
   Conformity,
@@ -283,7 +283,13 @@ export interface InspectionDetail extends Inspection {
   responses?: InspectionResponse[];
   nonConformities?: NonConformity[];
   reviews?: InspectionReview[];
+  technicianName?: string | null;
+  supervisorName?: string | null;
+  startLocation?: InspectionLocation | null;
+  completionLocation?: InspectionLocation | null;
 }
+
+export type InspectionLocation = Omit<GeoLocation, 'capturedAt'> & { capturedAt: IsoDateTime | null };
 
 // ---------- Auditoria ----------
 

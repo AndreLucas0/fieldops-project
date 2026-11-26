@@ -4,17 +4,17 @@ import {
     ChangeDetectionStrategy,
     Component,
   DestroyRef,
-    OnInit,
+    OnChanges,
     computed,
     inject,
     input,
     signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { catchError, finalize, forkJoin, of, switchMap } from 'rxjs';
+import { catchError, finalize, map, of, type Subscription, switchMap } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
-import { AuthStore, canWrite, isApiError, type ApiError } from '../../core';
+import { ApiError, AuthStore, canWrite, isApiError } from '../../core';
 import type {
     InspectionTemplate,
     TemplateItem,
@@ -45,7 +45,7 @@ import { RESPONSE_TYPE_LABELS } from './template-item-form-dialog.component';
     template: `
     <div class="page">
       <app-page-header
-        [title]="template()?.title ?? 'Prévia do modelo'"
+        [title]="previewTitle() ?? template()?.title ?? 'Prévia do modelo'"
         subtitle="Visualização de como o checklist será apresentado."
         [breadcrumbs]="[
           { label: 'Modelos de inspeção', link: '/inspection-templates' },
@@ -477,14 +477,17 @@ import { RESPONSE_TYPE_LABELS } from './template-item-form-dialog.component';
     }
   `,
 })
-export class TemplatePreviewComponent implements OnInit {
+export class TemplatePreviewComponent implements OnChanges {
     private readonly templates = inject(TemplatesService);
     private readonly auth = inject(AuthStore);
     private readonly confirm = inject(ConfirmDialogService);
     private readonly router = inject(Router);
     private readonly destroyRef = inject(DestroyRef);
+    private loadRequest?: Subscription;
 
     readonly templateId = input.required<string>();
+    readonly versionId = input<string>();
+    readonly draft = input<string>();
 
     protected readonly loading = signal(false);
     protected readonly error = signal<ApiError | null>(null);
@@ -492,6 +495,8 @@ export class TemplatePreviewComponent implements OnInit {
     protected readonly template = signal<InspectionTemplate | null>(null);
     protected readonly sections = signal<TemplateSectionDetail[]>([]);
     protected readonly previewVersion = signal<number | null>(null);
+    protected readonly previewTitle = signal<string | null>(null);
+    private readonly showingDraft = signal(false);
 
     protected readonly totalItems = computed(() =>
         this.sections().reduce(
@@ -504,33 +509,34 @@ export class TemplatePreviewComponent implements OnInit {
         () =>
             !this.loading() &&
             !this.error() &&
-            this.template()?.status === 'DRAFT' &&
+            this.showingDraft() &&
             canWrite('inspection-templates', this.auth.role()) &&
             this.sections().some((section) => (section.items?.length ?? 0) > 0),
     );
 
-    ngOnInit(): void {
+    ngOnChanges(): void {
         this.load();
     }
 
     protected load(): void {
+        this.loadRequest?.unsubscribe();
         this.loading.set(true);
         this.error.set(null);
+        this.showingDraft.set(false);
+        this.previewTitle.set(null);
 
-        this.templates
+        this.loadRequest = this.templates
             .get(this.templateId())
             .pipe(
                 switchMap((template) => {
                     this.template.set(template);
 
-                    if (template.status === 'DRAFT') {
+                    const versionId = this.versionId();
+                    if (versionId) return this.publishedPreview(template.id, versionId);
+
+                    if (template.status === 'DRAFT' || (template.status === 'ACTIVE' && this.draft() === '1')) {
                         return this.templates.listDraftSections(template.id).pipe(
-                            switchMap((sections) =>
-                                of({
-                                    sections,
-                                    version: null as number | null,
-                                }),
-                            ),
+                            map(sections => ({ sections, version: null, title: null, draft: true })),
                         );
                     }
 
@@ -543,26 +549,23 @@ export class TemplatePreviewComponent implements OnInit {
                             if (!version) {
                                 return of({
                                     sections: [] as TemplateSectionDetail[],
-                                    version: null as number | null,
+                                    version: null, title: null, draft: false,
                                 });
                             }
 
-                            return this.templates.getVersion(version.id).pipe(
-                                switchMap((detail) =>
-                                    of({
-                                        sections: detail.sections ?? [],
-                                        version: detail.versionNumber,
-                                    }),
-                                ),
-                            );
+                            return this.publishedPreview(template.id, version.id);
                         }),
                     );
                 }),
                 catchError((thrown: unknown) => {
-                    this.error.set(isApiError(thrown) ? thrown : null);
+                    this.error.set(isApiError(thrown) ? thrown : new ApiError({
+                        kind: 'UNKNOWN', status: 0, code: 'PREVIEW_LOAD_FAILED',
+                        userMessage: 'Não foi possível carregar a prévia.',
+                    }));
                     return of(null);
                 }),
                 finalize(() => this.loading.set(false)),
+                takeUntilDestroyed(this.destroyRef),
             )
             .subscribe((result) => {
                 if (!result) return;
@@ -579,7 +582,20 @@ export class TemplatePreviewComponent implements OnInit {
                 );
 
                 this.previewVersion.set(result.version);
+                this.previewTitle.set(result.title);
+                this.showingDraft.set(result.draft);
             });
+    }
+
+    private publishedPreview(templateId: string, versionId: string) {
+        return this.templates.getVersion(versionId).pipe(map(detail => {
+            if (detail.templateId !== templateId) {
+                throw new ApiError({ kind: 'NOT_FOUND', status: 404, code: 'TEMPLATE_VERSION_MISMATCH',
+                    userMessage: 'Esta versão não pertence ao modelo selecionado.' });
+            }
+            return { sections: detail.sections ?? [], version: detail.versionNumber,
+                title: detail.titleSnapshot, draft: false };
+        }));
     }
 
     protected responseTypeLabel(item: TemplateItem): string {

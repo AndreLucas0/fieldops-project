@@ -15,6 +15,7 @@ import { canWrite } from '../../core/auth/permissions';
 import { MatDialog } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { InspectionPlanningDialogComponent } from './inspection-planning-dialog.component';
+import { InspectionAssignmentDialogComponent } from './inspection-assignment-dialog.component';
 import { InspectionCancelDialogComponent } from './inspection-cancel-dialog.component';
 
 import type {
@@ -22,10 +23,9 @@ import type {
   Client,
   Equipment,
   Evidence,
-  Inspection,
+  InspectionDetail,
   InspectionSite,
   InspectionTemplateVersionDetail,
-  User,
 } from '../../core/models/domain';
 
 import {
@@ -34,7 +34,6 @@ import {
   InspectionsService,
   SitesService,
   TemplatesService,
-  UsersService,
 } from '../../core/services/resources';
 
 @Component({
@@ -53,7 +52,6 @@ export class InspectionDetailComponent {
   private readonly clientsService = inject(ClientsService);
   private readonly sitesService = inject(SitesService);
   private readonly equipmentService = inject(EquipmentService);
-  private readonly usersService = inject(UsersService);
   private readonly templatesService = inject(TemplatesService);
 
   private readonly authStore = inject(AuthStore);
@@ -67,8 +65,21 @@ export class InspectionDetailComponent {
     () =>
       canWrite('inspections', this.authStore.role()) &&
       !!this.inspection() &&
-      !['APPROVED', 'SUBMITTED', 'CANCELED'].includes(this.inspection()!.status),
+      ['DRAFT', 'ASSIGNED', 'IN_PROGRESS', 'REJECTED'].includes(this.inspection()!.status),
   );
+
+  protected assignTechnician(): void {
+    const inspection = this.inspection();
+    if (!inspection || !this.canEditPlanning()) return;
+    this.dialog.open(InspectionAssignmentDialogComponent, {
+      data: { inspection }, width: '32rem', maxWidth: '95vw', restoreFocus: true,
+    }).afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(updated => {
+      if (updated) {
+        this.loadInspection(inspection.id);
+        this.loadHistory(inspection.id);
+      }
+    });
+  }
 
   protected editPlanning(): void {
     const inspection = this.inspection();
@@ -112,13 +123,11 @@ export class InspectionDetailComponent {
 
   protected readonly isSupervisor = computed(() => this.authStore.role() === 'SUPERVISOR');
 
-  protected readonly inspection = signal<Inspection | null>(null);
+  protected readonly inspection = signal<InspectionDetail | null>(null);
 
   protected readonly client = signal<Client | null>(null);
   protected readonly site = signal<InspectionSite | null>(null);
   protected readonly equipment = signal<Equipment | null>(null);
-  protected readonly technician = signal<User | null>(null);
-  protected readonly supervisor = signal<User | null>(null);
   protected readonly templateVersion = signal<InspectionTemplateVersionDetail | null>(null);
 
   protected readonly history = signal<AuditEvent[]>([]);
@@ -160,14 +169,8 @@ export class InspectionDetailComponent {
 
         this.loadClient(result.clientId);
         this.loadSite(result.siteId);
-        this.loadTechnician(result.technicianId);
-
         if (result.equipmentId) {
           this.loadEquipment(result.equipmentId);
-        }
-
-        if (result.supervisorId) {
-          this.loadSupervisor(result.supervisorId);
         }
 
         this.loadTemplateVersion(result.templateVersionId);
@@ -202,26 +205,6 @@ export class InspectionDetailComponent {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((result) => this.equipment.set(result));
-  }
-
-  private loadTechnician(id: string): void {
-    this.usersService
-      .get(id)
-      .pipe(
-        catchError(() => of(null)),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe((result) => this.technician.set(result));
-  }
-
-  private loadSupervisor(id: string): void {
-    this.usersService
-      .get(id)
-      .pipe(
-        catchError(() => of(null)),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe((result) => this.supervisor.set(result));
   }
 
   private loadTemplateVersion(id: string): void {

@@ -42,6 +42,9 @@
           <button matButton="outlined" type="button" (click)="editPlanning()">
             Editar planejamento
           </button>
+          <button matButton type="button" (click)="assignTechnician()">
+            {{ item.status === 'DRAFT' ? 'Atribuir técnico' : 'Reatribuir técnico' }}
+          </button>
         }
         @if (canCancel()) {
           <button matButton type="button" (click)="cancelInspection()">Cancelar inspeção</button>
@@ -85,12 +88,12 @@
 
           <div class="detail-field">
             <span class="field-label">Técnico responsável</span>
-            <span class="field-value">{{ technician()?.name || '—' }}</span>
+            <span class="field-value">{{ item.technicianName || '—' }}</span>
           </div>
 
           <div class="detail-field">
             <span class="field-label">Supervisor</span>
-            <span class="field-value">{{ supervisor()?.name || '—' }}</span>
+            <span class="field-value">{{ item.supervisorName || '—' }}</span>
           </div>
 
           <div class="detail-field">

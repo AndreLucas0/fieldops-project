@@ -12,6 +12,19 @@ base Temurin 21 é fixada por digest. O cenário HTTP usa os dados de catálogo 
 usuários da seed apenas em ambiente local isolado. O APK da CI usa dados
 simulados e a assinatura de teste fornecida pelo template Expo.
 
+## 2026-11-26 — Modelos, agendamento e ambientes de teste
+
+`POST /inspection-templates/{id}/versions/draft` reaproveita a clonagem do
+checklist publicado. Prévia e histórico selecionam snapshots por ID, e os
+dados gerais de um modelo ativo continuam protegidos pelo contrato existente.
+O incremento do agendamento adiciona `assignImmediately`, mantendo o estado
+`DRAFT` para consumidores que omitem o parâmetro. O painel solicita a
+atribuição no mesmo ato. Reatribuição permite DRAFT e ASSIGNED. O catálogo
+global de auditoria oferece apenas o resumo para ADMIN e SUPERVISOR.
+
+O APK configurado posteriormente à primeira CI usa API real e assinatura
+de teste do template Expo. Apenas as suítes automatizadas habilitam mocks.
+
 ## 2026-11-04 — recuperação preserva contrato e histórico
 
 Autorizada execução integral pelo usuário. Base isolada de develop incorpora

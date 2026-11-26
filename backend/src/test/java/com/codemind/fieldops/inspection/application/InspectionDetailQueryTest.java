@@ -15,7 +15,11 @@ import com.codemind.fieldops.nonconformity.mapper.NonConformityMapper;
 import com.codemind.fieldops.nonconformity.repository.NonConformityRepository;
 import com.codemind.fieldops.review.mapper.InspectionReviewMapper;
 import com.codemind.fieldops.review.repository.InspectionReviewRepository;
+import com.codemind.fieldops.shared.audit.AuditEvent;
+import com.codemind.fieldops.shared.audit.AuditEventRepository;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -31,6 +35,7 @@ class InspectionDetailQueryTest {
         var ncMapper = mock(NonConformityMapper.class);
         var reviews = mock(InspectionReviewRepository.class);
         var reviewMapper = mock(InspectionReviewMapper.class);
+        var events = mock(AuditEventRepository.class);
         var id = UUID.randomUUID();
         var inspection = mock(Inspection.class);
         var metadata = mock(InspectionResponse.class);
@@ -40,13 +45,20 @@ class InspectionDetailQueryTest {
         when(mapper.toResponse(inspection)).thenReturn(metadata);
         when(snapshots.findByInspectionIdOrderBySectionOrderAscItemOrderAsc(id)).thenReturn(List.of(snapshot));
         when(responseMapper.toSnapshotDto(snapshot)).thenReturn(snapshotDto);
+        when(events.findFirstByInspectionIdAndActionOrderByOccurredAtDescIdDesc(id, "INSPECTION_STARTED"))
+            .thenReturn(Optional.of(AuditEvent.builder().metadataJson(Map.of(
+                "latitude", 0.0, "longitude", -47.4, "accuracyMeters", 12)).build()));
         var query = new InspectionDetailQuery(service, mapper, snapshots, responses, responseMapper,
-            nonConformities, ncMapper, reviews, reviewMapper);
+            nonConformities, ncMapper, reviews, reviewMapper, events);
         var detail = query.get(id);
         assertThat(detail.inspection()).isSameAs(metadata);
         assertThat(detail.items()).containsExactly(snapshotDto);
         assertThat(detail.responses()).isEmpty();
         assertThat(detail.nonConformities()).isEmpty();
         assertThat(detail.reviews()).isEmpty();
+        assertThat(detail.startLocation().latitude()).isZero();
+        assertThat(detail.startLocation().accuracyMeters()).isEqualTo(12.0);
+        assertThat(detail.startLocation().capturedAt()).isNull();
+        assertThat(detail.completionLocation()).isNull();
     }
 }

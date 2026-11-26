@@ -39,7 +39,7 @@ describe('Planejamento — integridade do contexto selecionado (RN-025/027)', ()
         { provide: SitesService, useValue: sites },
         { provide: TemplatesService, useValue: templates },
         { provide: ClientsService, useValue: { list: () => of(emptyPage()) } },
-        { provide: UsersService, useValue: { list: () => of(emptyPage()) } },
+        { provide: UsersService, useValue: { listInspectionAssignees: () => of(emptyPage()) } },
         { provide: EquipmentService, useValue: { listBySite: () => of(emptyPage()) } },
         { provide: InspectionsService, useValue: { create } },
       ],
@@ -73,12 +73,15 @@ describe('Planejamento — integridade do contexto selecionado (RN-025/027)', ()
     component.submit();
     expect(create).toHaveBeenCalledTimes(1);
   });
-  it('preserva o horário escolhido no contrato ISO', () => {
+  it('preserva o horário ISO e solicita atribuição na mesma operação', () => {
     const { component, create } = setup();
     fill(component);
     component.submit();
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ scheduledFor: new Date('2026-11-05T14:30').toISOString() }),
+      expect.objectContaining({
+        scheduledFor: new Date('2026-11-05T14:30').toISOString(),
+        assignImmediately: true,
+      }),
     );
   });
   it('não lança exceção nem envia uma data inválida', () => {

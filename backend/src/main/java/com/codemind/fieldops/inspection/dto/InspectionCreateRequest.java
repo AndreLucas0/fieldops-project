@@ -16,5 +16,6 @@ public record InspectionCreateRequest(
     @Size(max = 200) String title,
     @Size(max = 1000) String instructions,
     @NotNull InspectionPriority priority,
-    @NotNull Instant scheduledFor) {
+    @NotNull Instant scheduledFor,
+    Boolean assignImmediately) {
 }

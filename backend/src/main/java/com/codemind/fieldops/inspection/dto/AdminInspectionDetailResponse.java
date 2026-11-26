@@ -11,5 +11,9 @@ public record AdminInspectionDetailResponse(
     List<ItemSnapshotDto> items,
     List<MobileInspectionResponseDto> responses,
     List<MobileNonConformityDto> nonConformities,
-    List<InspectionReviewResponse> reviews) {
+    List<InspectionReviewResponse> reviews,
+    String technicianName,
+    String supervisorName,
+    InspectionLocationDto startLocation,
+    InspectionLocationDto completionLocation) {
 }

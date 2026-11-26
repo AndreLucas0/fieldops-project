@@ -25,12 +25,22 @@ O perfil `prod` oculta detalhes e componentes e mantém o Swagger desabilitado.
 O build Angular usa `/api/v1`. Encaminhe esse prefixo para a origem da API no
 CloudFront e sirva as rotas do painel pela origem do build estático.
 
+O perfil `prod` limita logs de corpos HTTP, comandos SQL, parâmetros SQL e
+requisições do SDK S3. Mantenha esses níveis na configuração da tarefa. Para
+RDS, configure TLS com verificação de certificado e hostname no `DB_URL` e
+forneça à JVM a cadeia de confiança do RDS usada pela instância.
+
 1. Criar e validar imagem imutável da API e build do painel com URL HTTPS da API.
 2. Configurar rede, papéis, segredos, banco, bucket e logs no ambiente autorizado.
 3. Restaurar dados sanitizados em ambiente de validação e aplicar Flyway V1–V14 conforme a versão do artefato.
 4. Validar o health check pelo ALB e testar autenticação, upload, leitura, exclusão e expiração de evidência no ambiente AWS de teste.
 5. Monitorar erros HTTP, latência, tarefas, conexões do banco e erros de armazenamento no CloudWatch, omitindo tokens e URLs assinadas dos logs.
 6. Para rollback, reimplantar a definição de tarefa e o artefato web anteriores após confirmar compatibilidade com o schema. Em caso de recuperação de dados, restaurar o RDS em instância separada e validar a integridade antes de redirecionar a API.
+
+O rollback local para `64b8b0a` confirmou que a revisão anterior lê o schema
+V14 e a inspeção aprovada do banco restaurado. Nessa revisão, a mesma sonda
+do ALB recebe HTTP 401 sem JWT. Ao planejar uma reversão para esse artefato,
+valide uma configuração de health check compatível antes de trocar o tráfego.
 
 Habilite backups automatizados e recuperação pontual no RDS. Revise o versionamento e o ciclo de vida do S3. Dimensione o custo com região, volume de evidências, tráfego, banco e número de tarefas.
 

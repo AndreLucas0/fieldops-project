@@ -5,17 +5,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.codemind.fieldops.FieldopsApplication;
 import com.codemind.fieldops.TestcontainersConfiguration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(classes = FieldopsApplication.class, properties = {
+	"debug=true",
 	"JWT_SECRET=fieldops-production-test-signing-key-only",
 	"CORS_ALLOWED_ORIGINS=https://admin.fieldops.example",
 	"EVIDENCE_STORAGE_REGION=us-east-1",
@@ -23,6 +28,7 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("prod")
+@ExtendWith(OutputCaptureExtension.class)
 class ProductionProfileIT {
 
 	@Autowired
@@ -47,6 +53,15 @@ class ProductionProfileIT {
 	@Test
 	void generatedApiDocsAreDisabled() {
 		assertThat(mvc.get().uri("/v3/api-docs")).hasStatus(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void productionDoesNotLogLoginCredentialsEvenWithDebugEnabled(CapturedOutput output) {
+		String password = "fieldops-test-password-do-not-log";
+		assertThat(mvc.post().uri("/auth/login").contentType(MediaType.APPLICATION_JSON)
+			.content("{\"email\":\"login-log-test@fieldops.example\",\"password\":\"" + password + "\"}"))
+			.hasStatus(HttpStatus.UNAUTHORIZED);
+		assertThat(output.getAll()).doesNotContain(password);
 	}
 
 	@Test

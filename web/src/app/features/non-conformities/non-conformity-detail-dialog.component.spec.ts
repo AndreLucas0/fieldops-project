@@ -1,6 +1,7 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import type { Evidence, InspectionDetail, NonConformity } from '../../core/models/domain';
@@ -71,6 +72,7 @@ describe('NonConformityDetailDialogComponent', () => {
       imports: [NonConformityDetailDialogComponent],
       providers: [
         provideZonelessChangeDetection(),
+        provideRouter([]),
         { provide: MAT_DIALOG_DATA, useValue: { nonConformity } },
         { provide: MatDialogRef, useValue: { close: vi.fn() } },
         { provide: NonConformitiesService, useValue: nonConformities },

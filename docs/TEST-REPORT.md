@@ -13,6 +13,8 @@ Base `64b8b0a` e Docker Desktop Linux 27.4.0, Node 22.19.0 e Java 21.0.11.
 | API isolada · `node backend/scripts/smoke-release.mjs` | JAR com perfil `prod`, PostgreSQL 16 e MinIO. Após as migrações e a carga inicial de `db/seed.sql`, o fluxo executou por HTTP. Usou usuário, catálogo e modelo de demonstração. Verificou agendamento, atribuição, leitura pelo técnico, resolução de código QR, início, quatro respostas, evidência com coordenadas e leitura dos mesmos bytes pela URL assinada, encerramento, aprovação, pull e histórico. Reenvios de sync retornaram `ALREADY_APPLIED`. O reenvio da foto retornou 409 e a listagem manteve uma única evidência. |
 | Web via proxy | `GET /login` pelo servidor Angular retornou 200. Através do mesmo servidor, a API retornou `UP`, aceitou o login e listou a inspeção aprovada do cenário HTTP. |
 | Restauração PostgreSQL e imagem da API | `pg_dump -Fc` e `pg_restore --exit-on-error` foram executados em bancos separados de teste. Origem e cópia retornaram 14 migrações válidas, uma inspeção aprovada do cenário e uma evidência vinculada. `docker build` gerou a imagem `fieldops-api:mission-20261126`. Em execução como `10001:10001`, a imagem validou o schema restaurado, retornou `UP` e serviu a inspeção aprovada pelo endpoint autenticado. |
+| Compatibilidade de rollback | O JAR anterior, compilado de `64b8b0a`, iniciou sobre o banco restaurado, validou V1–V14 e serviu a mesma inspeção aprovada. Sua sonda sem JWT respondeu 401. O [plano AWS](AWS-DEPLOYMENT.md) registra a implicação para o target group. |
+| Interrupção da rede entre API e PostgreSQL | A sonda HTTP ficou sem resposta até o limite do cliente de 45 s, em vez de devolver 503 naquele intervalo. Após reconectar a rede isolada do teste, a mesma sonda voltou a responder `UP`. O timeout efetivo do ALB ainda precisa de validação em AWS. |
 
 O teste HTTP forneceu a imagem e as coordenadas como entradas de teste. A
 câmera, o leitor QR, o GPS, a desconexão real do dispositivo, a reinstalação e
@@ -21,9 +23,27 @@ O host de automação de navegador retornou indisponível, o que limitou a
 validação do painel ao build, à suíte e ao fluxo HTTP pelo proxy. A AWS precisa
 de credenciais válidas para verificar IAM, serviços gerenciados e rollback.
 
-O job `android-apk` da CI foi configurado para gerar `fieldops-android-demo`
-com dados simulados e assinatura do template para testes internos. A execução
-remota e o teste de instalação precisam de evidência. [Build de APKs com Expo](https://docs.expo.dev/build-reference/apk/)
+A execução [45907907227](https://github.com/AndreLucas0/fieldops-project/actions/runs/45907907227)
+passou nos quatro jobs da primeira revisão do PR #313. O APK daquela execução
+usava os dados simulados da configuração anterior. O job atual produz
+`fieldops-android-test` para ARM64 e x86-64, com assinatura de teste e API real
+definida pela variável `FIELDOPS_API_BASE_URL`. [Build de APKs com Expo](https://docs.expo.dev/build-reference/apk/)
+
+### Regressão das telas prioritárias após o PR #313
+
+Os testes verificam a rota de criação de modelos, a versão histórica pedida
+pela URL, a reabertura do rascunho, a criação de inspeção com atribuição
+imediata, a reatribuição e o filtro de auditoria. Os 444 testes mobile incluem
+persistência em outbox SQLite via doubles de teste, reconexão, rebase de
+conflitos, tratamento de permissões, scanner, GPS e fotografia. Não foi
+localizado emulador Android neste host.
+
+O Angular aprovou 327 testes e o build. O novo cenário HTTP passou contra a
+API real com PostgreSQL 16 e MinIO. Confirmou duas versões de um modelo,
+imutabilidade do snapshot original, uso do seletor pelo supervisor sem acesso
+à administração de usuários, troca de responsável, perda do acesso do técnico
+anterior, GPS na revisão, evidência por URL assinada e auditoria com filtro.
+Os resultados da revisão publicada ficam no [PR #315](https://github.com/AndreLucas0/fieldops-project/pull/315).
 
 ## Histórico de 24 e 25 de novembro de 2026
 

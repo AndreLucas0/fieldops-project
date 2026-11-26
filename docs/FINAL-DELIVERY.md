@@ -13,8 +13,14 @@ anterior permanecem abaixo como histórico.
 | 2. Requisitos e design | Foram preservados o [plano local](IMPLEMENTATION-PLAN.md), a [Definition of Done](definition-of-done.md), os [critérios de aceitação](criterios-de-aceitacao.md) e a [matriz de rastreabilidade](REQUIREMENTS-TRACEABILITY.md). O texto integral do anexo original da missão não estava acessível nesta retomada. A equivalência entre as fontes, eventuais requisitos exclusivos do anexo, o conteúdo acadêmico do Notion e a paridade visual autenticada com o Lovable seguem sem confirmação. |
 | 3. API e persistência | Teste do perfil `prod` cobre health check, CORS, autenticação e Swagger desabilitado. A suíte passou a usar PostgreSQL 16, como o Compose. A API executada aplicou V1–V14 em banco vazio. |
 | 4. Fluxo de inspeção | Um ciclo HTTP real em `prod` passou com logins, agendamento, atribuição, download, resolução de QR, localização fornecida no payload, foto, reenvios, aprovação e retorno por pull. O proxy do servidor Angular retornou a inspeção aprovada. A automação de navegador ficou indisponível. Captura física, SQLite e reconexão em aparelho Android continuam sem evidência ponta a ponta. |
-| 5. Preparação de produção | Imagem Java 21 construída e iniciada como usuário sem privilégios. Backup PostgreSQL restaurado em banco separado e a API iniciou sobre a restauração. O perfil AWS local retornou `InvalidClientTokenId` em `sts get-caller-identity`. Deploy, IAM, RDS, S3 gerenciado, publicação do OpenAPI e rollback em AWS seguem em aberto. |
-| 6. Integração | O incremento foi preparado na branch `task/fieldops-mission-20261126`, criada de `64b8b0a`. A publicação e o estado remoto são registrados em [progresso](../project-state/progress.md). |
+| 5. Preparação de produção | Imagem Java 21 construída e iniciada como usuário sem privilégios. Backup PostgreSQL restaurado em banco separado. As duas revisões da API serviram a inspeção restaurada localmente. O perfil AWS local retornou `InvalidClientTokenId` em `sts get-caller-identity`. Deploy, IAM, RDS, S3 gerenciado, publicação do OpenAPI e rollback em AWS seguem em aberto. |
+| 6. Integração | O PR #313 foi mesclado em `develop` em `b5af182`. O incremento funcional está no PR #315, com base em `7c0bd52`, que também contém o PR #310. [PR #313](https://github.com/AndreLucas0/fieldops-project/pull/313), [PR #315](https://github.com/AndreLucas0/fieldops-project/pull/315) |
+
+O incremento de frontend cobre a navegação FE-W01 a FE-W23. As mudanças nos
+fluxos de modelos, inspeções, não conformidades e auditoria e as lacunas de
+origem estão no [inventário atualizado](../project-state/pending-web.md).
+O seletor de agendamento expõe nomes e IDs de profissionais ativos ao
+supervisor. O cadastro completo de usuários continua restrito ao administrador.
 
 Os [resultados por componente](TEST-REPORT.md) distinguem o cenário HTTP do
 teste em aparelho exigido pelo AC-RELEASE. O export Android gera o bundle Expo.

@@ -81,9 +81,10 @@ Duas observações que valem para todo o restante do documento:
 | FE-W20 | Detalhe da inspeção | Web | ADMIN, SUPERVISOR | `/inspections/:inspectionId` | Consultar/editar planejamento |
 | FE-W21 | Revisão da inspeção | Web | SUPERVISOR | `/inspections/:inspectionId/review` | Aprovar/reprovar |
 | FE-W22 | Não conformidades — lista | Web | ADMIN, SUPERVISOR | `/non-conformities` | Consultar NCs de todas as inspeções |
-| FE-W23 | Auditoria | Web | ADMIN, SUPERVISOR | `/audit` | **[PENDÊNCIA]** sem endpoint (INC-05/PEND-08 do documento 20) |
+| FE-W23 | Auditoria | Web | ADMIN, SUPERVISOR | `/audit` | Consultar resumo de eventos administrativos |
 
-**Total: 37 telas** (14 mobile + 23 web). Nenhuma tela foi inventada além do que consta nos catálogos de origem — FE-W23 é mantida no inventário porque a rota está mapeada em `interface-admnistrativa-web.md` §14.3, mesmo sem contrato de API ainda; ver seção 21.
+**Total: 37 telas** (14 mobile + 23 web). A rota de auditoria já prevista em
+`interface-admnistrativa-web.md` §14.3 usa o endpoint `GET /audit-events`.
 
 ---
 
@@ -566,6 +567,7 @@ Formulário detalhado: seção 9.2.
 | Ação | Perfil | Endpoint | Payload | Comportamento da UI |
 |---|---|---|---|---|
 | Editar dados gerais | ADMIN, SUPERVISOR | `PUT /inspection-templates/{id}` | `InspectionTemplateUpdateRequest{title, description?, category}` | — |
+| Abrir nova versão | ADMIN, SUPERVISOR | `POST /inspection-templates/{id}/versions/draft` | — | Para modelo ativo, cria ou recupera um rascunho com a estrutura publicada. |
 | Criar seção | ADMIN, SUPERVISOR | `POST /inspection-templates/{id}/sections` | `TemplateSectionCreateRequest{title, description?, displayOrder}` | `409` se o modelo não tiver versão rascunho editável (RN-019) |
 | Editar seção | ADMIN, SUPERVISOR | `PUT .../sections/{sectionId}` | `TemplateSectionUpdateRequest` (mesmos campos) | — |
 | Reordenar seção | ADMIN, SUPERVISOR | `PUT .../sections/{sectionId}` (mudando `displayOrder`) | — | Arrastar-e-soltar é desejável mas não obrigatório — ordenação por botões "mover" ou campo numérico é aceitável (`interface-admnistrativa-web.md` §14.8, decisão de escopo) |
@@ -627,13 +629,13 @@ Não há ação de edição nesta tela — versões publicadas são imutáveis (
 
 **Objetivo:** agendar e atribuir (UC-06, AC-SCHEDULING). **Usuários autorizados:** ADMIN, SUPERVISOR. **Rota:** `/inspections/new`. **Pré-condições:** existir ao menos um modelo publicado, um cliente ativo e um técnico ativo.
 
-**Dados exibidos (para popular o formulário):** modelos publicados (`GET /inspection-templates?status=ACTIVE` + `GET .../versions`), clientes (`GET /clients`), locais filtrados por cliente (`GET /clients/{clientId}/sites`), equipamentos filtrados por local (`GET /sites/{siteId}/equipment`), técnicos ativos (`GET /users?role=TECHNICIAN&status=ACTIVE`).
+**Dados exibidos (para popular o formulário):** modelos publicados (`GET /inspection-templates?status=ACTIVE` + `GET .../versions`), clientes (`GET /clients`), locais filtrados por cliente (`GET /clients/{clientId}/sites`), equipamentos filtrados por local (`GET /sites/{siteId}/equipment`) e profissionais ativos (`GET /users/inspection-assignees?role=TECHNICIAN` ou `role=SUPERVISOR`).
 
 **Ações disponíveis:**
 
 | Ação | Perfil | Endpoint | Payload | Comportamento da UI |
 |---|---|---|---|---|
-| Agendar e atribuir | ADMIN, SUPERVISOR | `POST /inspections` | `InspectionCreateRequest` (seção 9.6) | `422` se versão não publicada, local fora do cliente, equipamento fora do local ou técnico inativo (AC-SCHEDULING); sucesso `201` → redireciona para FE-W20 |
+| Agendar e atribuir | ADMIN, SUPERVISOR | `POST /inspections` | `InspectionCreateRequest` com `assignImmediately: true` | `422` se versão não publicada, local fora do cliente, equipamento fora do local ou técnico inativo (AC-SCHEDULING); sucesso `201` → redireciona para FE-W20 |
 
 Formulário detalhado (combos encadeados): seção 9.6.
 
@@ -684,7 +686,7 @@ A interface **não permite** editar silenciosamente a resposta original do técn
 | Ação | Perfil | Endpoint | Comportamento da UI |
 |---|---|---|---|
 | Listar/filtrar por criticidade e inspeção | ADMIN, SUPERVISOR | `GET /non-conformities?severity=&inspectionId=&page=&size=&sort=` | Ambos os filtros são suportados pela API |
-| Consultar item relacionado | ADMIN, SUPERVISOR | `GET /non-conformities/{id}`, `GET /inspections/{inspectionId}`, `GET /inspections/{inspectionId}/evidence` | Abre detalhe somente leitura com item do checklist e evidências associadas. FE-W20 ainda não está implementada como rota e segue no backlog. |
+| Consultar item relacionado | ADMIN, SUPERVISOR | `GET /non-conformities/{id}`, `GET /inspections/{inspectionId}`, `GET /inspections/{inspectionId}/evidence` | Abre o item do checklist e as evidências associadas em consulta, com acesso ao detalhe da inspeção em FE-W20. |
 
 O acompanhamento completo de plano de ação é P2 (`interface-admnistrativa-web.md` §14.12) — fora do escopo desta tela no MVP.
 
@@ -694,7 +696,10 @@ O acompanhamento completo de plano de ação é P2 (`interface-admnistrativa-web
 
 **Objetivo (pretendido):** consulta de eventos de auditoria em nível administrativo, fora do escopo de uma única inspeção. **Usuários autorizados:** ADMIN, SUPERVISOR (por analogia com `perfis-de-usuario.md` §5.2, "Consultar auditoria"). **Rota:** `/audit` (mapeada em `interface-admnistrativa-web.md` §14.3). **Pré-condições:** N/A.
 
-**Status:** **[PENDÊNCIA]** — esta tela está prevista no mapa de navegação de origem, mas **não existe endpoint de auditoria global** em `openapi.yaml`/`api-rest.md` (apenas `GET /inspections/{inspectionId}/history`, escopado a uma inspeção — ver INC-05/PEND-08 do documento 20). Não é possível documentar dados exibidos, ações ou integração sem que essa lacuna seja resolvida primeiro. Recomenda-se que a equipe decida entre: (a) criar `GET /audit-events` com filtros administrativos, ou (b) remover esta rota do escopo do MVP e mantê-la como P1/P2. Repetida como PEND-F04 na seção 21.
+**Contrato:** `GET /audit-events` retorna um catálogo paginado, com filtros
+por ação e inspeção. Exibe data, ação, entidade, autor e inspeção relacionada.
+O catálogo protege dados detalhados de evento. O histórico específico
+continua em `GET /inspections/{inspectionId}/history`. Consulte `openapi.yaml`.
 
 ---
 
@@ -1761,7 +1766,7 @@ FE-W18/FE-W20 "Cancelar"  : {DRAFT, ASSIGNED, IN_PROGRESS, REJECTED} → CANCELE
 | Estado | Ações disponíveis |
 |---|---|
 | `DRAFT` (sem versão publicada, ou alterações após publicação anterior) | Editar dados gerais, criar/editar seções e itens (FE-W15), publicar (FE-W16) |
-| `ACTIVE` (ao menos uma versão publicada) | Ver versões (FE-W17); nova alteração de seção/item não é possível diretamente — precisa criar um novo ciclo de edição que gere nova versão ao publicar novamente (RN-020) — mecanismo exato de "reabrir para nova versão" **[A DEFINIR]**, ver PEND-F07 |
+| `ACTIVE` (ao menos uma versão publicada) | Ver versões (FE-W17) ou abrir **Editar nova versão** no construtor. Altera seções e itens no rascunho clonado e gera novo snapshot na publicação (RN-020). |
 | `INACTIVE` | Somente leitura; não aparece no seletor de FE-W19 |
 
 ## 17.3 `NonConformity` — ações por estado
@@ -1971,10 +1976,10 @@ Itens específicos de **composição de tela** descobertos na elaboração deste
 | PEND-F01 | Rota de criação/edição de Usuário não é definida em `interface-admnistrativa-web.md` §14.3; Cliente, Local e Equipamento foram definidos como modais sobre as listas | `interface-admnistrativa-web.md` §14.3 vs. §14.6–14.7 | FE-W04/06/09/12 usam modal sobre `/users`, `/clients`, `/sites` e `/equipment` | Nenhum (mesmos endpoints `POST`/`PUT`) | **Resolvida — modal para os quatro formulários** |
 | PEND-F02 | Comportamento do logout mobile (FE-M05) quando existem operações pendentes na outbox | `aplicativo-mobile.md` §13.4 (silente sobre esse cruzamento) | Define se o logout bloqueia, avisa ou é silencioso nesse caso | Nenhum — é decisão 100% client-side | **[A DEFINIR]** |
 | PEND-F03 | Regra que decide, na divergência de equipamento no scanner (FE-M11) ou na tela de início (FE-M07), entre "exigir confirmação" e "bloquear" | `regras-de-negocio.md` RN-064 (menciona ambas as alternativas sem definir quando cada uma se aplica), `criterios-de-aceitacao.md` §17.11 | Define se a tela de scanner tem um modal de confirmação ou uma tela de bloqueio | Define se a regra é parametrizada por modelo/inspeção ou fixa no sistema | **[DECISÃO NECESSÁRIA]** |
-| PEND-F04 | Tela FE-W23 (Auditoria) sem endpoint correspondente | Repetição de INC-05/PEND-08 do documento 20, aplicada especificamente à composição desta tela | Tela não pode ser especificada em detalhe (dados exibidos, filtros) até a lacuna de backend ser resolvida | Precisa de `GET /audit-events` (ou equivalente) com filtros administrativos | **[PENDÊNCIA]** |
+| PEND-F04 | Consulta administrativa de auditoria | INC-05/PEND-08 | FE-W23 usa o catálogo paginado | `GET /audit-events` com autorização e filtros | **Resolvida no contrato local** |
 | PEND-F05 | Como o frontend de FE-W19 sabe, antes de o usuário escolher, se o modelo selecionado exige equipamento (para tornar o campo obrigatório) — `InspectionTemplate`/`InspectionTemplateVersion` não tem um campo explícito tipo `requiresEquipment` | `modelo-de-dados.md` §10.7 (ausente), `regras-de-negocio.md` RN-026 (regra existe, mas não diz onde ela é declarada no modelo) | Define se o campo é sempre exibido como opcional na UI (e a validação de obrigatoriedade só aparece como erro do servidor após submissão) ou se existe um sinalizador a ser consumido antes | Precisa de um campo adicional em `InspectionTemplate`/`Version`, ou aceitar validação somente no submit | **[DECISÃO NECESSÁRIA]** |
 | PEND-F06 | Existência (ou não) de sincronização periódica em background no mobile, além dos gatilhos manuais/de conectividade | `aplicativo-mobile.md` §13.7 (menciona "acionar sincronização de forma controlada", sem detalhar periodicidade) | Define se há um serviço em background/worker a implementar | Nenhum impacto direto na API (mesmos endpoints, apenas frequência de chamada) | **[A DEFINIR]** |
-| PEND-F07 | Mecanismo de UI para "reabrir" um `InspectionTemplate` já `ACTIVE` (com versão publicada) para produzir uma nova versão — o contrato não tem um endpoint de "reabrir"; os endpoints de seção/item já operam implicitamente sobre uma versão rascunho (decisão de normalização #3), mas não está claro na documentação de origem como uma nova rodada de edição é iniciada após a primeira publicação | `regras-de-negocio.md` RN-020 (nova versão ao alterar, sem detalhar o gatilho de UI), `openapi.yaml` (endpoints de seção/item sempre "sobre a versão DRAFT", sem descrever criação de uma nova versão DRAFT a partir de uma já publicada) | FE-W15 precisa de um botão/fluxo "editar nova versão" cujo endpoint de suporte não está claramente definido | Pode exigir um novo endpoint (`POST /inspection-templates/{id}/versions/draft` ou similar) | **[DECISÃO NECESSÁRIA]** |
+| PEND-F07 | Reabrir um modelo publicado para montar uma nova versão | RN-020 | FE-W15 oferece **Editar nova versão** | `POST /inspection-templates/{id}/versions/draft` | **Resolvida no contrato local** |
 | PEND-F08 | Máscaras de campo (telefone, documento/CNPJ-CPF, CEP) não são especificadas em nenhum documento | `modelo-de-dados.md` §10.5 (campos declarados como `string`, sem formato) | Define os componentes de máscara em FE-W04/06/09 | Nenhum — validação de formato não é normativa na API além de `string` | **[A DEFINIR]** |
 | PEND-F09 | Se a listagem de inspeções (FE-W18) exibe progresso (respondidos/total) na própria linha da tabela, o que exigiria uma chamada adicional por linha ou um campo agregado que não existe em `Inspection`/`InspectionPage` (só em `InspectionDetail.items`/`responses`) | `interface-admnistrativa-web.md` §14.10 (lista "progresso, quando disponível" como coluna, sem garantir a fonte) | Define se a coluna existe na lista ou só no detalhe | Pode exigir um campo agregado (`answeredCount`/`totalCount`) em `Inspection`/`InspectionPage` | **[DECISÃO NECESSÁRIA]** |
 
@@ -1998,7 +2003,7 @@ Checklist de autorrevisão deste documento, seguindo os critérios do enunciado.
 - [x] Nomes de campo consistentes com o backend — todos os nomes desta seção 5/6 foram copiados de `openapi.yaml`, não reescritos.
 - [x] Enums consistentes com o backend — seção 5/6 usa os mesmos enums do documento 20 §7.2, sem introduzir valores novos.
 - [x] Regras de negócio não foram alteradas — toda regra citada aponta para o `RN-XXX` de origem; nenhuma regra nova foi inventada, apenas sua consequência de UI foi descrita.
-- [ ] **Não existem telas sem suporte no backend** — **ressalva:** FE-W23 (Auditoria) é a exceção conhecida e sinalizada (PEND-F04); todas as demais 36 telas têm suporte de endpoint documentado.
+- [x] **As telas do inventário têm endpoint documentado.** FE-W23 usa `GET /audit-events`.
 - [x] Endpoints sem consumidor identificado foram sinalizados — seção 19 (`PATCH /non-conformities/{id}/status`).
 - [x] Fluxos mobile offline documentados — seção 16 (e seção 3 por tela, seção 7.4–7.6 para fluxos passo a passo).
 - [x] Upload/evidências documentados — seção 15 (mobile) e referências no documento 20 §10 (limites ainda pendentes, PEND-16).
@@ -2006,5 +2011,5 @@ Checklist de autorrevisão deste documento, seguindo os critérios do enunciado.
 
 ## Resumo das duas ressalvas acima
 
-1. **FE-W23 (Auditoria)** é a única tela do inventário sem contrato de API. Recomenda-se removê-la do escopo do MVP ou resolver PEND-08/PEND-F04 antes de alocar trabalho de frontend a ela.
+1. **FE-W23 (Auditoria)** usa o catálogo administrativo documentado. O histórico detalhado continua restrito à consulta por inspeção.
 2. Nenhuma das 9 pendências específicas de tela (PEND-F01–F09) impede que as outras 35 telas comecem a ser construídas hoje contra `openapi.yaml` — elas afetam apenas decisões de componente isoladas (modal vs. rota, máscara de campo, coluna de progresso), não o contrato de dados em si.

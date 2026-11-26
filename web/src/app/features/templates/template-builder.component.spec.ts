@@ -84,12 +84,17 @@ describe('TemplateBuilderComponent', () => {
     expect(conteudo).toContain('Seleção única');
   });
 
-  it('modelo ACTIVE mostra o aviso de bloqueio e esconde as ações de edição', () => {
+  it('modelo ACTIVE oferece nova versão e só habilita edição depois de abrir o rascunho', () => {
     const fixture = setup(TEMPLATE_IDS.seguranca);
-    const conteudo = texto(fixture);
-
-    expect(conteudo).toContain('não podem ser editados aqui');
-    expect(conteudo).not.toContain('Nova seção');
+    const templates = TestBed.inject(TemplatesService);
+    const openDraft = vi.spyOn(templates, 'openDraft');
+    expect(texto(fixture)).not.toContain('Nova seção');
+    const button = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'))
+      .find(element => element.textContent?.includes('Editar nova versão'))!;
+    button.click();
+    fixture.detectChanges();
+    expect(openDraft).toHaveBeenCalledWith(TEMPLATE_IDS.seguranca);
+    expect(texto(fixture)).toContain('Nova seção');
   });
 
   it('sem permissão de escrita, as ações de edição ficam escondidas mesmo em modelo DRAFT', () => {

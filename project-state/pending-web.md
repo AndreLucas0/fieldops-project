@@ -1,5 +1,24 @@
 # Web — Inventário de Telas e Status de Integração
 
+## Retomada de 26 de novembro de 2026
+
+O catálogo oficial verificado é [FE-W01 a FE-W23](../docs/telas-frontend.md).
+Mantivemos os fluxos e componentes dos colaboradores. Login, painel, usuários,
+clientes, locais e equipamentos mantêm as rotas e os formulários já integrados
+e o ambiente web usa a API real por padrão. A redefinição de senha ainda
+depende do mecanismo previsto no PEND-01 do contrato.
+
+| Telas | Incremento da retomada |
+|---|---|
+| FE-W13–FE-W17 | Rota do formulário de criação restabelecida. Construtor pode abrir rascunho a partir de uma publicação, preservando os snapshots históricos. Prévia distingue rascunho, versão atual e versão histórica selecionada. Histórico de versões voltou à navegação. |
+| FE-W18–FE-W21 | O agendamento confirma atribuição e snapshot no mesmo `POST`. O seletor permite ao supervisor consultar só nomes e IDs dos profissionais ativos. O detalhe permite atribuir ou reatribuir em `DRAFT`/`ASSIGNED`. A API valida vínculo cliente/local/equipamento e bloqueia edição fora dos estados de planejamento. A revisão exibe GPS do início e da conclusão quando registrado. |
+| FE-W22–FE-W23 | O modal de não conformidade abre a inspeção relacionada. `/audit` consulta eventos paginados e filtráveis por ação e inspeção, com acesso ADMIN/SUPERVISOR. O catálogo omite payloads e metadados. |
+
+O Notion retornou 404 ao conector para o UUID da página. A automação de
+navegador permaneceu indisponível para comparar os fluxos autenticados do
+Lovable. A matriz cobre o contrato local. A sinalização de equipamento
+obrigatório por modelo (PEND-F05) ainda depende do modelo de dados oficial.
+
 **Atualização 2026-11-04:** o inventário histórico abaixo é superado pelo
 [registro de recuperação](recovery-validation-20261104.md). Shell e navegação
 estão implementados; FE-W14/16/17 agora têm componentes/rotas; FE-W18/19/20/21

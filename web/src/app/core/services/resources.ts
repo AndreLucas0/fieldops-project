@@ -52,6 +52,9 @@ export type UserFilters = {
   status?: UserStatus;
 };
 
+export type InspectionAssignee = Pick<User, 'id' | 'name'>;
+export type InspectionAssigneeRole = Extract<UserRole, 'TECHNICIAN' | 'SUPERVISOR'>;
+
 export type ClientFilters = { name?: string; status?: 'ACTIVE' | 'INACTIVE' };
 export type SiteFilters = { name?: string; clientId?: Uuid };
 export type EquipmentFilters = { name?: string; siteId?: Uuid; status?: EquipmentStatus };
@@ -71,10 +74,13 @@ export type InspectionFilters = {
   overdue?: boolean;
 };
 
+export type InspectionCreateInput = Partial<Inspection> & { assignImmediately?: boolean };
+
 // ------------------------------------------------------------ contratos
 
 export abstract class UsersService {
   abstract list(query?: PageQuery<UserFilters>): Observable<Page<User>>;
+  abstract listInspectionAssignees(role: InspectionAssigneeRole, query?: PageQuery): Observable<Page<InspectionAssignee>>;
   abstract get(id: Uuid): Observable<User>;
   abstract create(input: Partial<User> & { password?: string }): Observable<User>;
   abstract update(id: Uuid, input: Partial<User>): Observable<User>;
@@ -181,6 +187,8 @@ export abstract class TemplatesService {
     templateId: Uuid,
   ): Observable<TemplateSectionDetail[]>;
 
+  abstract openDraft(templateId: Uuid): Observable<TemplateSectionDetail[]>;
+
   /** 409 se o modelo não tiver uma versão rascunho editável (RN-019). */
   abstract createSection(
     templateId: Uuid,
@@ -212,8 +220,9 @@ export abstract class InspectionsService {
   abstract list(query?: PageQuery<InspectionFilters>): Observable<Page<Inspection>>;
   abstract get(id: Uuid): Observable<InspectionDetail>;
   abstract history(id: Uuid, query?: PageQuery): Observable<Page<AuditEvent>>;
-  abstract create(input: Partial<Inspection>): Observable<Inspection>;
+  abstract create(input: InspectionCreateInput): Observable<Inspection>;
   abstract update(id: Uuid, input: Partial<Inspection>): Observable<Inspection>;
+  abstract assign(id: Uuid, technicianId: Uuid): Observable<Inspection>;
   abstract cancel(id: Uuid, reason: string): Observable<Inspection>;
   abstract beginReview(id: Uuid): Observable<Inspection>;
   abstract approve(id: Uuid, comments?: string): Observable<Inspection>;
@@ -240,6 +249,11 @@ export class HttpUsersService extends UsersService {
 
   list(query: PageQuery<UserFilters> = {}) {
     return this.api.getPage<User, UserFilters>('/users', query);
+  }
+  listInspectionAssignees(role: InspectionAssigneeRole, query: PageQuery = {}) {
+    return this.api.getPage<InspectionAssignee, { role: InspectionAssigneeRole }>(
+      '/users/inspection-assignees', { ...query, role },
+    );
   }
   get(id: Uuid) {
     return this.api.get<User>(`/users/${id}`);
@@ -370,6 +384,10 @@ export class HttpTemplatesService extends TemplatesService {
       .get<TemplateSectionDetail[]>(`/inspection-templates/${templateId}/sections`)
       .pipe(map(normalizeSections));
   }
+
+  openDraft(templateId: Uuid) {
+    return this.api.post<TemplateSectionDetail[]>(`/inspection-templates/${templateId}/versions/draft`);
+  }
   createSection(templateId: Uuid, input: Partial<TemplateSection>) {
     return this.api.post<TemplateSectionDetail>(
       `/inspection-templates/${templateId}/sections`,
@@ -406,11 +424,14 @@ export class HttpInspectionsService extends InspectionsService {
   history(id: Uuid, query: PageQuery = {}) {
     return this.api.getPage<AuditEvent>(`/inspections/${id}/history`, query);
   }
-  create(input: Partial<Inspection>) {
+  create(input: InspectionCreateInput) {
     return this.api.post<Inspection>('/inspections', input);
   }
   update(id: Uuid, input: Partial<Inspection>) {
     return this.api.put<Inspection>(`/inspections/${id}`, input);
+  }
+  assign(id: Uuid, technicianId: Uuid) {
+    return this.api.post<Inspection>(`/inspections/${id}/assign`, { technicianId });
   }
   cancel(id: Uuid, reason: string) {
     return this.api.post<Inspection>(`/inspections/${id}/cancel`, { reason });

@@ -23,6 +23,13 @@ management:
       show-details: never
       show-components: never
 
+logging:
+  level:
+    org.springframework.web.servlet.mvc.method.annotation: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN
+    software.amazon.awssdk.request: INFO
+
 fieldops:
   security:
     jwt:

@@ -37,14 +37,9 @@ function readNumber(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-/**
- * O mock fica ligado por padrão: enquanto a API não sobe, o app precisa abrir
- * e navegar por completo. Para falar com o backend de verdade, defina
- * `EXPO_PUBLIC_API_MOCK=false` no `.env`.
- */
 const defaults: ApiConfig = {
   baseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? DEFAULT_BASE_URL,
-  mockEnabled: readFlag(process.env.EXPO_PUBLIC_API_MOCK, true),
+  mockEnabled: process.env.NODE_ENV === 'test' && readFlag(process.env.EXPO_PUBLIC_API_MOCK, false),
   mockLatencyMs: readNumber(process.env.EXPO_PUBLIC_API_MOCK_LATENCY_MS, DEFAULT_MOCK_LATENCY_MS),
   timeoutMs: readNumber(process.env.EXPO_PUBLIC_API_TIMEOUT_MS, DEFAULT_TIMEOUT_MS),
 };
